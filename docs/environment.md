@@ -1,5 +1,7 @@
 # 现有资产和工具核验（2026-09-23 UTC）
 
+> 本文记录 2026-09-23 至 09-28 的旧 Linux 工作区观察，不能当作 2026-09-28 Windows 接手时的当前状态。本机事实、Git 新历史及执行证据见 `docs/CODEX-HANDOFF.md` 与 `docs/evidence/T010-windows-2026-09-28.md`。
+
 ## 来源盘点
 
 当前工作目录启动时只有 `.codex/` 占位；`rg --files` 无业务文件，`git status` 报 `not a git repository`。没有可读的仓库、项目配置或已提交前端。本轮初始化了新的本地 Git 仓库，未有远端。另一本地工作区存在 `edgevision-studio-frontend.zip`，原始 SHA-256 为 `c6f5bb8f8fc561e52caf69f32439c2d0505801f2f85d33191657987d4a964f41`，已复制到 `reference/`，没有修改原文件。另有较早的前端需求文本和示例图片；本轮最新范围优先。没有收到独立的「附带基线」文件，冻结依据是本轮用户指令与先前 2026-09-22 确认的设计约束。

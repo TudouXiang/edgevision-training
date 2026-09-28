@@ -12,6 +12,13 @@ WEB = ROOT / "web"
 COMMANDS = ("doctor", "migrate", "api", "worker", "web", "contract-generate", "contract-check", "check")
 
 
+def optional_port(name: str) -> str | None:
+    value = os.environ.get(name)
+    if value is not None and (not value.isdecimal() or not 1 <= int(value) <= 65535):
+        raise ValueError(f"{name} must be a valid TCP port")
+    return value
+
+
 def backend_python() -> str | None:
     executable = BACKEND / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     if not executable.is_file():
@@ -40,7 +47,12 @@ def main(argv: list[str]) -> int:
     if action == "doctor":
         return run(ROOT, backend_python() or sys.executable, str(ROOT / "scripts" / "doctor.py"))
     if action == "web":
-        return run(WEB, "npm", "run", "dev")
+        try:
+            port = optional_port("EDGEVISION_DEV_WEB_PORT")
+        except ValueError as exc:
+            print(exc, file=sys.stderr)
+            return 2
+        return run(WEB, "npm", "run", "dev", *(("--", "--port", port, "--strictPort") if port else ()))
     python = backend_python()
     if not python:
         return 127
@@ -53,7 +65,12 @@ def main(argv: list[str]) -> int:
     if action == "migrate":
         return run(BACKEND, python, "-m", "alembic", "upgrade", "head")
     if action == "api":
-        return run(BACKEND, python, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000")
+        try:
+            port = optional_port("EDGEVISION_DEV_API_PORT") or "8000"
+        except ValueError as exc:
+            print(exc, file=sys.stderr)
+            return 2
+        return run(BACKEND, python, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", port)
     if action == "worker":
         return run(BACKEND, python, "-m", "app.worker")
     if action in ("contract-generate", "contract-check"):

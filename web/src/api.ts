@@ -1,4 +1,8 @@
-import type { Capabilities, LiveResponse, ReadyResponse } from '../../contracts/api'
+import type { components } from '../../contracts/generated/openapi'
+
+type LiveResponse = components['schemas']['LiveResponse']
+type ReadyResponse = components['schemas']['ReadyResponse']
+export type Capabilities = components['schemas']['CapabilitiesResponse']
 
 async function get<T>(path: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(`/api/v1${path}`, { credentials: 'same-origin', signal })

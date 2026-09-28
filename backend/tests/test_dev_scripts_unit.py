@@ -70,6 +70,24 @@ class InstallCommandTests(unittest.TestCase):
         self.assertEqual(kwargs["cwd"], ROOT / "web")
         self.assertFalse(kwargs.get("shell", False))
 
+    def test_api_and_web_port_overrides_keep_local_entrypoints(self):
+        dev = load_script("dev")
+        with patch.dict(os.environ, {"EDGEVISION_DEV_API_PORT": "18000", "EDGEVISION_DEV_WEB_PORT": "15173"}), patch.object(
+            dev, "backend_python", return_value="C:\\backend\\python.exe"
+        ), patch.object(dev, "run", return_value=0) as runner:
+            self.assertEqual(dev.main(["api"]), 0)
+            self.assertEqual(runner.call_args.args[-2:], ("--port", "18000"))
+            self.assertEqual(dev.main(["web"]), 0)
+            self.assertEqual(runner.call_args.args[-4:], ("--", "--port", "15173", "--strictPort"))
+
+    def test_invalid_port_stops_before_launch(self):
+        dev = load_script("dev")
+        with patch.dict(os.environ, {"EDGEVISION_DEV_API_PORT": "18000 --reload"}), patch.object(
+            dev, "backend_python", return_value="C:\\backend\\python.exe"
+        ), patch.object(dev, "run") as runner, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(dev.main(["api"]), 2)
+            runner.assert_not_called()
+
 
 class WorkerLockTests(unittest.TestCase):
     def test_second_worker_cannot_hold_lock(self):
@@ -85,7 +103,7 @@ class WorkerLockTests(unittest.TestCase):
         job_id = str(uuid4())
         with tempfile.TemporaryDirectory() as directory:
             db_path = Path(directory) / "platform.db"
-            with sqlite3.connect(db_path) as db:
+            with contextlib.closing(sqlite3.connect(db_path)) as db, db:
                 db.execute("CREATE TABLE alembic_version (version_num TEXT)")
                 db.execute("INSERT INTO alembic_version VALUES ('0002_foundation')")
                 db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT)")
@@ -94,7 +112,7 @@ class WorkerLockTests(unittest.TestCase):
             environment = {**os.environ, "PLATFORM_DATA_ROOT": directory}
             first = subprocess.run([sys.executable, "-m", "app.worker", "--once"], cwd=ROOT / "backend", env=environment, capture_output=True, text=True, timeout=10)
             self.assertEqual(first.returncode, 0, first.stderr)
-            with sqlite3.connect(db_path) as db:
+            with contextlib.closing(sqlite3.connect(db_path)) as db, db:
                 self.assertEqual(db.execute("SELECT status,error_code FROM jobs WHERE id=?", (job_id,)).fetchone(), ("failed", "UNSUPPORTED_JOB"))
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM job_events WHERE job_id=?", (job_id,)).fetchone()[0], 2)
                 db.execute("INSERT INTO jobs (id,status,created_at) VALUES (?,?,?)", (str(uuid4()), "running", "2026-09-28T00:00:01Z"))

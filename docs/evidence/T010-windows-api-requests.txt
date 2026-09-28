@@ -1,0 +1,19 @@
+INFO:     127.0.0.1:58565 - "GET /api/v1/health/live HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58570 - "GET /api/v1/health/ready HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:58572 - "GET /api/v1/capabilities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58575 - "POST /api/v1/auth/login HTTP/1.1" 501 Not Implemented
+INFO:     127.0.0.1:58577 - "POST /api/v1/auth/login HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:58579 - "GET /api/v1/unknown-path HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:50977 - "GET / HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49694 - "GET /api/v1/health/ready HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65140 - "GET /api/v1/health/live HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65143 - "GET /api/v1/health/ready HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55622 - "GET /api/v1/health/live HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55623 - "GET /api/v1/health/ready HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55624 - "GET /api/v1/capabilities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58203 - "GET /api/v1/health/live HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58205 - "GET /api/v1/health/ready HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58206 - "GET /api/v1/capabilities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51412 - "GET /api/v1/health/live HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51415 - "GET /api/v1/health/ready HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51417 - "GET /api/v1/capabilities HTTP/1.1" 200 OK

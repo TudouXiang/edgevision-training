@@ -19,7 +19,7 @@ else:
 
 from .config import data_root
 from .contracts import JobState, require_transition
-from .database import connect, database_ready
+from .database import database_ready, transaction
 
 
 def now() -> str:
@@ -33,7 +33,7 @@ def event(connection, job_id: str, status: str) -> None:
 
 def orphaned_jobs() -> list[str]:
     """Fail closed: T040 must prove old child identity and exit before recovery."""
-    with connect() as connection:
+    with transaction() as connection:
         rows = connection.execute("SELECT id FROM jobs WHERE status IN ('running','cancelling')").fetchall()
         return [row["id"] for row in rows]
 
@@ -92,7 +92,7 @@ def stop_child(child: subprocess.Popen, force: bool = False) -> None:
 
 
 def claim(worker_instance: str, boot_id: str) -> tuple[str, str] | None:
-    with connect() as connection:
+    with transaction() as connection:
         connection.execute("BEGIN IMMEDIATE")
         if connection.execute("SELECT 1 FROM jobs WHERE status IN ('running','cancelling') LIMIT 1").fetchone():
             return None
@@ -119,7 +119,7 @@ def process(job_id: str, run_id: str) -> None:
     options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
     child = subprocess.Popen([sys.executable, "-m", "app.task_process", job_id], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **options)
     try:
-        with connect() as connection:
+        with transaction() as connection:
             connection.execute("UPDATE jobs SET child_pid=?,child_pgid=? WHERE id=? AND run_id=? AND status='running'", (child.pid, child.pid, job_id, run_id))
     except Exception:
         if child.poll() is None:
@@ -128,7 +128,7 @@ def process(job_id: str, run_id: str) -> None:
         raise
     cancellation_at = None
     while child.poll() is None:
-        with connect() as connection:
+        with transaction() as connection:
             row = connection.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
             if row and row["status"] == "cancelling" and cancellation_at is None:
                 stop_child(child)
@@ -138,7 +138,7 @@ def process(job_id: str, run_id: str) -> None:
             connection.execute("UPDATE jobs SET heartbeat_at=? WHERE id=? AND status IN ('running','cancelling')", (now(), job_id))
         time.sleep(0.25)
     child.wait()
-    with connect() as connection:
+    with transaction() as connection:
         row = connection.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
         cancelled = bool(row and row["status"] == "cancelling")
         # A zero exit is not sufficient for success: adapters must register validated evidence first.

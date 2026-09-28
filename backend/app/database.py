@@ -1,5 +1,7 @@
 import sqlite3
+from contextlib import closing, contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from .config import db_path
 
@@ -15,12 +17,19 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     return connection
 
 
+@contextmanager
+def transaction(path: Path | None = None) -> Iterator[sqlite3.Connection]:
+    with closing(connect(path)) as connection:
+        with connection:
+            yield connection
+
+
 def database_ready() -> bool:
     path = db_path()
     if not path.is_file():
         return False
     try:
-        with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=1) as connection:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=1)) as connection:
             row = connection.execute("SELECT version_num FROM alembic_version").fetchone()
             return bool(row and row[0] == SCHEMA_VERSION)
     except sqlite3.Error:

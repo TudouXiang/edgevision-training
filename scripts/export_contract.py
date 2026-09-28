@@ -23,7 +23,7 @@ def render(schema_path: Path, type_path: Path) -> None:
 
     schema_path.parent.mkdir(parents=True, exist_ok=True)
     type_path.parent.mkdir(parents=True, exist_ok=True)
-    schema_path.write_text(json.dumps(app.openapi(), sort_keys=True, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    schema_path.write_bytes((json.dumps(app.openapi(), sort_keys=True, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
     if not GENERATOR.is_file():
         raise RuntimeError("Missing project-local openapi-typescript; run cd web && npm ci first")
     node = shutil.which("node")

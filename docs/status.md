@@ -1,8 +1,12 @@
-# 项目状态 · review_required（更新至 2026-09-28 UTC）
+# 项目状态 · review_required（更新至 2026-09-28 Asia/Shanghai）
 
-目标仓库本地 main，接入前基线 57920e6；上传 ZIP 仍在 upload/ 且未纳入项目提交。当前范围仅 T000/T010，结果送独立审查；T020 **blocked**，未开始。详细实际执行结果见 docs/evidence/foundation-report.md。M0 的盘点完成但 ML_CHECK_PENDING；M1 的 A01–A04 尚未全部通过，不能宣称地基验收通过。
+当前 Windows 工作区为 `D:\WorkSpace\edgevision-foundation`。收到的是没有 `.git` 和原交接文档的源码快照，原 Work 仓库 `d5eade0` 的历史、未提交差异及远端状态无法验证；按用户授权新建 `main` 历史，根提交 `bcf0642bc7dcc7e2ab7da3b4dd7d9f21e7710bd6`。原 Linux 记录描述的是另一工作区，不应视作当前 Git 历史。当前范围仍为 T000/T010；T020 **blocked**。接手事实见 `docs/CODEX-HANDOFF.md`。
 
-2026-09-28 新增 Linux/Windows 项目级依赖安装与统一开发入口，见 README、ADR 0006 与 `docs/evidence/portable-bootstrap-2026-09-28.md`。本容器 Linux 预检、离线脚本/Worker 负向测试与前端构建通过；**真正依赖安装、本版本迁移、API HTTP 与 Windows 实机均未执行**，A01–A04 与 T020 状态不变。下表记录 2026-09-23 地基阶段已有资产及当时证据，不能以新增脚本覆盖其待补项。
+Windows 本机使用项目现有 `.venv` 和 `node_modules` 完成隔离空库迁移两次、代表性 `0001` 副本升级、OpenAPI/TS 生成与漂移检查、后端测试、前端构建、真实 API/Web HTTP、浏览器窄屏/键盘/刷新/断线检查；A01–A04 为 **PASS 候选**，执行命令、退出码和边界见 `docs/evidence/T010-windows-2026-09-28.md`。这不等于 T010 已获独立审查，也不表示实际重装依赖、真实旧用户库升级或 ML 链路已验证。T010 保持 `review_required`；M1 暂不标 accepted。`backend/uv.lock` 和生成契约已纳入本机候选基线。
+
+## 历史 Linux 工作区记录
+
+以下表格和命令结论属于 2026-09-23 至 09-28 的 Linux 隔离工作区，当时的 FastAPI/迁移/Windows 未执行结论仍保留作原始证据，当前本机结果以上述 Windows 报告为准。Linux 跨平台入口记录见 `docs/evidence/portable-bootstrap-2026-09-28.md`，地基报告见 `docs/evidence/foundation-report.md`。
 
 | 模块 | 源码存在 | 本轮实际构建/运行 | 真实业务后端接入 | 验收 |
 | --- | --- | --- | --- | --- |
@@ -21,9 +25,9 @@
 
 ## 待审查与领取闸门
 
-1. 在有可信 Python 包源的开发环境锁定 uv.lock，并仅对**临时空库和原 0001 数据库副本**运行两次 Alembic 升级、检查外键/约束、执行 pytest；本轮没有执行，不能以用户旧版启动日志抵充。
-2. 运行 contract-generate + contract-check，审查 OpenAPI，提交生成 TS 后用生成类型替换现有健康接口的临时手写桥接；当前无生成产物。
-3. 同时运行新版 API 与前端，在能访问 localhost 的浏览器检查空态、路由、断线、键盘与窄屏；本轮仅通过构建与同进程 HTTP 200。
+1. 独立审查本次 Windows 代码差异、生成契约、迁移与 HTTP/浏览器证据，核对 A01–A04 及 M1 条件；未通过项继续补证，不因本报告为 PASS 候选自动标 accepted。
+2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。重新安装依赖也尚未执行，已有项目环境的可运行性与可重装性分开判断。
+3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。
 
-T000/T010 代码与文档交付状态为 review_required，A01–A04 没有满足完整通过条件；在审查与补证前 T020 仍 blocked。审查后另行放行，勿自动进入身份/项目业务开发。
+T000/T010 代码与文档交付状态为 `review_required`；A01–A04 的 Windows 实测结果待独立审查。审查正式放行前 T020 仍 `blocked`，勿自动进入身份/项目业务开发。

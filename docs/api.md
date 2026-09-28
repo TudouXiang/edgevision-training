@@ -1,6 +1,6 @@
 # HTTP 契约 V0.1 · T010 候选
 
-唯一机器可读来源：backend/app/schemas.py 与 backend/app/main.py 生成 FastAPI OpenAPI，生成入口见 scripts/export_contract.py。本文件解释语义；本执行容器无法导入 FastAPI，contracts/openapi.json 与 contracts/generated/openapi.ts 尚未生成，A03 仍未通过。旧 contracts/api.ts 只为已有健康页面保留临时类型，后续须替换。
+唯一机器可读来源：backend/app/schemas.py 与 backend/app/main.py 生成 FastAPI OpenAPI，生成入口见 scripts/export_contract.py。本文件解释语义。Windows 本机已生成 `contracts/openapi.json` 与 `contracts/generated/openapi.ts`，`contract-check` 通过，健康页面已改用生成类型；A03 是待独立审查的 PASS 候选，证据见 `docs/evidence/T010-windows-2026-09-28.md`。旧 Linux 容器缺 FastAPI 的记录仍见原报告。
 
 根 /api/v1，时间带时区 UTC ISO 8601、UUID、snake_case。成功直接返回 DTO；列表为 items、total、page、page_size，page 从 1 起且 page_size 1–100。增量日志/指标返回 items、next_cursor、eof、job_state，limit 1–500，游标绑定单 Job 且单调；轮询间隔约 2 秒，失败退避，终态最后拉取一次。V1 不使用 SSE。
 

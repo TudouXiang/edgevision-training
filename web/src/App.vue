@@ -8,7 +8,7 @@ import {
   PackageCheck, RefreshCw, ScanEye, Server, ShieldCheck, SlidersHorizontal, X,
 } from '@lucide/vue'
 import { checkSystem } from './api'
-import type { Capabilities } from '../../contracts/api'
+import type { Capabilities } from './api'
 
 type StageKey = 'overview' | 'projects' | 'datasets' | 'training' | 'models' | 'onnx' | 'inference' | 'deployment'
 type FeatureKey = keyof Capabilities['features']

@@ -1,6 +1,6 @@
 # T010：可启动骨架与精确契约
 
-执行者：GPT6。前置：T000 实际盘点；用户授权在目标仓库内搭建骨架。状态：review_required（A01–A04 尚未全通过，详见 `docs/evidence/foundation-report.md`）；独立补证/审查前不能放行 T020。
+执行者：GPT6/Codex。前置：T000 实际盘点；用户授权在目标仓库内搭建骨架。状态：review_required（Windows A01–A04 为 PASS 候选，见 `docs/evidence/T010-windows-2026-09-28.md`；此前 Linux 未通过项见 `docs/evidence/foundation-report.md`）；独立审查前不能放行 T020。
 
 ## 目标
 
@@ -29,4 +29,4 @@
 
 执行A01-A04；基础测试实际运行，前端构建通过且浏览器核验最小壳。浏览器环境不可用记NOT_RUN，不能宣称完全验收。隔离环境内迁移/类型生成可重复运行，未实现路径不会误报成功。
 
-输出 docs/evidence/foundation-report.md，记命令、退出码、版本/工作区指纹、产物、失败/未执行、阻塞与T020可领取条件；更新status。完成后停止在review_required，由独立审查放行，不进入T020。
+输出 docs/evidence/foundation-report.md 及本机补证报告，记命令、退出码、版本/工作区指纹、产物、失败/未执行、阻塞与 T020 可领取条件；更新 status。完成后停止在 review_required，由独立审查放行，不进入 T020。
