@@ -1,0 +1,6 @@
+interface:
+  display_name: "EdgeVision Experiment Evidence"
+  short_description: "Capture reproducible model experiment evidence"
+  default_prompt: "使用 $experiment-evidence 按授权整理或执行实验，保留真实原始证据并清楚区分未验证项。"
+policy:
+  allow_implicit_invocation: true

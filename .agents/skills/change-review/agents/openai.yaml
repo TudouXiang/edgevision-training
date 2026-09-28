@@ -1,0 +1,6 @@
+interface:
+  display_name: "EdgeVision Change Review"
+  short_description: "Review scoped changes without modifying code"
+  default_prompt: "使用 $change-review 按需求审查指定差异，只给有证据的问题与验收结论，不直接修改代码。"
+policy:
+  allow_implicit_invocation: true
