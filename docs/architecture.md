@@ -22,7 +22,7 @@
 | running | 成功且产物校验 | succeeded | 先落盘、哈希和登记产物，再置成功 |
 | running | 执行异常/超时 | failed | 持久化错误码和可脱敏摘要 |
 | cancelling | 子进程确认停止 | cancelled | 清理临时产物；保留日志与终态 |
-| cancelling | 停止失败/崩溃 | failed | 标记取消失败原因 |
+| cancelling | 停止失败/崩溃且确认受管进程组已退出 | failed | 标记取消失败原因；无法确认退出时保持停领 |
 | running/cancelling | 核对确认原受管进程已退出 | interrupted | V1 不自动重放可能非幂等任务；身份/存活无法确认则拒绝领取新任务 |
 
 终态 `succeeded/failed/cancelled/interrupted` 不再改变。job 创建时冻结输入快照与参数；重试是新 job，带 `source_job_id`。只允许 dataset_check/train/export_onnx/infer/package 等白名单 kind。Worker 使用 DB 短事务，无 shell 拼接；进程组终止并等待回收；日志/事件顺序写入。全局文件锁阻止启动第二个 Worker，单任务串行。SQLite WAL、foreign_keys=ON、busy_timeout；数据库与文件共存单机固定 data root，文件落盘和事务之间的异常用临时目录及孤儿清理记录处理。SQLite 的 WAL 仍只有单写者，不能由此推出并行调度能力。[SQLite WAL](https://sqlite.org/wal.html)

@@ -34,6 +34,13 @@ class FoundationContractTests(unittest.TestCase):
             require_transition(JobState.RUNNING, JobState.INTERRUPTED)
         require_transition(JobState.RUNNING, JobState.INTERRUPTED, process_exited=True)
 
+    def test_cancelling_failure_requires_confirmed_exit(self):
+        with self.assertRaises(ValueError):
+            require_transition(JobState.CANCELLING, JobState.FAILED)
+        require_transition(JobState.CANCELLING, JobState.FAILED, process_exited=True)
+        with self.assertRaises(ValueError):
+            require_transition(JobState.FAILED, JobState.RUNNING)
+
     def test_job_parameters_are_bound_to_kind_and_limited(self):
         good = {"kind": "train", "params": {"dataset_id": str(uuid4()), "experiment_name": "tiny", "epochs": 1, "batch": 1, "seed": 0}}
         model = TypeAdapter(JobCreate).validate_python(good)

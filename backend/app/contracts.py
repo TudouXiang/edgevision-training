@@ -42,7 +42,7 @@ TERMINAL_STATES = frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.CANCE
 ALLOWED_TRANSITIONS: dict[JobState, frozenset[JobState]] = {
     JobState.QUEUED: frozenset({JobState.RUNNING, JobState.CANCELLED}),
     JobState.RUNNING: frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLING, JobState.INTERRUPTED}),
-    JobState.CANCELLING: frozenset({JobState.CANCELLED, JobState.INTERRUPTED}),
+    JobState.CANCELLING: frozenset({JobState.CANCELLED, JobState.FAILED, JobState.INTERRUPTED}),
 }
 
 

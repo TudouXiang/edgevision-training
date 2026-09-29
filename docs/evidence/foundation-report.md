@@ -2,6 +2,8 @@
 
 > 本报告只记录原 Linux 隔离工作区当时的执行结果。2026-09-28 Windows 接手补证另见 `T010-windows-2026-09-28.md`；其中的 FastAPI、迁移、生成与浏览器实测不能倒写为本报告所在 Linux 环境的结果。
 
+> 2026-09-29 Windows 复核补证见 [`T010-review-2026-09-29.md`](T010-review-2026-09-29.md)：项目级后端依赖同步/核对（已安装的 26 包无需更改）、隔离空库及 `0001` 一致性副本迁移、真实 API/Worker/Web、`bash scripts/dev.sh check`（修复后再次退出 0）、浏览器和断线检查均留下本机原始记录。独立 [`change-review`](T010-change-review-2026-09-29.md) 为 `accept`；**当前 Windows A01、A02、A03、A04 均 PASS，T010 accepted，T020 ready、未领取**。下方 NOT_RUN/FAIL 是原 Linux 宿主的历史结论，保持原样。
+
 日期：2026-09-23 UTC。执行宿主：当前隔离工作空间 Ubuntu 24.04.3；实际项目 /workspace/scratch/be544824c543，Git main 基线 57920e6，无远端。用户个人电脑曾展示旧版 uv 同步、0001 迁移和 Uvicorn 日志，**不能替代当前 0002 的执行证据**。本报告所述新版改动均待独立审查，不等于 accepted。
 
 ## 输入与资产复用

@@ -1,0 +1,68 @@
+{
+  "live": 200,
+  "ready": 200,
+  "capabilities": {
+    "auth": {
+      "available": false,
+      "reason_code": "NOT_IMPLEMENTED"
+    },
+    "projects": {
+      "available": false,
+      "reason_code": "NOT_IMPLEMENTED"
+    },
+    "datasets": {
+      "available": false,
+      "reason_code": "NOT_IMPLEMENTED"
+    },
+    "training_cpu": {
+      "available": false,
+      "reason_code": "DEPENDENCY_NOT_INSTALLED"
+    },
+    "training_cuda": {
+      "available": false,
+      "reason_code": "NOT_PROBED"
+    },
+    "events": {
+      "available": false,
+      "reason_code": "NOT_IMPLEMENTED"
+    },
+    "models": {
+      "available": false,
+      "reason_code": "NOT_IMPLEMENTED"
+    },
+    "onnx_export": {
+      "available": false,
+      "reason_code": "DEPENDENCY_NOT_INSTALLED"
+    },
+    "pt_inference": {
+      "available": false,
+      "reason_code": "DEPENDENCY_NOT_INSTALLED"
+    },
+    "onnx_inference": {
+      "available": false,
+      "reason_code": "DEPENDENCY_NOT_INSTALLED"
+    },
+    "deployment": {
+      "available": false,
+      "reason_code": "NOT_IMPLEMENTED"
+    },
+    "rknn": {
+      "available": false,
+      "reason_code": "NOT_PROBED"
+    }
+  },
+  "login": 501,
+  "login_code": "NOT_IMPLEMENTED",
+  "invalid": 422,
+  "invalid_code": "VALIDATION_ERROR",
+  "unknown": 404,
+  "root": 404,
+  "request_ids": true,
+  "optional_modules_present": {
+    "torch": false,
+    "ultralytics": false,
+    "onnx": false,
+    "onnxruntime": false,
+    "rknn": false
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "/": {
+    "status": 200,
+    "content_type": "text/html",
+    "bytes": 428
+  },
+  "/training": {
+    "status": 200,
+    "content_type": "text/html",
+    "bytes": 428
+  },
+  "/api/v1/health/live": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 31,
+    "body": {
+      "status": "ok",
+      "service": "api"
+    }
+  },
+  "/api/v1/health/ready": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 62,
+    "body": {
+      "status": "ready",
+      "database": "migrated",
+      "storage": "available"
+    }
+  },
+  "/api/v1/capabilities": {
+    "status": 200,
+    "content_type": "application/json",
+    "bytes": 1625,
+    "body": {
+      "auth": "NOT_IMPLEMENTED",
+      "projects": "NOT_IMPLEMENTED",
+      "datasets": "NOT_IMPLEMENTED",
+      "training_cpu": "DEPENDENCY_NOT_INSTALLED",
+      "training_cuda": "NOT_PROBED",
+      "events": "NOT_IMPLEMENTED",
+      "models": "NOT_IMPLEMENTED",
+      "onnx_export": "DEPENDENCY_NOT_INSTALLED",
+      "pt_inference": "DEPENDENCY_NOT_INSTALLED",
+      "onnx_inference": "DEPENDENCY_NOT_INSTALLED",
+      "deployment": "NOT_IMPLEMENTED",
+      "rknn": "NOT_PROBED"
+    }
+  }
+}

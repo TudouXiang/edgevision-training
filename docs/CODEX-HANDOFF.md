@@ -1,5 +1,7 @@
 # Codex 接手记录 · Windows 源码快照（2026-09-28）
 
+> 2026-09-29 更新：在隔离环境重新完成 A01–A04 补证，修复状态守卫漏项并通过独立 change-review；T010 **accepted**，T020 **ready、未领取**。当前判定以 [`docs/status.md`](status.md)、[`T010 复核报告`](evidence/T010-review-2026-09-29.md) 和 [`独立审查`](evidence/T010-change-review-2026-09-29.md) 为准。以下 2026-09-28 的 PASS 候选和 blocked 描述是接手时的历史快照。
+
 ## 工作区与 Git 来源
 
 当前工作区是 `D:\WorkSpace\edgevision-foundation`。接手时这里有 EdgeVision 源码、既有 `backend/uv.lock` 和未纳入版本控制的项目环境，但**没有 `.git` 及网页 Work 交接所述的本文件**。因此不能验证原 `d5eade0` 提交、原来的未提交 diff 或远端/未推送状态。`scripts/install_deps.py`、编辑前的 `scripts/dev.py` 与交接指纹吻合；这只能证明两个文件一致，不能还原历史。
@@ -14,6 +16,6 @@ A01–A04 在本机隔离环境为 **PASS 候选**，完整命令、退出码、
 
 ## 下一步闸门
 
-按 `AGENTS.md` 顺序读 `docs/status.md`、`docs/scope.md`、`docs/architecture.md`、`docs/contracts.md`，再读任务单、`docs/acceptance.md` 和本次证据。当前 T010 为 `review_required`；须独立审查 A01–A04、生成契约与 Windows 差异后才可标 `accepted` 并考虑领取 T020。T020 目前 `blocked`，不得用 A01–A04 的 PASS 候选自动放行。范围、公共接口、任务状态、存储或技术栈变化先走 `arch-spec`；逐项开发、改动审查和实验证据分别按仓库 Skill 手动核对。
+按 `AGENTS.md` 顺序读 `docs/status.md`、`docs/scope.md`、`docs/architecture.md`、`docs/contracts.md`，再读任务单、`docs/acceptance.md` 和本次证据。2026-09-29 独立审查已将 T010 放行为 `accepted`，T020 现为 `ready`，但本轮没有领取或实现。范围、公共接口、任务状态、存储或技术栈变化先走 `arch-spec`；逐项开发、改动审查和实验证据分别按仓库 Skill 手动核对。
 
 对真实旧库升级时先停 API/Worker、做一致性备份，在副本试迁移；不得在唯一副本试错。默认数据、用户正在使用的 8000/5173 进程和未取得许可的模型/数据均不因接手而自动处理。

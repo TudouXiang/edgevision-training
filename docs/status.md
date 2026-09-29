@@ -1,8 +1,8 @@
-# 项目状态 · review_required（更新至 2026-09-28 Asia/Shanghai）
+# 项目状态 · T010 accepted / T020 ready（更新至 2026-09-29 Asia/Shanghai）
 
-当前 Windows 工作区为 `D:\WorkSpace\edgevision-foundation`。收到的是没有 `.git` 和原交接文档的源码快照，原 Work 仓库 `d5eade0` 的历史、未提交差异及远端状态无法验证；按用户授权新建 `main` 历史，根提交 `bcf0642bc7dcc7e2ab7da3b4dd7d9f21e7710bd6`。原 Linux 记录描述的是另一工作区，不应视作当前 Git 历史。当前范围仍为 T000/T010；T020 **blocked**。接手事实见 `docs/CODEX-HANDOFF.md`。
+当前 Windows 工作区为 `D:\WorkSpace\edgevision-foundation`。收到的是没有 `.git` 和原交接文档的源码快照，原 Work 仓库 `d5eade0` 的历史、未提交差异及远端状态无法验证；按用户授权新建 `main` 历史，根提交 `bcf0642bc7dcc7e2ab7da3b4dd7d9f21e7710bd6`。原 Linux 记录描述的是另一工作区，不应视作当前 Git 历史。本轮只完成 T010 补证与独立验收，T020 **ready 但未领取**。接手事实见 `docs/CODEX-HANDOFF.md`。
 
-Windows 本机使用项目现有 `.venv` 和 `node_modules` 完成隔离空库迁移两次、代表性 `0001` 副本升级、OpenAPI/TS 生成与漂移检查、后端测试、前端构建、真实 API/Web HTTP、浏览器窄屏/键盘/刷新/断线检查；A01–A04 为 **PASS 候选**，执行命令、退出码和边界见 `docs/evidence/T010-windows-2026-09-28.md`。这不等于 T010 已获独立审查，也不表示实际重装依赖、真实旧用户库升级或 ML 链路已验证。T010 保持 `review_required`；M1 暂不标 accepted。`backend/uv.lock` 和生成契约已纳入本机候选基线。
+Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无需更改），并完成隔离空库重复迁移、代表性 `0001` 一致性副本升级、OpenAPI/TS 生成与漂移检查、真实 API/Worker/Web HTTP、浏览器窄屏/键盘/刷新/断线检查。修复独立审查发现的 `cancelling→failed` 守卫漏项后，原样 `bash scripts/dev.sh check` 退出 0：纯契约 6 项、脚本/Worker 9 项、pytest 20 passed、前端 build 和 contract-check 通过。A01–A04 **PASS**；独立 [`change-review`](evidence/T010-change-review-2026-09-29.md) 结论 `accept`，T010/M1 **accepted**，T020 **ready**。原始命令、退出码、数据/代码指纹和边界见 [`Windows 复核报告`](evidence/T010-review-2026-09-29.md)。`backend/uv.lock` 和生成契约已在本机 Git 基线。真实旧用户库迁移、ML/ONNX/RKNN、真任务进程树仍未执行。
 
 ## 历史 Linux 工作区记录
 
@@ -25,9 +25,9 @@ Windows 本机使用项目现有 `.venv` 和 `node_modules` 完成隔离空库�
 
 ## 待审查与领取闸门
 
-1. 独立审查本次 Windows 代码差异、生成契约、迁移与 HTTP/浏览器证据，核对 A01–A04 及 M1 条件；未通过项继续补证，不因本报告为 PASS 候选自动标 accepted。
-2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。重新安装依赖也尚未执行，已有项目环境的可运行性与可重装性分开判断。
+1. 本轮只完成 T010；T020 已具备领取前置，但须另起单任务开发与验收，不能把 ready 当成身份/项目功能已实现。
+2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。项目级后端同步没有重装已存在的 26 个包，已有环境的可运行性与全新环境可重装性分开判断。
 3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。
 
-T000/T010 代码与文档交付状态为 `review_required`；A01–A04 的 Windows 实测结果待独立审查。审查正式放行前 T020 仍 `blocked`，勿自动进入身份/项目业务开发。
+T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **ready**。本轮止于审查与文档更新，不自动进入身份/项目业务开发。

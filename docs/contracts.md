@@ -39,9 +39,10 @@ Artifact.validation_state：unverified、passed、failed。完成写入但未验
 |running|failed|启动/运行/产物验证失败，所属子进程已退出|
 |running|cancelling|取消请求原子成功|
 |cancelling|cancelled|已确认该任务进程组退出；不得仍占用资源却显示已取消|
+|cancelling|failed|取消过程失败，且已确认受管进程组退出；记录失败原因；无法确认退出时保持停领|
 |running/cancelling|interrupted|恢复核对确认任务失去执行且没有仍运行的受管子进程|
 
-终态收到取消请求返回当前终态，不改写为 cancelled。成功提交与取消通过状态条件更新竞争：成功先提交则维持 succeeded；取消先写入 cancelling 则不再发布成功产物，确认进程退出后进入 cancelled。取消中的异常作为诊断记录，不用它绕过进程退出确认。
+终态收到取消请求返回当前终态，不改写为 cancelled。成功提交与取消通过状态条件更新竞争：成功先提交则维持 succeeded；取消先写入 cancelling 则不再发布成功产物。正常取消并确认进程退出后进入 cancelled；取消失败且确认受管进程组退出后进入 failed 并记录原因。无法确认退出时继续停领，不用异常绕过进程退出确认。
 
 API 重启不杀独立 Worker。Worker 重启先核对遗留执行再领取新任务；主机重启后未终结任务可在核对后记 interrupted。不得默认自动重训。重试产生新 Job 并记录 source_job_id；实际输入重新校验后冻结。
 
