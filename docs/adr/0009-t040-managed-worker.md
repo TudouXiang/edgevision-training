@@ -69,3 +69,10 @@ Linux guardian 是独立 session 的 child subreaper，记录 boot ID、PID、`/
 架构方向于 2026-11-04 放行实施，最终验收仍待实际证据。取消/中断/基础设施失败统一将匹配 validation_job_id 且仍 validating 的 Dataset 恢复 pending；只有真实数据校验错误才置 invalid。此处最小调整旧 contracts.md 的“校验中断→invalid”语义，区分未验证和数据错误。提交新 Job 时清空当前 report_key；历史报告 Artifact 与原 Job/文件保留，绝不把旧报告冒充此次结果。重试新建 Job，ready 不能重试。environment_json 仅白名单 Python 版本、平台、协议版本，不读取/保存整份环境变量；公共日志为固定脱敏消息，不输出服务器绝对路径或内部 traceback。
 
 GO 发送与 cancelling 的条件检查在同一短写事务内串行；身份在前一事务已提交。GO 后事务提交前崩溃可能保留 prepared，所以 prepared 绝不被解释成“未执行”，仍须完整 drain receipt。
+
+
+## Windows 虚拟环境解释器兼容性修正
+
+真实 Windows CI 暴露 CPython venv redirector：Popen 创建的 python.exe 可能只负责创建并等待实际解释器，因此不能把 redirector PID 当成 guardian 自身 PID。采用 [CPython 3.12.10 multiprocessing 官方同款启动协议](https://github.com/python/cpython/blob/v3.12.10/Lib/multiprocessing/popen_spawn_win32.py#L55-L62)：仅对当前 Windows 虚拟环境，使用 `sys._base_executable` 并在复制的子进程环境中设置 `__PYVENV_LAUNCHER__=sys.executable`，保留隔离依赖；不修改全局环境。Worker→guardian 以及测试/浏览器编排中用于身份或终止的 Worker/API Popen 句柄均指向实际解释器。原有出生身份、严格匹配与 receipt 退出证明完全保留；历史不匹配记录仍阻塞，不采信另一份自报身份修复旧记录。
+
+Windows runner 的原子 Job Object 启动 ABI 不变：记录的 root 是 CreateProcessW 初始创建的进程，可能为 redirector，不宣称等于 adapter 自身 PID。它在 GO 前 suspended，实际 adapter 与后代仍继承外层 Job；根句柄退出与外层 ActiveProcesses=0 同时成立才视为整树清空。原有 nested Job、强杀 guardian 的 KILL_ON_JOB_CLOSE 与孙进程用例继续执行，不绕开 venv、不削弱测试。新增原生探针比较活着的子解释器 PID/出生身份、venv prefix/可执行身份以及项目依赖可导入性；CI 只输出布尔诊断，先于完整矩阵失败即停止。

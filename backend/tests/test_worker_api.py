@@ -19,6 +19,7 @@ from app.job_service import incremental, append_event
 from app.database import transaction
 from app.main import app
 from app.run_files import relative_file, read_json
+from app.python_launch import python_child
 
 
 def submit(client, dataset_id, key="check"):
@@ -28,7 +29,8 @@ def submit(client, dataset_id, key="check"):
 
 
 def work():
-    result = subprocess.run([sys.executable, "-m", "app.worker", "--once"], cwd=BACKEND, env=os.environ.copy(), capture_output=True, text=True, timeout=30)
+    args, environment = python_child([sys.executable, "-m", "app.worker", "--once"], os.environ.copy())
+    result = subprocess.run(args, cwd=BACKEND, env=environment, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
 
 

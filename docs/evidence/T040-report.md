@@ -73,3 +73,12 @@ Windows 真实 Job Object、nested Job/初始 suspended cancellation 与 Windows
 本次仅修正浏览器夹具：在项目归档前用现有已认证页面上传合成 ZIP，确认 Dataset 属于该项目且为 pending；归档后对这个真实 Dataset 使用新幂等键提交，继续严格断言 `409 PROJECT_ARCHIVED`。不改变生产错误优先级或弱化为 404，不输出凭据。重新执行仅做 TypeScript 与四场景发现，真实 Chromium 仍待下一次 CI。
 
 本次有限回归：`npm --prefix web run test:e2e:list` 退出 0，TypeScript 通过、发现 4 / 完成 0、browser NOT_RUN；`cd backend && .venv/bin/python -m pytest tests/test_worker_api.py -k concurrent_submission_single_job_key_conflict_and_actor_authority -q` 为 1 passed / 5 deselected；`git diff --check` 通过。这些不替代待运行的完整 Chromium 验证。
+
+
+## Windows 首次真实矩阵与 redirector 修正
+
+提交 `2c194bb4cbc68b292a034243a30007b6d12c8d7d` 的 [CI 41797084998 / Windows job 126463600990](https://github.com/TudouXiang/edgevision-training/actions/runs/41797084998/job/126463600990) 已真正执行矩阵，结果 **22 failed / 8 passed**，不是 setup 失败或跳过。pre-GO 测试已到 identity barrier，Worker 强杀前 GO 用例已有 drain receipt/guardian exit 但被严格身份匹配拒绝；大多数执行标记超时。Linux 同提交全套通过，不能抵消 Windows 失败。
+
+根因依据为 [CPython 3.12.10 Windows launcher](https://github.com/python/cpython/blob/v3.12.10/PC/launcher.c) 通过 CreateProcessW 启动并等待另一个解释器，以及 [stdlib multiprocessing 的明确修正](https://github.com/python/cpython/blob/v3.12.10/Lib/multiprocessing/popen_spawn_win32.py#L55-L62)。当前 Worker 错把 redirector 的 Popen PID 与实际 guardian 自报出生身份比较。采用官方 direct-base + 子环境 venv 标记方式，保持原有出生身份/receipt 校验；完整原生确认仍由下一次 Windows CI 的 fail-fast 探针和未削弱矩阵完成。未伪造 Windows 本地通过。
+
+本次修正的 Linux 有限回归：`cd backend && .venv/bin/python -m pytest tests/test_python_launch.py tests/test_worker_process.py tests/test_worker_api.py -q -s` 为 **33 passed / 0 skipped**（39.98 秒），日志 `T040-python-launch-local-2026-11-04.txt`；安全探针显示 PID/出生身份/venv/依赖全部匹配，windows=false，不冒充 Windows 实验。`tests/http_restart_probe.py` 退出 0、真实 API 重启/独立 Worker/整树退出通过，日志 `T040-python-launch-http-2026-11-04.txt`。脚本单元测试改在 backend 正确目录执行为 11 passed；先从仓库根执行曾因 app 导入路径缺失报 1 error，未当作通过。工作流 YAML 和原生探针先于矩阵的顺序断言、`git diff --check` 通过。此次候选仍待 Windows 原生 CI；此前代码指纹只描述原始候选，不覆盖本次兼容性修正。

@@ -15,6 +15,7 @@ from test_worker_api import submit, work
 from app.database import transaction
 from app.main import app
 from app.process_identity import identity, exited
+from app.python_launch import python_child
 from app.run_files import run_directory, read_json
 from app.worker import claim, recover
 
@@ -38,7 +39,8 @@ def record(job_id):
 
 def start(behavior):
     args = [sys.executable, FIXTURE, "nested_windows"] if behavior == "nested_windows" else [sys.executable, FIXTURE, "worker", behavior]
-    return subprocess.Popen(args, cwd=BACKEND, env=os.environ.copy(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    args, environment = python_child(args, os.environ.copy())
+    return subprocess.Popen(args, cwd=BACKEND, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def run_path(job_id):
@@ -93,7 +95,8 @@ def test_atomic_fifo_claim_and_real_second_worker_lock(data_root):
     directory = run_path(second)
     try:
         wait_marker(directory, "grandchild.json")
-        other = subprocess.run([sys.executable, "-m", "app.worker", "--once"], cwd=BACKEND, capture_output=True, timeout=10)
+        args, environment = python_child([sys.executable, "-m", "app.worker", "--once"])
+        other = subprocess.run(args, env=environment, cwd=BACKEND, capture_output=True, timeout=10)
         assert other.returncode == 3
         client.post(f"/api/v1/jobs/{second}/cancel", headers=headers(client))
         assert process.wait(timeout=10) == 0

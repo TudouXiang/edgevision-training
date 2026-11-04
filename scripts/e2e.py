@@ -123,6 +123,10 @@ def stop_owned(processes: tuple[subprocess.Popen[bytes] | None, ...]) -> bool:
 
 
 def start_process(args: list[str], cwd: Path, environment: dict[str, str]) -> subprocess.Popen[bytes]:
+    if os.name == "nt" and os.path.normcase(args[0]) == os.path.normcase(sys.executable):
+        # main already re-executed in backend/.venv; Node is not transformed.
+        from app.python_launch import python_child
+        args, environment = python_child(args, environment)
     return subprocess.Popen(
         args,
         cwd=cwd,

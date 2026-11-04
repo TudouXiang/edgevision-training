@@ -22,6 +22,7 @@ from .database import database_ready, transaction
 from .dataset_storage import resolve_storage_file
 from .job_service import append_event, canonical, invalidate_dataset, transition
 from .process_identity import boot_id, exited, identity, valid_identity, valid_boot_id
+from .python_launch import python_child
 from .run_files import atomic_json, fingerprint, read_json, run_directory
 from .security import timestamp
 
@@ -222,7 +223,8 @@ def process(job_id: str, run_id: str) -> None:
         return
     child = None
     try:
-        child = subprocess.Popen(guardian_command(job_id, run_id), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        command, environment = python_child(guardian_command(job_id, run_id))
+        child = subprocess.Popen(command, env=environment, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  close_fds=True, start_new_session=os.name != "nt", creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         guardian_identity = identity(child.pid)
         with transaction() as connection:

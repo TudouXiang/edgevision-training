@@ -20,6 +20,7 @@ from test_worker_api import submit
 from test_worker_process import start, run_path, wait_marker, wait_until, stop_and_reap, record
 from app.config import SESSION_COOKIE_NAME
 from app.process_identity import exited
+from app.python_launch import python_child
 
 
 def main():
@@ -50,7 +51,8 @@ def main():
             except OSError:
                 return None
         def launch_api():
-            return subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port), "--no-access-log"],
+            args, environment = python_child([sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port), "--no-access-log"])
+            return subprocess.Popen(args, env=environment,
                                     cwd=BACKEND, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             worker = start("tree")
