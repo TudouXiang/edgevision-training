@@ -67,7 +67,8 @@ label { display: block; color: #485c57; font-size: 13px; font-weight: 650; }
 .load-more { width: 100%; margin-top: 14px; }
 .dataset-panel .section-title { gap: 16px; }
 .dataset-panel .section-title span { text-align: right; }
-.project-picker { display: block; max-width: 520px; margin-top: 18px; }
+.project-picker { display: block; width: 100%; max-width: 520px; min-width: 0; margin-top: 18px; }
+.project-picker select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
 .dataset-upload { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; margin-top: 14px; padding: 16px; background: #f7faf8; border: 1px solid var(--line); border-radius: 10px; }
 .dataset-upload input[type="file"] { padding: 8px; }
 .dataset-row .row-title span.pending, .dataset-row .row-title span.validating { color: #796947; background: #f4efe4; }

@@ -1,6 +1,6 @@
 # T030 数据导入与校验核心交付记录
 
-状态：`review_required`。日期：2026-11-04 UTC。基线：分支 `feat/t030-dataset-core`，HEAD `56c34f2ccc3d2dea46360c450079f373437f5e8f`，工作区候选尚未提交。远端 main 后续外部合并 T020 到 `f6db48a68534a93a50110e09750243e39417df7f`，其树与本基线相同；本实现未 merge/rebase。T020 前置已 accepted；T040 未放行、未实现。
+状态：`review_required`。日期：2026-11-04 UTC。实现基线为 `56c34f2ccc3d2dea46360c450079f373437f5e8f`；T030 首次候选已发布为分支 `feat/t030-dataset-core` 的 `29107984e7c6204072af08363662205fd24a496a`，本报告所述浏览器修复尚未提交。远端 main 外部合并 T020 到 `f6db48a68534a93a50110e09750243e39417df7f`，其树与实现基线相同；本实现未 merge/rebase。T020 前置已 accepted；T040 未放行、未实现。
 
 ## 范围与决定
 
@@ -65,9 +65,17 @@
 
 公共差异：API 版本 0.3.0；dataset list/upload/detail 从占位变为真实实现；samples 从错误的 `Page[ArtifactPublic]` 改为 `Page[DatasetSamplePublic]`，新增 owner-aware sample image 路由；capabilities.datasets 表示 staging/list/preview 核心可用，不表示异步校验或训练可用。
 
+## 首次托管浏览器运行与修复
+
+- GitHub Actions run `41785821044` 的聚合后端、前端单元测试、生产构建及新增 T030 浏览器场景通过；既有 T020 两个浏览器场景分别在 `web/e2e/t020.e2e.ts:98` 与 `:228` 失败。失败证据保留在该 run 及下载的安全 artifact；没有把首次失败运行改写为成功。
+- 原因是 T030 新增“所属项目”下拉框后，项目名称同时出现在项目卡片与 `<option>`，旧的页面级 `getByText(name, { exact: true })` 因 strict locator 匹配两个元素而失败，并非项目功能或数据错误。
+- 修复只把正向名称断言限定到对应 `article.row-card`，保留原有“项目卡真实可见”的检查；跨 owner 的页面级零匹配断言仍保持，未弱化权限检查。其他项目名称正向断言同步限定到项目卡，避免同类歧义。
+- 375px 下拉框补充 `width/max-width/min-width` 与省略显示约束，防止 160 字符项目名凭 intrinsic width 撑宽面板；项目卡仍完整换行展示名称，浏览器用例继续检查页面无水平溢出。
+- 本修复需新的托管 Chromium run 才能接受；`41785821044` 仅作为“首次运行失败并定位原因”的负向证据。
+
 ## 未执行与后续闸门
 
-- 真实 Linux Chromium：未执行，待候选提交的 GitHub Actions；不能复用 T020 旧 run 接受 T030。
+- 真实 Linux Chromium：首次候选已由 GitHub Actions run `41785821044` 执行；T030 新场景通过，但两个既有 T020 场景因 locator 歧义失败，因此整体仍未接受。当前修复必须由新的托管 run 重跑三项场景，不能把该失败 run 当作通过证据。
 - Windows、实际 TLS、磁盘耗尽/进程崩溃/多进程压力、Worker 取消恢复：未执行。
 - 用户真实数据、大模型、训练、PT/ONNX/RKNN/NPU：未使用、未执行。
 - T040 只有在本候选独立代码/安全审查和真实 CI 浏览器证据通过后才能领取；届时复用纯 validator，写 report，原子发布 snapshot/ready 或 invalid，不能把 HTTP 请求改成长任务。
