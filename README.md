@@ -1,6 +1,6 @@
-# YOLO 目标检测训练与部署辅助平台（架构骨架）
+# EdgeVision — 边缘视觉模型管理与部署平台
 
-本仓库只交付范围基线、项目规则、接口/数据库/存储契约、API 与 Worker 骨架、迁移和测试基础。业务链路当前**未实现、未验收**。Windows T010 补证与审查状态见 `docs/status.md`、`docs/evidence/T010-windows-2026-09-28.md`；旧 Linux 证据保留在 `docs/evidence/foundation-report.md`。接手说明见 `docs/CODEX-HANDOFF.md`。
+EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环境串起数据、训练、模型、ONNX 验证与部署生命周期；ONNX 是部署主线，RKNN 仅保留未验证的扩展边界，不冒充实机能力。本仓库已交付范围/存储/接口基线、API 与 Worker 骨架以及迁移/测试基础。T020 真实身份、管理员账号管理与项目闭环已通过独立审查及 Linux CI 真实浏览器验收；数据集、训练、模型和部署业务仍明确未实现。状态见 `docs/status.md` 与 `docs/evidence/T020-browser-acceptance-2026-11-04.md`。
 
 ## 目录
 
@@ -33,7 +33,7 @@ py -3 scripts\dev.py doctor
 
 仅装一侧依赖可分别加 `--backend-only` 或 `--web-only`；`--check` 只检查前置工具与将执行的命令，不安装。安装中某一步失败即返回非零，输出不代表后续步骤已完成。训练、ONNX 和硬件依赖须按后续任务及实际设备单独核验。
 
-## 启动骨架
+## 初始化与启动
 
 如已有旧版 `0001` 数据库，**先停 API/Worker、做一致性备份，并在副本上验证 `0002_foundation`**；不要对唯一数据副本直接试迁移。全新开发目录才直接运行下面的迁移命令。
 
@@ -41,6 +41,7 @@ Linux：
 
 ```bash
 python3 scripts/dev.py migrate
+python3 scripts/dev.py init-admin   # 交互式输入并确认密码，不把密码放在命令行
 python3 scripts/dev.py api
 # 另开终端：python3 scripts/dev.py worker
 # 再开终端：python3 scripts/dev.py web
@@ -50,12 +51,17 @@ Windows PowerShell：
 
 ```powershell
 py -3 scripts\dev.py migrate
+py -3 scripts\dev.py init-admin
 py -3 scripts\dev.py api
 # 另开终端：py -3 scripts\dev.py worker
 # 再开终端：py -3 scripts\dev.py web
 ```
 
-浏览器访问 `http://127.0.0.1:5173/`；API 直接地址为 `http://127.0.0.1:8000/api/v1/health/live`，根路径 `/` 返回 404 是当前路由约定。前端默认从同源 `/api/v1` 访问服务，由 Vite 代理至 127.0.0.1:8000；部署时刷新 `/training` 等路由需要 SPA fallback。端口占用时可在启动命令前设置 `EDGEVISION_DEV_API_PORT` 和 `EDGEVISION_DEV_WEB_PORT`（例如 PowerShell 中 `$env:EDGEVISION_DEV_API_PORT='18000'; $env:EDGEVISION_DEV_WEB_PORT='15173'`），API 和 Vite 代理使用前者，Web 使用后者。Worker 遇到不明遗留 running/cancelling 任务会停止领取并返回 4，不会静默重训。Windows 已验证占位 Worker 的单实例、失败和遗留停领路径；真实任务的进程树清理与重启验证仍属 T040。
+浏览器访问 `http://127.0.0.1:5173/`；API 直接地址为 `http://127.0.0.1:8000/api/v1/health/live`，根路径 `/` 返回 404。前端从同源 `/api/v1` 访问服务，由 Vite 代理至 127.0.0.1:8000。端口占用时可设置 `EDGEVISION_DEV_API_PORT` 和 `EDGEVISION_DEV_WEB_PORT`。`EDGEVISION_ADMIN_USERNAME` 可覆盖初始化命令默认显示名；密码只从交互式隐藏输入读取。
+
+身份配置默认只允许 `http://127.0.0.1` / `localhost` 的 5173、8000 开发 Origin。部署时用逗号分隔的 `EDGEVISION_ALLOWED_ORIGINS` 明确列出浏览器 Origin；非本机 Origin 必须是 HTTPS，并同时设置 `EDGEVISION_COOKIE_SECURE=true`，否则身份接口按失败关闭返回 503。`EDGEVISION_SESSION_TTL_SECONDS` 可设为 300–604800 秒，默认 43200。修改请求必须携带同源 Origin 与浏览器从 CSRF Cookie 读取的 `X-CSRF-Token`。
+
+Worker 遇到不明遗留 running/cancelling 任务会停止领取并返回 4，不会静默重训。真实任务的进程树清理与重启验证仍属 T040。
 
 检查/契约生成（把 `python3 scripts/dev.py` 换为 Windows 的 `py -3 scripts\dev.py`）：
 
@@ -66,5 +72,14 @@ python3 scripts/dev.py check
 ```
 
 `contract-generate` 从 FastAPI OpenAPI 生成 TS；`contract-check` 不修改跟踪产物。`check` 包括纯契约/脚本测试、后端 pytest、前端构建和契约漂移检查。兼容的 Bash 入口仍可使用 `bash scripts/dev.sh <命令>`。Windows 本机的运行结果见 `docs/evidence/T010-windows-2026-09-28.md`；此前 Linux 容器缺依赖的结论只适用于当时环境。
+
+T020 的真实浏览器回归使用锁定的 Playwright/Chromium，并且只连接测试入口创建的临时迁移数据库。先安装项目依赖和与锁文件匹配的浏览器，再执行包装脚本；包装脚本会生成内存测试凭据、启动真实 Uvicorn 与 Vite 同源代理，并在结束时停止服务和删除临时数据库：
+
+```bash
+cd web && ./node_modules/.bin/playwright install chromium && cd ..
+python3 scripts/e2e.py
+```
+
+只核对测试发现、临时迁移和服务编排而不启动浏览器时，可运行 `python3 scripts/e2e.py --list`。浏览器报告只包含用例名、状态、耗时和源码位置；不保存截图、trace、视频、Cookie、请求正文、服务日志、数据库或凭据。CI 使用相同步骤；测试源码或 `--list` 成功不等于真实浏览器验收通过。
 
 旧基线的执行记录见 `docs/evidence/bootstrap-2026-09-23.md` 与 `docs/evidence/foundation-report.md`；本机结果见 `docs/evidence/T010-windows-2026-09-28.md`。不要把启动说明当成已执行证据。未实现路径明确返回 501，未知路径 404，字段无效 422；正式运行不注入 Fake Runner。

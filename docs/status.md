@@ -1,6 +1,10 @@
-# 项目状态 · T010 accepted / T020 ready（更新至 2026-09-29 Asia/Shanghai）
+# 项目状态 · T020 accepted / T030 ready（2026-11-04 UTC）
 
-当前 Windows 工作区为 `D:\WorkSpace\edgevision-foundation`。收到的是没有 `.git` 和原交接文档的源码快照，原 Work 仓库 `d5eade0` 的历史、未提交差异及远端状态无法验证；按用户授权新建 `main` 历史，根提交 `bcf0642bc7dcc7e2ab7da3b4dd7d9f21e7710bd6`。原 Linux 记录描述的是另一工作区，不应视作当前 Git 历史。本轮只完成 T010 补证与独立验收，T020 **ready 但未领取**。接手事实见 `docs/CODEX-HANDOFF.md`。
+T020 身份与项目最小闭环已通过独立代码/安全审查，并在提交 `cc2e66043473b9d3f432319fab41130cab3f2270` 的 [GitHub Actions 41779814303](https://github.com/TudouXiang/edgevision-training/actions/runs/41779814303) 完成真实 Chromium 验证：2 个用例实际执行且通过，完整后端/前端/契约检查通过。T020 **accepted（Linux CI 范围）**，T030 **ready、未领取**。验收覆盖、原始日志定位和剩余边界见 [独立验收记录](evidence/T020-browser-acceptance-2026-11-04.md)。
+
+现有能力为身份/会话、显式管理员初始化、账号管理、项目归属/编辑/归档和最小真实页面；复用 0002，无新增迁移。Windows 新功能、实际 TLS、人工视觉/截图、多进程压力及后续数据/训练/模型/部署仍未验收。历史本地 Chromium 不可启动的结论保持有效，但不再阻塞已完成的受信 CI 浏览器验收。main 仍为 `dff9ad1fc92e9ce43b135138df18795106d4bf89`，未合并开发分支。
+
+## 历史 Windows T010 验收（2026-09-29）
 
 Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无需更改），并完成隔离空库重复迁移、代表性 `0001` 一致性副本升级、OpenAPI/TS 生成与漂移检查、真实 API/Worker/Web HTTP、浏览器窄屏/键盘/刷新/断线检查。修复独立审查发现的 `cancelling→failed` 守卫漏项后，原样 `bash scripts/dev.sh check` 退出 0：纯契约 6 项、脚本/Worker 9 项、pytest 20 passed、前端 build 和 contract-check 通过。A01–A04 **PASS**；独立 [`change-review`](evidence/T010-change-review-2026-09-29.md) 结论 `accept`，T010/M1 **accepted**，T020 **ready**。原始命令、退出码、数据/代码指纹和边界见 [`Windows 复核报告`](evidence/T010-review-2026-09-29.md)。`backend/uv.lock` 和生成契约已在本机 Git 基线。真实旧用户库迁移、ML/ONNX/RKNN、真任务进程树仍未执行。
 
@@ -25,9 +29,9 @@ Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无�
 
 ## 待审查与领取闸门
 
-1. 本轮只完成 T010；T020 已具备领取前置，但须另起单任务开发与验收，不能把 ready 当成身份/项目功能已实现。
+1. T020 已形成实现候选并完成[独立代码/安全审查](evidence/T020-change-review-2026-11-04.md)，浏览器 CI 源码待发布后在 GitHub 托管 runner 上执行；在取得该提交的真实 Chromium 结果和独立验收前，不能把 `review_required` 写成 accepted。T030 不自动进入。
 2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。项目级后端同步没有重装已存在的 26 个包，已有环境的可运行性与全新环境可重装性分开判断。
 3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。
 
-T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **ready**。本轮止于审查与文档更新，不自动进入身份/项目业务开发。
+T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **accepted**，T030 **ready**。ML、ONNX、RKNN 和真实训练均未因 T020 执行。

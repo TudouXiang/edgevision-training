@@ -31,15 +31,23 @@ def test_live_is_not_readiness_or_a_business_result(tmp_path, monkeypatch):
     with TestClient(app) as client:
         assert client.get("/api/v1/health/live").json() == {"status": "ok", "service": "api"}
         assert client.get("/api/v1/health/ready").status_code == 503
-        assert client.post("/api/v1/auth/login", json={"username": "x", "password": "x"}).json()["error"]["code"] == "NOT_IMPLEMENTED"
+        unavailable_login = client.post(
+            "/api/v1/auth/login",
+            headers={"Origin": "http://127.0.0.1:5173"},
+            json={"username": "x", "password": "x"},
+        )
+        assert unavailable_login.status_code == 503
+        assert unavailable_login.json()["error"]["code"] == "NOT_READY"
         invalid = client.post("/api/v1/auth/login", json={})
         assert invalid.status_code == 422
         assert invalid.json()["error"]["code"] == "VALIDATION_ERROR"
         assert client.get("/api/v1/unknown-path").status_code == 404
-        assert not any(feature["available"] for feature in client.get("/api/v1/capabilities").json()["features"].values())
+        features = client.get("/api/v1/capabilities").json()["features"]
+        assert features["auth"]["available"] and features["projects"]["available"]
+        assert not any(value["available"] for key, value in features.items() if key not in {"auth", "projects"})
         migrate(tmp_path)
         assert client.get("/api/v1/health/ready").json()["status"] == "ready"
-        assert client.get("/api/v1/jobs/" + str(uuid4()) + "/logs").status_code == 501
+        assert client.get("/api/v1/jobs/" + str(uuid4()) + "/logs").status_code == 401
 
 
 def test_unimplemented_worker_cannot_report_success(tmp_path, monkeypatch):

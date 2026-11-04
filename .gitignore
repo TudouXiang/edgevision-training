@@ -6,6 +6,8 @@ upload/
 **/.pytest_cache/
 **/node_modules/
 **/dist/
+web/playwright-report/
+web/test-results/
 data/
 *.db
 *.db-shm

@@ -1,0 +1,98 @@
+name: T020 checks
+
+on:
+  push:
+    branches:
+      - 'feat/**'
+      - 'feature/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: t020-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.14'
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          package-manager-cache: false
+
+      - name: Configure runner paths
+        shell: bash
+        run: |
+          {
+            echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache"
+            echo "npm_config_cache=$RUNNER_TEMP/npm-cache"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright"
+          } >> "$GITHUB_ENV"
+
+      - name: Install isolated uv tooling
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/edgevision-tools"
+          "$RUNNER_TEMP/edgevision-tools/bin/python" -m pip install \
+            --disable-pip-version-check --no-deps 'uv==0.13.5'
+          echo "$RUNNER_TEMP/edgevision-tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install locked project dependencies
+        run: python scripts/install_deps.py
+
+      - name: Run aggregate checks
+        id: aggregate
+        run: python scripts/dev.py check
+
+      - name: Install pinned Chromium
+        working-directory: web
+        run: ./node_modules/.bin/playwright install chromium
+
+      - name: Run real browser checks
+        id: browser
+        run: python scripts/e2e.py --report-dir "$RUNNER_TEMP/edgevision-report"
+
+      - name: Write result summary
+        if: always()
+        shell: bash
+        env:
+          AGGREGATE_OUTCOME: ${{ steps.aggregate.outcome }}
+          BROWSER_OUTCOME: ${{ steps.browser.outcome }}
+        run: |
+          {
+            echo '## T020 validation'
+            printf '%s\n' "- Aggregate checks: $AGGREGATE_OUTCOME"
+            printf '%s\n' "- Browser checks: $BROWSER_OUTCOME"
+            echo '- Browser scope: T020 identity and projects only.'
+            echo '- This workflow does not accept T020 or release T030.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload safe failure report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: t020-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/edgevision-report/summary.json
+            ${{ runner.temp }}/edgevision-report/summary.md
+          if-no-files-found: warn
+          include-hidden-files: false
+          retention-days: 7
