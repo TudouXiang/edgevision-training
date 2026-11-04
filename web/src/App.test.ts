@@ -44,6 +44,7 @@ describe('authenticated workspace state', () => {
     let projectPageTwoReads = 0
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input)
+      if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
       if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -86,6 +87,7 @@ describe('authenticated workspace state', () => {
     let projectReads = 0
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
       if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -138,6 +140,7 @@ describe('authenticated workspace state', () => {
     const logoutResponse = deferred<Response>()
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
       if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -162,6 +165,7 @@ describe('authenticated workspace state', () => {
   it('clears the workspace when password change reports an invalid session', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
       if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -217,6 +221,7 @@ describe('dataset upload client', () => {
     const lateUpload = deferred<Response>()
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+      if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
       if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))

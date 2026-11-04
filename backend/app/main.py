@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from importlib import metadata, util
 import json
+from hashlib import sha256
 import sqlite3
 from uuid import UUID, uuid4
 
@@ -12,6 +13,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .contracts import JobKind
+from .job_service import artifact_public, cancel_job, incremental, job_public, submit_check
 from .config import data_root
 from .database import database_ready, transaction
 from .dataset_storage import (
@@ -33,9 +36,10 @@ from .security import (
 )
 from .services import active_project, begin_write, dataset_public, project_for_actor, project_for_resource, project_public, user_public
 
-app = FastAPI(title="EdgeVision API", version="0.3.0")
+app = FastAPI(title="EdgeVision API", version="0.4.0")
 API = "/api/v1"
 _ERROR_RESPONSE = {501: {"model": ApiError, "description": "Not implemented in the production shell"}}
+_JOB_RESPONSES = {status: {"model": ApiError} for status in (404, 409, 422, 503)}
 _AUTH_RESPONSES = {
     401: {"model": ApiError, "description": "Authentication required or session invalid"},
     403: {"model": ApiError, "description": "Origin, CSRF, role or access denied"},
@@ -114,7 +118,7 @@ def capabilities():
         "features": {
             "auth": available(), "projects": available(), "datasets": available(),
             "training_cpu": unavailable("ultralytics"), "training_cuda": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="CUDA device not verified", detected_version=None),
-            "events": unavailable(), "models": unavailable(), "onnx_export": unavailable("onnx"),
+            "events": available(), "dataset_check": available(), "models": unavailable(), "onnx_export": unavailable("onnx"),
             "pt_inference": unavailable("ultralytics"), "onnx_inference": unavailable("onnxruntime"),
             "deployment": unavailable(), "rknn": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="No RKNN target or board verification", detected_version=None),
         },
@@ -275,7 +279,7 @@ def datasets(project_id: UUID, request: Request, page: int = Query(1, ge=1), pag
         project_for_actor(connection, str(project_id), actor)
         total = connection.execute("SELECT COUNT(*) FROM datasets WHERE project_id=?", (str(project_id),)).fetchone()[0]
         rows = connection.execute(
-            "SELECT * FROM datasets WHERE project_id=? ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            "SELECT datasets.*,(SELECT id FROM artifacts WHERE storage_key=datasets.report_key) AS report_artifact_id FROM datasets WHERE project_id=? ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
             (str(project_id), page_size, (page - 1) * page_size),
         ).fetchall()
         return {"items": [dataset_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}
@@ -311,6 +315,8 @@ async def upload_dataset(project_id: UUID, request: Request):
             if exc.issue.line is not None:
                 details["line"] = str(exc.issue.line)
             raise HTTPException(422, {"code": exc.issue.code, "message": exc.issue.message, "details": details}) from exc
+        except OSError as exc:
+            raise HTTPException(503, {"code": "STORAGE_READ_FAILED", "message": "Staged dataset could not be read"}) from exc
         name = dataset_name_from_filename(staged.filename)
         try:
             with api_transaction() as connection:
@@ -338,7 +344,7 @@ async def upload_dataset(project_id: UUID, request: Request):
                     VALUES (?,?,?,?,?,?,?,?,?,'pending',NULL,'{}','[]',?,?)""",
                     (dataset_id, str(project_id), parent_id, version, name, archive_key, snapshot_key, staged.sha256, staged.size_bytes, manifest, now),
                 )
-                row = connection.execute("SELECT * FROM datasets WHERE id=?", (dataset_id,)).fetchone()
+                row = connection.execute("SELECT datasets.*,(SELECT id FROM artifacts WHERE storage_key=datasets.report_key) AS report_artifact_id FROM datasets WHERE id=?", (dataset_id,)).fetchone()
             return dataset_public(row)
         except (OSError, RuntimeError, sqlite3.Error) as exc:
             if published:
@@ -355,7 +361,7 @@ async def upload_dataset(project_id: UUID, request: Request):
             pass
 
 
-@app.post(API + "/projects/{project_id}/images", response_model=ArtifactPublic, status_code=201, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE}, openapi_extra=_UPLOAD_BODY)
+@app.post(API + "/projects/{project_id}/images", response_model=ArtifactPublic, status_code=201, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES}, openapi_extra=_UPLOAD_BODY)
 def upload_image(project_id: UUID, request: Request):
     guard_project(request, project_id, mutation=True, require_active=True)
     not_implemented()
@@ -366,14 +372,18 @@ def dataset(dataset_id: UUID, request: Request):
     with api_transaction() as connection:
         actor = require_actor(connection, request)
         project_for_resource(connection, "datasets", str(dataset_id), actor)
-        row = connection.execute("SELECT * FROM datasets WHERE id=?", (str(dataset_id),)).fetchone()
+        row = connection.execute("SELECT datasets.*,(SELECT id FROM artifacts WHERE storage_key=datasets.report_key) AS report_artifact_id FROM datasets WHERE id=?", (str(dataset_id),)).fetchone()
         return dataset_public(row)
 
 
-@app.post(API + "/datasets/{dataset_id}/check", response_model=JobAccepted, status_code=202, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.post(API + "/datasets/{dataset_id}/check", response_model=JobAccepted, status_code=202, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def check_dataset(dataset_id: UUID, request: Request, idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=128)):
-    guard_resource(request, "datasets", dataset_id, mutation=True, require_active=True)
-    not_implemented()
+    require_allowed_origin(request)
+    with api_transaction() as connection:
+        begin_write(connection)
+        actor = require_actor(connection, request, csrf=True)
+        project = project_for_resource(connection, "datasets", str(dataset_id), actor)
+        return submit_check(connection, actor, project["id"], str(dataset_id), idempotency_key, request.url.path)
 
 
 @app.get(API + "/datasets/{dataset_id}/samples", response_model=Page[DatasetSamplePublic], responses={**_AUTH_RESPONSES, **_DATASET_READ_RESPONSES})
@@ -426,61 +436,108 @@ def dataset_sample_image(dataset_id: UUID, sample_id: str, request: Request):
     return FileResponse(image, media_type=media_type, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
-@app.post(API + "/projects/{project_id}/jobs", response_model=JobAccepted, status_code=202, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.post(API + "/projects/{project_id}/jobs", response_model=JobAccepted, status_code=202, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def create_job(project_id: UUID, body: JobCreate, request: Request, idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=128)):
-    guard_project(request, project_id, mutation=True, require_active=True)
-    not_implemented()
+    require_allowed_origin(request)
+    with api_transaction() as connection:
+        begin_write(connection)
+        actor = require_actor(connection, request, csrf=True)
+        project = project_for_actor(connection, str(project_id), actor)
+        if body.kind != JobKind.DATASET_CHECK:
+            active_project(project)
+            not_implemented()
+        return submit_check(connection, actor, str(project_id), str(body.params.dataset_id), idempotency_key, request.url.path)
 
 
-@app.get(API + "/projects/{project_id}/jobs", response_model=Page[JobPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/projects/{project_id}/jobs", response_model=Page[JobPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def jobs(project_id: UUID, request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
-    guard_project(request, project_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_actor(connection, str(project_id), actor)
+        total = connection.execute("SELECT COUNT(*) FROM jobs WHERE project_id=?", (str(project_id),)).fetchone()[0]
+        rows = connection.execute("SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?", (str(project_id), page_size, (page-1)*page_size)).fetchall()
+        return {"items": [job_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
-@app.get(API + "/jobs/{job_id}", response_model=JobPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/jobs/{job_id}", response_model=JobPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def job(job_id: UUID, request: Request):
-    guard_resource(request, "jobs", job_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, "jobs", str(job_id), actor)
+        return job_public(connection.execute("SELECT * FROM jobs WHERE id=?", (str(job_id),)).fetchone())
 
 
-@app.post(API + "/jobs/{job_id}/cancel", response_model=JobPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.post(API + "/jobs/{job_id}/cancel", response_model=JobPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def cancel(job_id: UUID, request: Request):
-    guard_resource(request, "jobs", job_id, mutation=True)
-    not_implemented()
+    require_allowed_origin(request)
+    with api_transaction() as connection:
+        begin_write(connection)
+        actor = require_actor(connection, request, csrf=True)
+        project_for_resource(connection, "jobs", str(job_id), actor)
+        return cancel_job(connection, str(job_id))
 
 
-@app.get(API + "/jobs/{job_id}/logs", response_model=Incremental[JobLog], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/jobs/{job_id}/logs", response_model=Incremental[JobLog], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def logs(job_id: UUID, request: Request, cursor: str | None = None, limit: int = Query(100, ge=1, le=500)):
-    guard_resource(request, "jobs", job_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, "jobs", str(job_id), actor)
+        return incremental(connection, str(job_id), "log", cursor, limit)
 
 
-@app.get(API + "/jobs/{job_id}/metrics", response_model=Incremental[Metric], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/jobs/{job_id}/metrics", response_model=Incremental[Metric], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def metrics(job_id: UUID, request: Request, cursor: str | None = None, limit: int = Query(100, ge=1, le=500)):
-    guard_resource(request, "jobs", job_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, "jobs", str(job_id), actor)
+        return incremental(connection, str(job_id), "metric", cursor, limit)
 
 
-@app.get(API + "/projects/{project_id}/artifacts", response_model=Page[ArtifactPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/projects/{project_id}/artifacts", response_model=Page[ArtifactPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def artifacts(project_id: UUID, request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
-    guard_project(request, project_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_actor(connection, str(project_id), actor)
+        total = connection.execute("SELECT COUNT(*) FROM artifacts WHERE project_id=?", (str(project_id),)).fetchone()[0]
+        rows = connection.execute("SELECT * FROM artifacts WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?", (str(project_id), page_size, (page-1)*page_size)).fetchall()
+        return {"items": [artifact_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
-@app.get(API + "/artifacts/{artifact_id}", response_model=ArtifactPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/artifacts/{artifact_id}", response_model=ArtifactPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def artifact(artifact_id: UUID, request: Request):
-    guard_resource(request, "artifacts", artifact_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, "artifacts", str(artifact_id), actor)
+        return artifact_public(connection.execute("SELECT * FROM artifacts WHERE id=?", (str(artifact_id),)).fetchone())
 
 
 @app.get(API + "/artifacts/{artifact_id}/download", response_class=Response, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, 200: {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}})
 def download_artifact(artifact_id: UUID, request: Request):
-    guard_resource(request, "artifacts", artifact_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, "artifacts", str(artifact_id), actor)
+        row = connection.execute("SELECT * FROM artifacts WHERE id=?", (str(artifact_id),)).fetchone()
+    if row["kind"] != "dataset_report":
+        not_implemented()
+    if row["validation_status"] != "passed":
+        raise HTTPException(409, {"code": "ARTIFACT_UNAVAILABLE", "message": "Report integrity has not been verified"})
+    try:
+        path = resolve_storage_file(row["storage_key"])
+        # Reports have a bounded schema. Return verified bytes, avoiding a reopen race.
+        if path.stat().st_size > 16 * 1024 * 1024:
+            raise ValueError("report exceeds its bound")
+        with path.open("rb") as source:
+            content = source.read(16 * 1024 * 1024 + 1)
+        if len(content) > 16 * 1024 * 1024:
+            raise ValueError("report exceeds its bound")
+        if len(content) != row["size_bytes"] or sha256(content).hexdigest() != row["sha256"]:
+            raise ValueError("report fingerprint mismatch")
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(409, {"code": "ARTIFACT_UNAVAILABLE", "message": "Report is missing or its fingerprint changed"}) from exc
+    return Response(content, media_type="application/json", headers={"Content-Disposition": f'attachment; filename="dataset-report-{artifact_id}.json"', "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
-@app.get(API + "/inferences/{inference_id}", response_model=InferenceResult, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/inferences/{inference_id}", response_model=InferenceResult, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def inference_result(inference_id: UUID, request: Request):
     guard_resource(request, "artifacts", inference_id)
     not_implemented()
@@ -543,7 +600,7 @@ def admin_projects(request: Request, page: int = Query(1, ge=1), page_size: int 
         return {"items": [project_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
-@app.get(API + "/admin/jobs", response_model=Page[JobPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE})
+@app.get(API + "/admin/jobs", response_model=Page[JobPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def admin_jobs(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
     with api_transaction() as connection:
         actor = require_actor(connection, request)

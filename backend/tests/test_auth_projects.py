@@ -258,7 +258,7 @@ def test_cross_owner_derived_resource_guards_precede_unimplemented(data_root):
         f"/api/v1/jobs/{job_id}", f"/api/v1/jobs/{job_id}/logs",
         f"/api/v1/jobs/{job_id}/metrics", f"/api/v1/artifacts/{artifact_id}", f"/api/v1/artifacts/{artifact_id}/download",
     ):
-        assert owner.get(path).status_code == 501
+        assert owner.get(path).status_code == (409 if path.endswith("/download") else 200)
         assert other.get(path).status_code == 404
-    assert owner.post(f"/api/v1/jobs/{job_id}/cancel", headers=mutation_headers(owner)).status_code == 501
+    assert owner.post(f"/api/v1/jobs/{job_id}/cancel", headers=mutation_headers(owner)).json()["state"] == "cancelled"
     assert other.post(f"/api/v1/jobs/{job_id}/cancel", headers=mutation_headers(other)).status_code == 404

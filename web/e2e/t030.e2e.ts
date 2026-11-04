@@ -67,9 +67,8 @@ test('real bounded dataset upload creates immutable pending versions and archive
   const pendingPreview = await sameOrigin(page, `/datasets/${first.id}/samples`)
   expect(pendingPreview.status).toBe(409)
   expect((pendingPreview.body as { error: { code: string } }).error.code).toBe('DATASET_NOT_READY')
-  const unavailableCheck = await sameOrigin(page, `/datasets/${first.id}/check`, 'POST', { 'Idempotency-Key': 't030-browser-check' })
-  expect(unavailableCheck.status).toBe(501)
-  expect((unavailableCheck.body as { error: { code: string } }).error.code).toBe('NOT_IMPLEMENTED')
+  // T040 implements check; this retained T030 case still verifies pending-only upload.
+
 
   await page.getByLabel('受控 YOLO ZIP').setInputFiles(fixture)
   const secondUpload = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${project.id}/datasets`) && response.request().method() === 'POST')

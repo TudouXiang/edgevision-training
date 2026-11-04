@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import sqlite3
 import subprocess
@@ -89,6 +90,28 @@ class InstallCommandTests(unittest.TestCase):
             runner.assert_not_called()
 
 
+class BrowserCleanupTests(unittest.TestCase):
+    def test_every_owned_service_is_stopped_after_one_failure(self):
+        script = load_script("e2e")
+        processes = (object(), object(), object())
+        with patch.object(script, "stop", side_effect=[OSError("isolated stop fault"), None, None]) as stop:
+            self.assertFalse(script.stop_owned(processes))
+        self.assertEqual([call.args[0] for call in stop.call_args_list], list(processes))
+
+    def test_cleanup_failure_preserves_real_browser_evidence(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = {"schema_version": 1, "stage": "browser", "status": "passed", "browser_status": "passed", "discovered": 4, "counts": {"passed": 4}, "cases": [{"title": "synthetic", "status": "passed"}]}
+            (root / "summary.json").write_text(json.dumps(original), encoding="utf-8")
+            script.record_cleanup(root, "failed")
+            result = json.loads((root / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["cleanup_status"], "failed")
+            for field in ("browser_status", "discovered", "counts", "cases"):
+                self.assertEqual(result[field], original[field])
+
+
 class WorkerLockTests(unittest.TestCase):
     def test_second_worker_cannot_hold_lock(self):
         from app.worker import worker_lock
@@ -105,8 +128,9 @@ class WorkerLockTests(unittest.TestCase):
             db_path = Path(directory) / "platform.db"
             with contextlib.closing(sqlite3.connect(db_path)) as db, db:
                 db.execute("CREATE TABLE alembic_version (version_num TEXT)")
-                db.execute("INSERT INTO alembic_version VALUES ('0002_foundation')")
-                db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT)")
+                db.execute("INSERT INTO alembic_version VALUES ('0003_worker')")
+                db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT, launch_phase TEXT DEFAULT 'unverified', kind TEXT DEFAULT 'train', environment_json TEXT, process_identity_json TEXT DEFAULT '{}')")
+                db.execute("CREATE TABLE datasets (status TEXT, validation_job_id TEXT)")
                 db.execute("CREATE TABLE job_events (job_id TEXT, seq INTEGER, kind TEXT, payload_json TEXT, created_at TEXT)")
                 db.execute("INSERT INTO jobs (id,status,created_at) VALUES (?,?,?)", (job_id, "queued", "2026-09-28T00:00:00Z"))
             environment = {**os.environ, "PLATFORM_DATA_ROOT": directory}

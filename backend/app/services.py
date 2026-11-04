@@ -54,6 +54,8 @@ def dataset_public(row: sqlite3.Row) -> dict:
         "name": row["name"],
         "state": row["status"],
         "version": row["version"],
+        "validation_job_id": row["validation_job_id"],
+        "report_artifact_id": row["report_artifact_id"] if "report_artifact_id" in row.keys() else None,
         "sha256": row["sha256"],
         "size_bytes": row["size_bytes"],
         "classes": classes,

@@ -44,7 +44,7 @@ def test_live_is_not_readiness_or_a_business_result(tmp_path, monkeypatch):
         assert client.get("/api/v1/unknown-path").status_code == 404
         features = client.get("/api/v1/capabilities").json()["features"]
         assert features["auth"]["available"] and features["projects"]["available"] and features["datasets"]["available"]
-        assert not any(value["available"] for key, value in features.items() if key not in {"auth", "projects", "datasets"})
+        assert not any(value["available"] for key, value in features.items() if key not in {"auth", "projects", "datasets", "events", "dataset_check"})
         migrate(tmp_path)
         assert client.get("/api/v1/health/ready").json()["status"] == "ready"
         assert client.get("/api/v1/jobs/" + str(uuid4()) + "/logs").status_code == 401
@@ -109,7 +109,7 @@ def test_legacy_0001_copy_upgrade_preserves_rows(tmp_path, monkeypatch):
     command.upgrade(config, "head")
     command.upgrade(config, "head")
     with closing(sqlite3.connect(copy_path)) as db:
-        assert db.execute("SELECT version_num FROM alembic_version").fetchone() == ("0002_foundation",)
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone() == ("0003_worker",)
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
         assert [db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("users", "projects", "datasets", "jobs", "artifacts")] == [1] * 5
         assert db.execute("SELECT status FROM datasets").fetchone() == ("pending",)

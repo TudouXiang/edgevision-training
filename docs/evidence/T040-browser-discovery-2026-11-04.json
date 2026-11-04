@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "discovery",
+  "status": "listed",
+  "browser_status": "NOT_RUN",
+  "discovered": 4,
+  "counts": {},
+  "cases": [],
+  "cleanup_status": "passed"
+}

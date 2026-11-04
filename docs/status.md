@@ -1,3 +1,15 @@
+# 项目状态 · T040 review_required（2026-11-04 UTC）
+
+T040 已实现真实单实例 Worker、全局 FIFO 单槽、幂等 dataset_check、Linux guardian/subreaper/pidfd、Windows Job Object 实现、日志/取消/恢复、真实校验与不可变报告/快照发布，以及前端任务面板。当前为 **review_required**，不是 accepted，T050 仍 blocked。
+
+本轮 Linux 隔离测试和实际 Uvicorn 重启已执行；最终命令与精确代码指纹见 [T040 报告](evidence/T040-report.md)。Windows 托管进程矩阵和四项 Chromium 场景已配置，尚需对应候选提交的真实 CI 结果；不借用 T030 的浏览器通过结果。没有训练、模型下载、Torch、ONNX 或硬件实验。
+
+新库目标为 `0003_worker`。旧库须停 API/Worker、备份，在一致性副本验证后升级。缺乏受管树退出证据时 Worker 退出 4 并停止领取；不会把取消/Worker 中断误报数据无效，Dataset 恢复 pending，内容校验错误才 invalid。完整协议、回退条件和 Windows 无 receipt 时的重启限制见 [ADR 0009](adr/0009-t040-managed-worker.md)。
+
+---
+
+以下是 T040 开始前的已接受基线，保留历史日期与证据：
+
 # 项目状态 · T030 accepted / T040 ready（2026-11-04 UTC）
 
 T030 受限数据导入、不可变版本、纯校验核心、授权预览和前端已通过独立审查，以及提交 `a9309e7d9be279ca1143c1a49dd31d2fdfe085f5` 的 [GitHub Actions 41786393552](https://github.com/TudouXiang/edgevision-training/actions/runs/41786393552)：60 项后端、6 项前端、构建/契约和三项真实 Chromium 回归通过。**T030 accepted（Linux 核心范围）**，T040 **ready**。精确版本、失败修复与限制见 [T030 验收](evidence/T030-browser-acceptance-2026-11-04.md)。

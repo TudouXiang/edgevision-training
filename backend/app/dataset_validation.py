@@ -261,6 +261,8 @@ def _bounded_eocd(archive_path: Path) -> None:
     except DatasetValidationError:
         raise
     except (OSError, struct.error, ValueError) as exc:
+        if isinstance(exc, OSError) and exc.errno is not None:
+            raise
         _fail("ARCHIVE_INVALID", "<archive>", f"Cannot inspect ZIP end record: {type(exc).__name__}")
 
 
@@ -327,6 +329,8 @@ def inspect_dataset_archive(archive_path: Path) -> ArchivePlan:
     except DatasetValidationError:
         raise
     except (BadZipFile, OSError, ValueError) as exc:
+        if isinstance(exc, OSError) and exc.errno is not None:
+            raise
         _fail("ARCHIVE_INVALID", "<archive>", f"ZIP central directory is invalid: {type(exc).__name__}")
 
 
@@ -470,7 +474,7 @@ def _extract(plan: ArchivePlan, archive_path: Path, snapshot_dir: Path) -> None:
                         os.fsync(target.fileno())
                 except DatasetValidationError:
                     raise
-                except (BadZipFile, OSError, EOFError, NotImplementedError, RuntimeError, zlib.error) as exc:
+                except (BadZipFile, EOFError, NotImplementedError, RuntimeError, zlib.error) as exc:
                     _fail("ARCHIVE_MEMBER_CORRUPT", entry.canonical_path, f"Cannot extract member: {type(exc).__name__}")
                 if actual != entry.size_bytes:
                     _fail("ARCHIVE_SIZE_MISMATCH", entry.canonical_path, "Extracted size does not match central directory")
@@ -503,6 +507,8 @@ def _validate_image(path: Path, relative: str) -> tuple[int, int]:
     except DatasetValidationError:
         raise
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        if isinstance(exc, OSError) and exc.errno is not None:
+            raise  # Host storage/permission failures are not bad dataset content.
         _fail("IMAGE_CORRUPT", relative, f"Image cannot be safely decoded: {type(exc).__name__}")
     return width, height
 

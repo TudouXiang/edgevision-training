@@ -132,7 +132,7 @@ def test_upload_registers_real_pending_archive_and_same_name_creates_new_version
     preview = client.get(f"/api/v1/datasets/{first_body['id']}/samples")
     assert preview.status_code == 409 and preview.json()["error"]["code"] == "DATASET_NOT_READY"
     check = client.post(f"/api/v1/datasets/{first_body['id']}/check", headers={**headers(client), "Idempotency-Key": "check-1"})
-    assert check.status_code == 501 and check.json()["error"]["code"] == "NOT_IMPLEMENTED"
+    assert check.status_code == 202 and check.json()["state"] == "queued"
 
 
 def test_upload_rejects_bad_archive_csrf_owner_and_archived_project_without_registration(data_root):

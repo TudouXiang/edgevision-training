@@ -21,7 +21,7 @@
 
 Session、Job、Artifact 等实际表名由骨架统一，不额外复制“训练任务表/转换任务表/推理任务表”三套状态机。各 Job.kind 的参数使用独立的严格 Schema，不透传任意字典。
 
-Job.kind：dataset_check、train、export_onnx、infer、package。Dataset.state：pending、validating、ready、invalid。Dataset 校验中断时记 invalid 并保存可解释错误，可创建新的校验任务；已 ready 快照不可被失败重试改坏。
+Job.kind：dataset_check、train、export_onnx、infer、package。Dataset.state：pending、validating、ready、invalid。Dataset 仅在真实内容校验失败时记 invalid；取消、Worker 中断或基础设施失败恢复 pending 并在 Job 保存可解释错误，可创建新的校验任务。新任务清空当前报告指针，旧 Artifact/Job 历史保留；已 ready 快照不可被失败重试改坏。
 
 Artifact.validation_state：unverified、passed、failed。完成写入但未验证的导出产物不能当作可用 ONNX 模型供后续任务选择。验证失败产生错误报告，可保留受限诊断文件，但不能展示“导出成功”。
 

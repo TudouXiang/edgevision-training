@@ -110,6 +110,8 @@ class DatasetPublic(StrictModel):
     size_bytes: int = Field(ge=0)
     classes: list[str]
     counts: dict[str, int] | None
+    validation_job_id: UUID | None = None
+    report_artifact_id: UUID | None = None
     created_at: AwareDatetime
 
 
@@ -199,7 +201,7 @@ JobCreate = Annotated[
 
 class JobAccepted(StrictModel):
     job_id: UUID
-    state: Literal[JobState.QUEUED]
+    state: JobState
 
 
 class JobPublic(StrictModel):

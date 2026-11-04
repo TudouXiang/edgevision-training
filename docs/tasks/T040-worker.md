@@ -1,6 +1,6 @@
 # T040：Worker与异步数据校验
 
-执行者：实现Agent。前置：T030 accepted，进程方案明确；状态 ready（T030 已于 2026-11-04 验收，先冻结真实进程方案再实现）。
+执行者：实现Agent。前置：T030 accepted，进程方案明确；状态 review_required（T030 已于 2026-11-04 验收；ADR 0009 架构已放行，T040 最终独立审查及 Windows/Chromium CI 尚待完成）。
 
 目标：真正的单实例Worker、FIFO/单槽、原子领取、受管子进程、幂等、日志游标、取消和恢复核对，接入dataset_check。复用唯一状态转换入口。
 
@@ -11,3 +11,5 @@
 Linux 和 Windows 均需分别实测。Windows T010 只支持无子孙进程的占位 `task_process`，其 `windows-unverified` 不是可用于恢复的主机 boot ID；接入真实适配器前须补齐进程树终止、重启后的身份核验及竞争故障注入（ADR 0006）。未取得 Windows 环境时对应验收标 NOT_RUN，不据 Linux 结果放行 Windows 能力。
 
 以真实进程测试而非只mock函数调用验收A08-A10/A12。完成数据集上传→排队→校验→ready/invalid与日志的浏览器链路。输出docs/evidence/T040-report.md及实际进程方案记录。
+
+当前候选、实际命令与故障边界见 `docs/evidence/T040-report.md`；不得在独立验收之前领取 T050。

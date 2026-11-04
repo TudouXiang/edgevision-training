@@ -5,7 +5,7 @@ from typing import Iterator
 
 from .config import db_path
 
-SCHEMA_VERSION = "0002_foundation"
+SCHEMA_VERSION = "0003_worker"
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:

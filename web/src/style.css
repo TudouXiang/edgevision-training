@@ -85,3 +85,17 @@ label { display: block; color: #485c57; font-size: 13px; font-weight: 650; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .workspace > header { height: auto; padding: 14px 18px; gap: 12px; } .account > span { display: none; } .content { width: min(100% - 24px, 1120px); padding-top: 20px; } .panel { padding: 18px; } .grid-form, .admin-create, .dataset-upload { grid-template-columns: 1fr; } .row-card, .hero-panel { align-items: flex-start; flex-direction: column; } .actions { width: 100%; } .actions button { flex: 1; } .edit-grid { grid-template-columns: 1fr; width: 100%; } .login-card { padding: 28px 22px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; } }
+.job-panel { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.job-panel h3 { margin: 0; font-size: 15px; }
+.job-panel .section-title { flex-wrap: wrap; gap: 10px; }
+.job-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.job-row > div:first-child { min-width: 0; display: flex; flex-wrap: wrap; gap: 7px; font-size: 12px; }
+.job-row small { flex-basis: 100%; overflow-wrap: anywhere; }
+.job-row span { font-weight: 700; }
+.job-log { margin-top: 12px; padding: 14px; border-radius: 8px; background: #f4f7f5; overflow-wrap: anywhere; }
+.job-log ol { max-height: 240px; overflow: auto; padding-left: 24px; font: 12px/1.7 monospace; }
+.job-log small { font-size: 11px; color: var(--muted); }
+.dataset-actions { flex-wrap: wrap; align-items: center; }
+.dataset-actions a { color: #286d5e; font-size: 12px; }
+@media (max-width: 760px) { .job-row { flex-direction: column; align-items: stretch; } .dataset-actions { width: 100%; } }
+.job-pagination { margin-top: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; }

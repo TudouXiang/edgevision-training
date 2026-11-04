@@ -1,4 +1,4 @@
-"""Run the real T020/T030 browser suite against disposable local services.
+"""Run the real T020/T030/T040 browser suite against disposable local services.
 
 The harness owns its temporary database and generated credentials. It never
 loads a developer database, changes the production startup path, or writes
@@ -31,7 +31,7 @@ BACKEND = ROOT / "backend"
 WEB = ROOT / "web"
 
 
-def create_dataset_fixture(path: Path) -> None:
+def create_dataset_fixture(path: Path, invalid: bool = False) -> None:
     """Create a deterministic tiny synthetic dataset inside the disposable runtime."""
     from PIL import Image
 
@@ -43,7 +43,7 @@ def create_dataset_fixture(path: Path) -> None:
     values = {
         "data.yaml": b"train: images/train\nval: images/val\nnames: [object]\nnc: 1\n",
         "images/train/a.png": raster("PNG"),
-        "labels/train/a.txt": b"0 0.5 0.5 0.5 0.5\n",
+        "labels/train/a.txt": b"9 0.5 0.5 0.5 0.5\n" if invalid else b"0 0.5 0.5 0.5 0.5\n",
         "images/val/b.jpg": raster("JPEG"),
         "labels/val/b.txt": b"",
     }
@@ -111,6 +111,17 @@ def stop(process: subprocess.Popen[bytes] | None) -> None:
         process.wait(timeout=5)
 
 
+def stop_owned(processes: tuple[subprocess.Popen[bytes] | None, ...]) -> bool:
+    """Attempt every owned root even if an earlier stop cannot be confirmed."""
+    confirmed = True
+    for process in processes:
+        try:
+            stop(process)
+        except (OSError, subprocess.TimeoutExpired):
+            confirmed = False
+    return confirmed
+
+
 def start_process(args: list[str], cwd: Path, environment: dict[str, str]) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
         args,
@@ -134,9 +145,26 @@ def safe_summary(report_dir: Path, stage: str, status: str) -> None:
         payload["browser_status"] = "NOT_RUN"
     (report_dir / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     (report_dir / "summary.md").write_text(
-        f"# T020/T030 browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
+        f"# T020/T030/T040 browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
         encoding="utf-8",
     )
+
+
+def record_cleanup(report_dir: Path, status: str) -> None:
+    """Keep the actual browser outcome even when later cleanup fails."""
+    try:
+        payload = json.loads((report_dir / "summary.json").read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("summary must be an object")
+    except (OSError, ValueError):
+        payload = {"schema_version": 1, "stage": "cleanup", "status": "failed", "browser_status": "NOT_RUN"}
+    payload["cleanup_status"] = status
+    if status != "passed":
+        payload["status"] = "failed"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    with (report_dir / "summary.md").open("a", encoding="utf-8") as summary:
+        summary.write(f"\n- Isolated runtime cleanup: {status}.\n")
 
 
 def main(argv: list[str]) -> int:
@@ -167,6 +195,7 @@ def main(argv: list[str]) -> int:
 
     api_process: subprocess.Popen[bytes] | None = None
     web_process: subprocess.Popen[bytes] | None = None
+    worker_process: subprocess.Popen[bytes] | None = None
     runtime: Path | None = None
     try:
         runtime = Path(tempfile.mkdtemp(prefix="edgevision-e2e-"))
@@ -175,6 +204,8 @@ def main(argv: list[str]) -> int:
         output_dir = runtime / "playwright-output"
         dataset_fixture = runtime / "tiny-dataset.zip"
         create_dataset_fixture(dataset_fixture)
+        invalid_fixture = runtime / "invalid-dataset.zip"
+        create_dataset_fixture(invalid_fixture, invalid=True)
         api_port, web_port = available_port(), available_port()
         while web_port == api_port:
             web_port = available_port()
@@ -227,6 +258,8 @@ def main(argv: list[str]) -> int:
         )
         wait_for(f"http://127.0.0.1:{api_port}/api/v1/health/ready", api_process)
 
+        worker_process = start_process([str(python), "-m", "app.worker"], BACKEND, service_environment)
+
         web_process = start_process(
             [node, str(WEB / "node_modules" / "vite" / "bin" / "vite.js"), "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"],
             WEB,
@@ -245,6 +278,7 @@ def main(argv: list[str]) -> int:
             "EDGEVISION_E2E_REPORT_DIR": str(report_dir),
             "EDGEVISION_E2E_OUTPUT_DIR": str(output_dir),
             "EDGEVISION_E2E_DATASET_ZIP": str(dataset_fixture),
+            "EDGEVISION_E2E_INVALID_DATASET_ZIP": str(invalid_fixture),
         }
         safe_summary(report_dir, run_stage, "running")
         result = subprocess.run(
@@ -269,14 +303,33 @@ def main(argv: list[str]) -> int:
         print(f"browser_e2e bootstrap_failed: {exc}", file=sys.stderr)
         return 2
     finally:
-        stop(web_process)
-        stop(api_process)
-        if runtime is not None:
+        cleanup_safe = stop_owned((web_process, api_process, worker_process))
+        if worker_process is not None and runtime is not None:
+            try:
+                from app.worker import recover, worker_lock
+                with worker_lock(runtime / "data"):
+                    cleanup_safe = (not recover()) and cleanup_safe
+            except Exception:
+                cleanup_safe = False
+        if not cleanup_safe:
+            print("browser_e2e cleanup_blocked: service or task exit is unconfirmed; isolated runtime retained", file=sys.stderr)
+            record_cleanup(report_dir, "failed")
+            return 4
+        if runtime is not None and cleanup_safe:
             try:
                 shutil.rmtree(runtime)
             except OSError:
                 time.sleep(0.2)
-                shutil.rmtree(runtime, ignore_errors=True)
+                try:
+                    shutil.rmtree(runtime)
+                except OSError:
+                    record_cleanup(report_dir, "failed")
+                    print("browser_e2e filesystem_cleanup_failed: isolated runtime retained", file=sys.stderr)
+                    return 4
+            if runtime.exists():
+                record_cleanup(report_dir, "failed")
+                return 4
+            record_cleanup(report_dir, "passed")
 
 
 if __name__ == "__main__":

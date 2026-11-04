@@ -1,4 +1,4 @@
-"""Metadata tables for revision 0002. Runtime writes are implemented per task.
+"""Metadata tables for revision 0003. Runtime writes are implemented per task.
 
 The initial and follow-up Alembic revisions are authoritative; API startup
 never calls create_all() and does not create users or sample results.
@@ -70,6 +70,7 @@ class Dataset(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[str] = mapped_column(String(16))
     report_key: Mapped[str | None] = mapped_column(String(512))
+    validation_job_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("jobs.id"))
     counts_json: Mapped[str] = mapped_column(Text)
     classes_json: Mapped[str] = mapped_column(Text)
     manifest_json: Mapped[str] = mapped_column(Text)
@@ -107,6 +108,9 @@ class Job(Base):
     child_pid: Mapped[int | None] = mapped_column(Integer)
     child_pgid: Mapped[int | None] = mapped_column(Integer)
     cancel_requested_at: Mapped[str | None] = mapped_column(String(32))
+    process_identity_json: Mapped[str] = mapped_column(Text, server_default="{}")
+    launch_phase: Mapped[str] = mapped_column(String(24), server_default="unverified")
+    publication_json: Mapped[str] = mapped_column(Text, server_default="{}")
 
 
 class JobEvent(Base):
