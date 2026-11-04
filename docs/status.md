@@ -1,8 +1,8 @@
-# 项目状态 · T020 accepted / T030 review_required（2026-11-04 UTC）
+# 项目状态 · T030 accepted / T040 ready（2026-11-04 UTC）
 
-T020 身份与项目最小闭环已通过独立代码/安全审查，并在提交 `cc2e66043473b9d3f432319fab41130cab3f2270` 的 [GitHub Actions 41779814303](https://github.com/TudouXiang/edgevision-training/actions/runs/41779814303) 完成真实 Chromium 验证。T020 **accepted（Linux CI 范围）**。T030 已形成候选：真实受限 ZIP staging/pending 版本、纯校验服务、owner-aware 查询、ready-only 有界框预览及基础前端；复用 0002，无迁移。当前 **review_required**，本机 34 项 T030 定向测试与完整后端/前端/契约检查待以最终报告为准，真实 Chromium 新场景仍须 GitHub CI。
+T030 受限数据导入、不可变版本、纯校验核心、授权预览和前端已通过独立审查，以及提交 `a9309e7d9be279ca1143c1a49dd31d2fdfe085f5` 的 [GitHub Actions 41786393552](https://github.com/TudouXiang/edgevision-training/actions/runs/41786393552)：60 项后端、6 项前端、构建/契约和三项真实 Chromium 回归通过。**T030 accepted（Linux 核心范围）**，T040 **ready**。精确版本、失败修复与限制见 [T030 验收](evidence/T030-browser-acceptance-2026-11-04.md)。
 
-现有候选能力增加数据集上传/列表/不可变版本与受限预览；pending 不可预览/训练，`/check` 仍明确 501，完整 Worker 接线属 T040。Windows 新功能、实际 TLS、人工视觉/截图、多进程压力及后续训练/模型/部署仍未验收。历史本地 Chromium 不可启动的结论保持有效；T030 浏览器仅完成 Playwright 发现，真实执行待受信 CI。远端 main 已由外部 PR 合并 T020 到 `f6db48a68534a93a50110e09750243e39417df7f`；其源码树与本工作树基线 `56c34f2ccc3d2dea46360c450079f373437f5e8f` 相同，T030 尚未提交/合并。
+生产上传仍固定为 pending，不能训练/预览；`/check` 仍 501。T040 将实现真实 Worker、日志、取消/恢复及 ready/invalid 发布。Windows 新功能、实际 TLS、人工视觉检查、真实 ML/ONNX/边缘硬件均未验收。远端 main 的外部 T020 合并为 `f6db48a68534a93a50110e09750243e39417df7f`，T030 发布在独立功能分支，未由本次操作合并 main。
 
 ## 历史 Windows T010 验收（2026-09-29）
 
@@ -29,9 +29,9 @@ Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无�
 
 ## 待审查与领取闸门
 
-1. T030 候选须完成独立代码/数据安全审查，并在候选提交的 GitHub 托管 runner 上实际执行新增 Chromium 场景；在取得对应提交证据前不能写 accepted，T040 不自动进入。
+1. T030 核心已验收。T040 先完成进程/发布协议 ADR，再实施真实子进程与 Linux/Windows 故障测试，不能沿用占位 Worker 冒充完成。
 2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。项目级后端同步没有重装已存在的 26 个包，已有环境的可运行性与全新环境可重装性分开判断。
 3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。
 
-T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **accepted**，T030 **review_required**。T040 不自动放行；ML、ONNX、RKNN 和真实训练均未因 T030 执行。
+T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **accepted**，T030 **accepted（Linux 核心）**。T040 **ready**；ML、ONNX、RKNN 和真实训练均未因 T030 执行。

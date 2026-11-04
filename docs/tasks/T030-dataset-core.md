@@ -1,6 +1,6 @@
 # T030：数据导入与校验核心
 
-执行者：实现Agent。前置：T020 accepted。状态：review_required（实现候选已完成，待独立审查和真实 Linux CI 浏览器验收）。
+执行者：实现Agent。前置：T020 accepted。状态：accepted（Linux 核心范围；见 T030-browser-acceptance-2026-11-04.md，完整异步链路仍属 T040）。
 
 目标：受限ZIP接收/staging、不可变Dataset记录、纯校验服务、预览数据结构与基础前端。暂不声称完整异步流程已完成；T040负责Worker接线。
 

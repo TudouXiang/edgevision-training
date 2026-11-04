@@ -1,6 +1,6 @@
 # ADR 0008：T030 受控数据集接收与校验边界
 
-状态：review_required（2026-11-04；待独立安全/数据审查与 CI）
+状态：accepted（2026-11-04；Linux 核心范围，独立审查及真实 CI 见 T030-browser-acceptance-2026-11-04.md）
 
 ## 问题与既有约束
 

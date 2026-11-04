@@ -1,6 +1,6 @@
 # T040：Worker与异步数据校验
 
-执行者：实现Agent。前置：T030 accepted，进程方案明确；状态blocked。
+执行者：实现Agent。前置：T030 accepted，进程方案明确；状态 ready（T030 已于 2026-11-04 验收，先冻结真实进程方案再实现）。
 
 目标：真正的单实例Worker、FIFO/单槽、原子领取、受管子进程、幂等、日志游标、取消和恢复核对，接入dataset_check。复用唯一状态转换入口。
 

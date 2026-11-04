@@ -1,4 +1,4 @@
-# HTTP 契约 V0.3 · T030 候选待审查
+# HTTP 契约 V0.3 · T030 Linux 核心已验收
 
 唯一机器可读来源：backend/app/schemas.py 与 backend/app/main.py 生成 FastAPI OpenAPI，生成入口见 scripts/export_contract.py。本文件解释语义。T010/T020 已 accepted；T030 候选复用 `0002_foundation`，实现受限 ZIP staging、Dataset 版本记录、owner-aware 查询和 ready-only 有界预览，Worker 校验接线仍属 T040。生成契约与前端类型已同步，见 ADR 0008 与 `docs/evidence/T030-report.md`。
 
@@ -9,9 +9,9 @@
 | GET /health/live、/health/ready、/capabilities | LiveResponse、ReadyResponse、CapabilitiesResponse；能力每项有 available、reason_code、reason、detected_version | 健康/就绪接口，安装不等于实测 |
 | POST /auth/login、/logout、/change-password；GET /auth/me | LoginRequest、ChangePasswordRequest、UserPublic，会话 Cookie；登出/改密 204 | T020 已实现，accepted（Linux CI） |
 | GET/POST /projects、GET/PATCH /projects/{id}、POST /projects/{id}/archive | ProjectCreate/Update/Public、Page[ProjectPublic] | T020 已实现，accepted（Linux CI） |
-| GET/POST /projects/{id}/datasets、GET /datasets/{id} | Page[DatasetPublic]；multipart 的单一 `file` ZIP，成功登记真实 pending Dataset | T030 候选已实现、review_required；完整校验不在 HTTP 请求执行 |
+| GET/POST /projects/{id}/datasets、GET /datasets/{id} | Page[DatasetPublic]；multipart 的单一 `file` ZIP，成功登记真实 pending Dataset | T030 核心已实现、accepted（Linux CI）；完整校验不在 HTTP 请求执行 |
 | POST /datasets/{id}/check | Idempotency-Key，成功语义为 202 JobAccepted | T040；owner/归档保护后仍明确 501 |
-| GET /datasets/{id}/samples、GET /datasets/{id}/samples/{sample_id}/image | Page[DatasetSamplePublic]；opaque sample ID 的鉴权图片流 | T030 候选；仅 ready 且 manifest 合法时可读，pending/invalid 拒绝 |
+| GET /datasets/{id}/samples、GET /datasets/{id}/samples/{sample_id}/image | Page[DatasetSamplePublic]；opaque sample ID 的鉴权图片流 | T030 核心已验收；仅 ready 且 manifest 合法时可读，pending/invalid 拒绝 |
 | GET/POST /projects/{id}/jobs、GET /jobs/{id}、POST /jobs/{id}/cancel | Page[JobPublic]、判别式 JobCreate(kind,params)、JobAccepted、JobPublic | T040/T050；目前 501 |
 | GET /jobs/{id}/logs、/metrics | Incremental[JobLog/Metric]；cursor、limit | T040/T050；目前 501 |
 | GET /projects/{id}/artifacts、GET /artifacts/{id}、/download | Page[ArtifactPublic]、ArtifactPublic、鉴权文件流 | T050/T060；目前 501 |
