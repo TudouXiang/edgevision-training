@@ -138,7 +138,7 @@ def drain_receipt(job: dict, *, wait_seconds: float = 0) -> dict | None:
             expected = {"schema_version", "job_id", "run_id", "guardian", "tree_exited", "started", "exit_code", "reason", "logs_complete"}
             if set(record) != expected or type(record["schema_version"]) is not int or record["schema_version"] != 1 or record["job_id"] != job["id"] or record["run_id"] != job["run_id"] or record["tree_exited"] is not True:
                 return None
-            reasons = {"completed", "worker_lost", "cancelled", "descendants_after_root_exit", "timeout", "containment_or_startup_failed"}
+            reasons = {"completed", "worker_lost", "cancelled", "descendants_after_root_exit", "remaining_job_members_after_settle", "timeout", "containment_or_startup_failed"}
             code = record["exit_code"]
             if not valid_identity(record["guardian"]) or type(record["started"]) is not bool or type(record["logs_complete"]) is not bool or record["reason"] not in reasons or (code is not None and (type(code) is not int or not -128 <= code < 2**32)):
                 return None

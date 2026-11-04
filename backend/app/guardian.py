@@ -15,6 +15,7 @@ from .run_files import atomic_json, run_directory
 
 POLL_SECONDS = 0.05
 GRACE_SECONDS = 1.0
+WINDOWS_EXIT_SETTLE_SECONDS = 0.25
 DRAIN_SECONDS = 15.0
 MAX_RUN_SECONDS = 3600.0
 
@@ -126,6 +127,7 @@ def supervise(job_id: str, run_id: str) -> int:
     reason = "completed"
     started = False
     drain_at = None
+    root_exit_at = None
     began = time.monotonic()
     try:
         tree = ProcessTree(runner_command(job_id, run_id))
@@ -151,13 +153,27 @@ def supervise(job_id: str, run_id: str) -> int:
                     tree.go()
                     started = True
             root_code = tree.poll()
+            natural_exit = False
             if root_code is not None and drain_at is None:
-                drain_at = now
-                if not tree.empty():
-                    reason = "descendants_after_root_exit"
+                if os.name == "nt":
+                    # Job accounting can retain exited processes while references
+                    # are released. Keep handling STOP/EOF each poll while settling.
+                    if root_exit_at is None:
+                        root_exit_at = now
+                    if tree.empty():
+                        natural_exit = True
+                    elif now - root_exit_at >= WINDOWS_EXIT_SETTLE_SECONDS:
+                        reason = "remaining_job_members_after_settle"
+                        drain_at = now
+                else:
+                    drain_at = now
+                    if not tree.empty():
+                        reason = "descendants_after_root_exit"
             if now - began > MAX_RUN_SECONDS or (not started and now - began > 30):
                 reason = "timeout"
                 drain_at = drain_at or now
+            if natural_exit and drain_at is None:
+                break  # Witnessed root exit + zero Job members; do not terminate.
             if drain_at is not None:
                 tree.stop(force=now - drain_at > GRACE_SECONDS)
                 if tree.empty():

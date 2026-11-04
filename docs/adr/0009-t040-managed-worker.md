@@ -76,3 +76,10 @@ GO 发送与 cancelling 的条件检查在同一短写事务内串行；身份�
 真实 Windows CI 暴露 CPython venv redirector：Popen 创建的 python.exe 可能只负责创建并等待实际解释器，因此不能把 redirector PID 当成 guardian 自身 PID。采用 [CPython 3.12.10 multiprocessing 官方同款启动协议](https://github.com/python/cpython/blob/v3.12.10/Lib/multiprocessing/popen_spawn_win32.py#L55-L62)：仅对当前 Windows 虚拟环境，使用 `sys._base_executable` 并在复制的子进程环境中设置 `__PYVENV_LAUNCHER__=sys.executable`，保留隔离依赖；不修改全局环境。Worker→guardian 以及测试/浏览器编排中用于身份或终止的 Worker/API Popen 句柄均指向实际解释器。原有出生身份、严格匹配与 receipt 退出证明完全保留；历史不匹配记录仍阻塞，不采信另一份自报身份修复旧记录。
 
 Windows runner 的原子 Job Object 启动 ABI 不变：记录的 root 是 CreateProcessW 初始创建的进程，可能为 redirector，不宣称等于 adapter 自身 PID。它在 GO 前 suspended，实际 adapter 与后代仍继承外层 Job；根句柄退出与外层 ActiveProcesses=0 同时成立才视为整树清空。原有 nested Job、强杀 guardian 的 KILL_ON_JOB_CLOSE 与孙进程用例继续执行，不绕开 venv、不削弱测试。新增原生探针比较活着的子解释器 PID/出生身份、venv prefix/可执行身份以及项目依赖可导入性；CI 只输出布尔诊断，先于完整矩阵失败即停止。
+
+
+## Windows Job 退出计数的有界收敛
+
+[Microsoft Job accounting 说明](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information) 将 ActiveProcesses 递减绑定到退出及所有引用释放。Windows root 已经 signaled/记录退出后，guardian 允许最多 250ms 自然计数收敛，按原 50ms 循环继续处理 STOP/EOF；不在 empty() 内睡眠。第一次观察 root exit 时只设一次起点。若 root 退出且 Job 数为零，则直接结束观察，不调用 TerminateJobObject；若过窗仍非零，则记 `remaining_job_members_after_settle` 并进行原有有界终止/清理。此名称仅表示尚有 Job 成员计数，不把计数直接等同于活着的后代。STOP/EOF 无须等待窗口，立即进入清理。Linux 行为不变。
+
+250ms 是保守的调度策略，不是 Windows 的保证或退出证据；持续非零会保守失败/阻塞，任何超时都不能生成成功 receipt。退出证明仍要求已观察 root 退出、ActiveProcesses=0、日志捕获线程结束；Worker 还须确认 guardian 实际退出，成功发布另须 logs_complete=true。旧 receipt 不重映射，错误码规则不放宽。一次历史容量测试的 RUNNER_FAILED 未捕获 receipt 详情，不能断言本次独立稳健性修正已经证明其根因。

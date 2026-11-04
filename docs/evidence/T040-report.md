@@ -93,3 +93,12 @@ Windows 真实 Job Object、nested Job/初始 suspended cancellation 与 Windows
 诊断调整本地仅执行 `cd backend && .venv/bin/python -m pytest tests/test_worker_process.py -k output_capacity_failure_remains_pending -q`：Linux 1 passed / 22 deselected（1.75 秒）；`git diff --check` 通过，不视为 Windows 故障已修复。
 
 诊断补充：容量场景仅重复五次，Windows 矩阵 `-s` 输出白名单 receipt 字段；无环境/路径/标识或用户内容。保留完整进程矩阵和严格错误码断言，不将偶然通过解释为缺陷已修复。
+
+
+## Windows 诊断全绿与独立计数稳健性修正
+
+提交 `ec83268` 的 [CI 41799258901](https://github.com/TudouXiang/edgevision-training/actions/runs/41799258901) 已全部通过：Linux 后端 99 / 前端 10 / 真实 Chromium 4 项及真实 HTTP 重启，Windows 原生探针 4 / 进程矩阵 34 项及真实 HTTP 重启。五次容量场景都记录 reason=completed、exit_code=71、logs_complete=true。此前唯一 RUNNER_FAILED 的 receipt 详情缺失，故根因依旧未确认；不能把后续通过或以下修正写成已经复现并修复那次失败。
+
+经独立审查批准，额外完成 Windows Job accounting 的最小稳健性修正：root exit 后非阻塞 250ms 自然收敛，每 poll 继续处理 STOP/EOF；归零直接完成、不人为 Terminate；过窗非零仍保守失败清理，持续非零绝不生成 receipt。Linux 与所有真实树/取消/恢复/错误码断言不变。新增 6 项确定性 supervisor 回归仅验证状态决策，不冒充 Windows 原生实验；新版本仍待精确提交 CI。
+
+最后有界修正本地证据：`cd backend && .venv/bin/python -m pytest tests/test_guardian_settle.py tests/test_worker_process.py tests/test_worker_api.py -q -s` 退出 0，**39 passed / 0 skipped**（46.49 秒），日志 `T040-settle-local-2026-11-04.txt`。`tests/http_restart_probe.py` 退出 0、实际重启及树退出通过，日志 `T040-settle-http-2026-11-04.txt`。`git diff --check` 通过。以上是 Linux 宿主及确定性决策回归；修正后的 Windows 原生矩阵与浏览器仍待新提交 CI，不挪用 ec83268 的全绿结果。
