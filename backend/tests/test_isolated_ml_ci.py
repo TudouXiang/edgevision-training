@@ -713,3 +713,27 @@ def test_report_write_failure_preserves_prior_sanitized_outcomes(tmp_path, monke
     result = json.loads(output.out)
     assert result['stage'] == 'cleanup' and result['status'] == 'failed'
     assert result['stages'] == previous['stages']
+
+
+def test_workflow_uses_independent_approved_sha_input_without_shell_interpolation():
+    import yaml
+    workflow = yaml.load((ROOT / '.github/workflows/t020-ci.yml').read_text(), Loader=yaml.BaseLoader)
+    approved = workflow['on']['workflow_dispatch']['inputs']['approved_commit']
+    assert approved == {'description': 'Full reviewed commit SHA required only for explicit isolated ML', 'type': 'string', 'required': 'false', 'default': ''}
+    job = workflow['jobs']['linux-training']
+    assert job['env']['EDGEVISION_APPROVED_COMMIT'] == '${{ inputs.approved_commit }}'
+    command = next(step['run'] for step in job['steps'] if step.get('name') == 'Run reviewed isolated validation')
+    assert '--expected-commit "$EDGEVISION_APPROVED_COMMIT"' in command
+    assert '$GITHUB_SHA' not in command and '${{' not in command
+
+
+@pytest.mark.parametrize('approved', ['', 'd' * 7, 'e' * 40, '; never-execute'])
+def test_unapproved_or_moved_commit_stops_before_any_preparation(tmp_path, monkeypatch, capsys, approved):
+    environment = hosted_context()
+    monkeypatch.setattr(ci.os, 'environ', environment)
+    monkeypatch.setattr(ci, 'PrivateCommands', lambda *args: pytest.fail('must not prepare commands'))
+    monkeypatch.setattr(ci, 'prepare_context', lambda *args: pytest.fail('must not acquire or build'))
+    assert ci.main(['--execute', '--expected-commit', approved, '--report-dir', str(tmp_path / 'report')]) == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result['stage'] == 'preparation' and result['status'] == 'failed'
+    assert all(row['status'] == 'NOT_RUN' for row in result['stages'])

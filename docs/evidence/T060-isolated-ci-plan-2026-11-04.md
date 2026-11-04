@@ -62,7 +62,7 @@ GitHub-hosted workflow executing the reviewed source revision.
 
 ### Exact source binding
 
-The workflow supplies `--expected-commit "$GITHUB_SHA"`. Preparation requires HEAD
+The workflow requires a separately reviewed full SHA in the manual `approved_commit` input, passed through the quoted `EDGEVISION_APPROVED_COMMIT` environment variable. It does not derive authorization from its own `GITHUB_SHA`. Empty/abbreviated/mismatched values fail before preparation. The runtime and workflow source SHAs must both equal that independent input. Preparation requires HEAD
 at that exact commit and a clean tracked/untracked state for the relevant source
 roots. Both checks repeat after freezing. It reads the commit's `git ls-tree`
 and `git cat-file` blobs, verifies each Git blob object ID, and writes only

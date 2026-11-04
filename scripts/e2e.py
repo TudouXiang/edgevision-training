@@ -145,14 +145,107 @@ def interrupt_for_cleanup(_signum: int, _frame: object) -> None:
 
 def safe_summary(report_dir: Path, stage: str, status: str) -> None:
     report_dir.mkdir(parents=True, exist_ok=True)
-    payload = {"schema_version": 1, "stage": stage, "status": status}
-    if stage != "browser":
-        payload["browser_status"] = "NOT_RUN"
+    # A harness fallback is not a reporter receipt. Unknown discovery/counts
+    # must not be replaced with zero or a successful browser claim.
+    payload = {"schema_version": 2, "stage": stage, "status": status,
+               "browser_status": "UNKNOWN" if stage == "browser" else "NOT_RUN",
+               "evidence_available": False, "discovered": None, "counts": None,
+               "outcomes": None, "attempts": None, "cases": []}
     (report_dir / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     (report_dir / "summary.md").write_text(
-        f"# EdgeVision isolated browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
+        f"# EdgeVision isolated browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Browser status: `{payload['browser_status']}`\n- Reporter evidence unavailable; counts unknown.\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
         encoding="utf-8",
     )
+
+
+def valid_browser_receipt(payload: object) -> bool:
+    """Check the closed anonymous schema and rebuild all aggregates from attempts."""
+    statuses = ("passed", "failed", "timedOut", "interrupted", "skipped")
+    outcome_names = ("expected", "unexpected", "flaky", "skipped", "NOT_RUN")
+
+    def natural(value: object) -> bool:
+        return type(value) is int and value >= 0
+
+    def numeric_map(value: object, expected: dict) -> bool:
+        return (isinstance(value, dict) and set(value) == set(expected)
+                and all(natural(item) for item in value.values()) and value == expected)
+
+    keys = {"schema_version", "stage", "status", "browser_status", "evidence_available",
+            "discovered", "counts", "outcomes", "attempts", "reporter_errors", "cases"}
+    if not (isinstance(payload, dict) and set(payload) == keys
+            and type(payload["schema_version"]) is int and payload["schema_version"] == 2
+            and payload["stage"] == "browser" and payload["evidence_available"] is True
+            and payload["status"] in ("passed", "failed", "timedout", "interrupted")
+            and natural(payload["discovered"]) and natural(payload["reporter_errors"])
+            and isinstance(payload["cases"], list) and len(payload["cases"]) == payload["discovered"]):
+        return False
+    counts = dict.fromkeys((*statuses, "NOT_RUN", "executed", "expected_skipped", "unexpected_skipped"), 0)
+    attempts = dict.fromkeys((*statuses, "total", "executed"), 0)
+    outcomes = dict.fromkeys(outcome_names, 0)
+    for number, case in enumerate(payload["cases"], 1):
+        if not (isinstance(case, dict) and set(case) == {"case_number", "status", "outcome", "executed", "attempts"}
+                and type(case["case_number"]) is int and case["case_number"] == number
+                and type(case["executed"]) is bool and isinstance(case["attempts"], list)):
+            return False
+        results = case["attempts"]
+        for retry, attempt in enumerate(results):
+            if not (isinstance(attempt, dict) and set(attempt) == {"status", "expected_status", "retry", "duration_ms"}
+                    and attempt["status"] in statuses and attempt["expected_status"] in statuses
+                    and natural(attempt["retry"]) and attempt["retry"] == retry and natural(attempt["duration_ms"])):
+                return False
+            attempts[attempt["status"]] += 1
+            attempts["total"] += 1
+            attempts["executed"] += int(attempt["status"] != "skipped")
+        final_status = results[-1]["status"] if results else "NOT_RUN"
+        executed = any(attempt["status"] != "skipped" for attempt in results)
+        # Playwright 1.64 computes outcome against the case's final expectedStatus,
+        # ignores interrupted attempts, and separates expected/unexpected skips.
+        outcome = "NOT_RUN"
+        if results:
+            expected_status = results[-1]["expected_status"]
+            expected = sum(attempt["status"] == expected_status for attempt in results
+                           if attempt["status"] not in ("skipped", "interrupted"))
+            unexpected = sum(attempt["status"] != expected_status for attempt in results
+                             if attempt["status"] not in ("skipped", "interrupted"))
+            expected_skips = expected_status == "skipped" and any(attempt["status"] == "skipped" for attempt in results)
+            outcome = ("skipped" if expected == unexpected == 0 else "expected" if unexpected == 0
+                       else "unexpected" if expected == 0 and not expected_skips else "flaky")
+        if case["status"] != final_status or case["executed"] != executed or case["outcome"] != outcome:
+            return False
+        counts[final_status] += 1
+        counts["executed"] += int(executed)
+        outcomes[outcome] += 1
+        if final_status == "skipped":
+            counts["expected_skipped" if results[-1]["expected_status"] == "skipped" else "unexpected_skipped"] += 1
+    return (numeric_map(payload["counts"], counts) and numeric_map(payload["attempts"], attempts)
+            and numeric_map(payload["outcomes"], outcomes)
+            and payload["browser_status"] == (payload["status"] if counts["executed"] else "NOT_RUN")
+            and (payload["status"] != "passed" or (outcomes["unexpected"] == 0 and payload["reporter_errors"] == 0)))
+
+
+def browser_exit_code(report_dir: Path, returncode: int, require_all_passed: bool = False) -> int:
+    """Require a valid receipt; opted-in ML must execute every discovered case."""
+    try:
+        # Bound untrusted input before decoding/parsing; never echo its contents.
+        with (report_dir / "summary.json").open("rb") as receipt:
+            raw = receipt.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise ValueError("receipt too large")
+        payload = json.loads(raw.decode("utf-8"))
+        valid = valid_browser_receipt(payload)
+    except (OSError, ValueError, RecursionError):
+        valid = False
+    if not valid:
+        safe_summary(report_dir, "browser", "failed")
+        return returncode or 2
+    counts = payload["counts"]
+    all_passed = (counts["executed"] > 0 and counts["passed"] == counts["executed"] == payload["discovered"]
+                  and payload["reporter_errors"] == 0 and payload["outcomes"]["unexpected"] == 0
+                  and payload["outcomes"]["flaky"] == 0)
+    # Keep the actual receipt when the stricter mode rejects observed skips.
+    if require_all_passed and not all_passed:
+        return returncode or 2
+    return returncode or (0 if payload["status"] == "passed" else 2)
 
 
 def record_cleanup(report_dir: Path, status: str) -> None:
@@ -162,7 +255,7 @@ def record_cleanup(report_dir: Path, status: str) -> None:
         if not isinstance(payload, dict):
             raise ValueError("summary must be an object")
     except (OSError, ValueError):
-        payload = {"schema_version": 1, "stage": "cleanup", "status": "failed", "browser_status": "NOT_RUN"}
+        payload = {"schema_version": 2, "stage": "cleanup", "status": "failed", "browser_status": "UNKNOWN", "evidence_available": False}
     payload["cleanup_status"] = status
     if status != "passed":
         payload["status"] = "failed"
@@ -344,14 +437,7 @@ def main(argv: list[str]) -> int:
             env=browser_environment,
             check=False,
         )
-        try:
-            recorded_status = json.loads((report_dir / "summary.json").read_text(encoding="utf-8")).get("status")
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            recorded_status = None
-        if recorded_status == "running" or recorded_status is None:
-            fallback_status = "listed" if run_stage == "discovery" and result.returncode == 0 else ("passed" if result.returncode == 0 else "failed")
-            safe_summary(report_dir, run_stage, fallback_status)
-        return result.returncode
+        return browser_exit_code(report_dir, result.returncode, require_all_passed=training)
     except KeyboardInterrupt:
         safe_summary(report_dir, run_stage, "interrupted")
         return 130

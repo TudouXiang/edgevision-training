@@ -134,6 +134,7 @@ def reject_overrides(environment: dict[str, str]) -> None:
 def verify_hosted_workflow(environment: dict[str, str], expected_commit: str) -> None:
     # Accident-prevention gate, not authentication against a malicious owner who
     # can forge env vars or edit this program. Trust the reviewed hosted workflow.
+    require(bool(re.fullmatch(r'[a-f0-9]{40}', expected_commit)))
     require(environment.get('GITHUB_ACTIONS') == 'true')
     require(environment.get('RUNNER_ENVIRONMENT') == 'github-hosted')
     require(environment.get('GITHUB_EVENT_NAME') == 'workflow_dispatch')

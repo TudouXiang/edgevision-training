@@ -2,9 +2,13 @@
 
 T050 的既有验收保持原范围。未发布的旧 T060 工作区已丢失，本轮从公开 T050 `3b5b8ec785be595dd82a15fe94adcb7d102396f2` 重新实现，**不沿用旧候选测试结果**。
 
-E（可信模型 ONNX 导出）的后端、严格契约、前端和验证脚本已形成源码检查点，独立静态审查已收口，新一轮轻量整合回归为后端 356 passed/9 skipped、前端 38 passed，构建/契约通过；详见 [重建记录](evidence/T060-rebuild-recovery-2026-11-04.md) 与 [后端范围](evidence/T060-export-rebuild-core.md)。隔离 CI 的静态方案审查已收口，但实际执行仍未发生。最终源码与命令范围见 [检查点记录](evidence/T060-rebuild-checkpoints.md)。源码已按阶段提交并另存持久备份，不等同于正式发布或业务验收。
+E（可信模型 ONNX 导出）的后端、严格契约、前端和验证脚本已形成源码检查点，独立静态审查已收口，新一轮轻量整合回归为后端 356 passed/9 skipped、前端 38 passed，构建/契约通过；详见 [重建记录](evidence/T060-rebuild-recovery-2026-11-04.md) 与 [后端范围](evidence/T060-export-rebuild-core.md)。隔离 CI 的静态方案审查已收口，但实际执行仍未发生。最终源码与命令范围见 [检查点记录](evidence/T060-rebuild-checkpoints.md)。源码已按阶段提交并另存持久备份，不等同于完整项目交付或业务验收。
 
 **真实 ONNX/ORT、ML HTTP/浏览器、容器隔离、Windows 新增 E 行为均未执行，E 未 accepted。** 默认自动工作流暂不运行真实 ML；隔离方案须完成审查并获准后才能实际验证。I（真实图片推理）与 P（独立部署包）继续保持规范化 501，不越过 E 验收闸门。没有发布图片、模型权重或原始运行证据。
+
+公开源码 `0455566` 已通过 [Linux/Windows 普通 CI](evidence/T060-source-ci-2026-11-04.md)，ML job 明确跳过。此结果不解除 E 原生验收闸门。
+
+浏览器证据计数另有独立修正（静态复审与轻量整合回归已通过：371 后端/9 跳过、47 前端，增量远端 CI 待执行）：匿名 schema v2 区分执行、跳过、未运行与重试，不再把所有回调写成 completed；[验证记录](evidence/T060-browser-evidence-counts-2026-11-04.md)。仅报告器/离线回归和发现检查，不推进 E/I/P 验收。
 
 以下保留历史阶段记录；遇到差异以本节为准。
 
