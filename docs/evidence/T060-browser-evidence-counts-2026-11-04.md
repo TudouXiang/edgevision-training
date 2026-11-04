@@ -90,3 +90,10 @@ nine retry/failure/skip outcome scenarios, and strict-mode flaky-pass rejection.
 报告器收据校验的独立静态复审已接受：完整匿名字段、逐项重算、负向输入与严格 ML 模式边界未发现新的阻断。独立批准 SHA 门禁亦经静态复审，分支变化或空/错 SHA 在容器准备前拒绝，不直接向 shell 插入输入。
 
 上述补充只更新本轮源码、轻量完整回归与静态审查范围；新报告器的真实浏览器、实际容器隔离和 ML 仍未执行。发布后仅允许普通 Linux/Windows CI，手动 ML job 保持默认关闭。
+
+
+## 后续远端普通浏览器实测
+
+公开提交 `b9cbc568774d8ddfdfb4a312009ebf39bebe4437` 的 [CI 41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873) 完成 success。
+Linux job `126718733541` 报告 discovered=5、executed=4、passed=4、skipped=1、failed=0、NOT_RUN=0、attempts=5、flaky=0、unexpected=0。
+这验证了普通浏览器路径和 schema v2 的实际报告，不将 skip 回调计为执行。ML job `126718736890` skipped，实际容器隔离和 ML 仍 NOT_RUN。

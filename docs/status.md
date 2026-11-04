@@ -8,9 +8,11 @@ E（可信模型 ONNX 导出）的后端、严格契约、前端和验证脚本�
 
 公开源码 `0455566` 已通过 [Linux/Windows 普通 CI](evidence/T060-source-ci-2026-11-04.md)，ML job 明确跳过。此结果不解除 E 原生验收闸门。
 
-浏览器证据计数另有独立修正（静态复审与轻量整合回归已通过：371 后端/9 跳过、47 前端，增量远端 CI 待执行）：匿名 schema v2 区分执行、跳过、未运行与重试，不再把所有回调写成 completed；[验证记录](evidence/T060-browser-evidence-counts-2026-11-04.md)。仅报告器/离线回归和发现检查，不推进 E/I/P 验收。
+浏览器证据计数另有独立修正（静态复审与轻量整合回归已通过：371 后端/9 跳过、47 前端，增量远端 CI 已通过，详见下方精确版本）：匿名 schema v2 区分执行、跳过、未运行与重试，不再把所有回调写成 completed；[验证记录](evidence/T060-browser-evidence-counts-2026-11-04.md)。公开提交 `b9cbc568774d8ddfdfb4a312009ebf39bebe4437` 的 [CI 41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873) 已完成 success：普通浏览器实际执行 4 项通过、1 项 ML 跳过；Linux 371 后端/9 跳过、47 前端，Windows 既有进程/API 通过；ML job skipped。不推进 E/I/P 验收。
 
 以下保留历史阶段记录；遇到差异以本节为准。
+
+README/验收文档的当前与历史范围已校正，并新增[纯合成 SQLite WAL 恢复练习](evidence/synthetic-backup-recovery-2026-11-04.md)。本轮端点差异独立复核 accept，27 项新增文档/合成恢复测试通过；整合轻量回归为 **398 后端通过、9 原生跳过、47 前端通过**，构建/契约及真实 API 重启探针通过。恢复练习只覆盖固定临时样本，不是生产备份工具或全平台恢复验收；真实 E/I/P 的边界不变。各远端结果仍以对应精确发布 SHA 为准。
 
 ---
 

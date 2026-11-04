@@ -1,6 +1,15 @@
 # EdgeVision — 边缘视觉模型管理与部署平台
 
-EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环境串起数据、训练、模型、ONNX 验证与部署生命周期；ONNX 是部署主线，RKNN 仅保留未验证的扩展边界，不冒充实机能力。本仓库已交付范围/存储/接口基线、API 与 Worker 骨架以及迁移/测试基础。T020 真实身份、管理员账号管理与项目闭环已通过独立审查及 Linux CI 真实浏览器验收；T030 受限数据集上传、版本记录与纯校验核心已通过独立审查和 Linux CI 三项真实浏览器回归；T040 真实异步校验、任务日志/取消/恢复和报告下载已通过 Linux/Windows 进程及 Linux 浏览器 CI，具体范围与未执行项见 `docs/evidence/T040-cross-platform-acceptance-2026-11-04.md`；训练、模型和部署仍明确未实现。状态见 `docs/status.md` 与 `docs/evidence/T020-browser-acceptance-2026-11-04.md`。
+EdgeVision 面向单机计算机视觉场景，目标是把项目、数据集、训练、模型产物、ONNX 验证与部署准备连成可追溯的工作流。V1 以 YOLO11n 目标检测为主，RKNN 只保留接口，不声称已完成 NPU 转换或实机验证。
+
+## 当前可用范围与限制
+
+- T020–T040：身份/账号与项目、受控数据集上传与版本、异步校验、真实日志、取消/恢复和报告下载已有实现及分范围验收；[Worker 跨平台证据](docs/evidence/T040-cross-platform-acceptance-2026-11-04.md)保留重启、掉电等未实测限制。
+- T050：固定 Linux CPU 小规模训练、真实指标、验证后的 best/last 产物及鉴权下载已在限定范围 accepted；见 [T050 验收](docs/evidence/T050-ci-acceptance-2026-11-04.md)。不代表 Windows ML、CUDA 或正式精度实验通过。
+- T060 E：可信 PT 的 ONNX 导出源码、前端、严格契约与测试已实现并发布，但本轮真实 ONNX/ORT、隔离模型执行与 ML 浏览器仍 **NOT_RUN**，E 未 accepted。轻量/普通浏览器 CI 不能代替真实导出验证。
+- I/P：真实图片推理与独立部署包尚未实现，接口保持规范化 501。T070 的完整管理员能力、全链路与正式实验仍受前置闸门约束。
+
+本轮文档/合成恢复测试修正前的普通 CI [41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873)对应源码 `b9cbc568`：371 项后端、47 项前端通过，9 项原生 opt-in 跳过；普通浏览器 4 项实际执行通过、1 项 ML 跳过；Windows 既有进程/API 检查通过，ML job 跳过。新增 27 项文档/合成恢复测试后的本地轻量回归为 398 后端通过、9 跳过、47 前端通过，见[限定恢复练习](docs/evidence/synthetic-backup-recovery-2026-11-04.md)。精确阶段状态见 [docs/status.md](docs/status.md)，验收条件与证据边界见 [验收矩阵](docs/acceptance.md)。这不是完整项目交付声明。
 
 ## 许可
 
@@ -13,8 +22,8 @@ EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环
 ## 目录
 
 - `docs/`：范围、架构、环境、接口、表、存储、模型、验收、ADR、证据、T000–T070 任务。
-- `backend/`：FastAPI 健康/就绪接口、显式 501 占位、独立 Worker 入口、Alembic 迁移。
-- `web/`：Vue 3/TypeScript 最小状态页面，只报告真实 API 状态。
+- `backend/`：FastAPI 身份/项目/数据集/任务/产物接口、独立 Worker、训练与导出适配器、Alembic 迁移；未实现的推理/部署路径明确 501。
+- `web/`：Vue 3/TypeScript 工作台，展示项目、数据集、任务、训练和导出状态；只报告 API 返回的事实。
 - `contracts/openapi.json`、`contracts/generated/openapi.ts`：从 FastAPI OpenAPI 生成的公共契约和前端类型；`contracts/api.ts` 临时桥接已移除。
 - `scripts/install_deps.py`：Linux/Windows 共用的项目依赖安装与预检；`scripts/dev.py`：共用的检查、启动、迁移、生成入口。`scripts/dev.sh` 保留为 Linux/Bash 兼容包装。
 - `reference/edgevision-studio-frontend.zip`：既有演示前端**原样保留**，含虚构数据，不能用于产品运行或验收。
@@ -44,6 +53,9 @@ py -3 scripts\dev.py doctor
 ## 初始化与启动
 
 如已有旧版 `0001` 数据库，**先停 API/Worker、做一致性备份，并在副本上验证 `0001`→`0002_foundation`→`0003_worker`**；不要对唯一数据副本直接试迁移。全新开发目录才直接运行下面的迁移命令。
+
+SQLite WAL 模式不能简单只复制 `platform.db`；数据库与所需受控文件须作为一致性集合备份。
+[合成 WAL 恢复练习](docs/evidence/synthetic-backup-recovery-2026-11-04.md)仅证明固定临时样本的字节保真，不是可用于真实用户库的生产备份工具。
 
 Linux：
 
@@ -88,7 +100,7 @@ cd web && ./node_modules/.bin/playwright install chromium && cd ..
 python3 scripts/e2e.py
 ```
 
-只核对测试发现、临时迁移和服务编排而不启动浏览器时，可运行 `python3 scripts/e2e.py --list`。浏览器报告只包含用例名、状态、耗时和源码位置；不保存截图、trace、视频、Cookie、请求正文、服务日志、数据库或凭据。CI 使用相同步骤；测试源码或 `--list` 成功不等于真实浏览器验收通过。
+只核对测试发现、临时迁移和服务编排而不启动浏览器时，可运行 `python3 scripts/e2e.py --list`。浏览器报告 schema v2 只包含匿名用例序号、闭集状态、计数与尝试耗时；区分执行、跳过、未运行和重试，不包含用例名、源码位置或错误正文；不保存截图、trace、视频、Cookie、请求正文、服务日志、数据库或凭据。CI 使用相同步骤；测试源码或 `--list` 成功不等于真实浏览器验收通过。
 
 旧基线的执行记录见 `docs/evidence/bootstrap-2026-09-23.md` 与 `docs/evidence/foundation-report.md`；本机结果见 `docs/evidence/T010-windows-2026-09-28.md`。不要把启动说明当成已执行证据。未实现路径明确返回 501，未知路径 404，字段无效 422；正式运行不注入 Fake Runner。
 
@@ -122,3 +134,13 @@ Ultralytics 8.4.202、Torch 2.15.0+cpu、torchvision 0.29.2+cpu；CUDA 和 Windo
 保留量，不是磁盘配额；存储失败不会发布部分模型。ready 数据不会因训练失败变为 invalid。
 代码/环境/资产变化后需要重跑操作员探针。未确认退出的探针或 Worker 会阻止继续领取，需要先核对原执行，
 不能删除记录或凭 PID 杀未知进程来绕过检查。当前验收仍见 docs/status.md。
+
+
+## ONNX 导出验证边界（T060 E）
+
+轻量 API 不安装或导入原生模型依赖。联合依赖计划与只读安装预检见
+[重建依赖计划](docs/evidence/T060-rebuild-dependency-plan.md)；源码存在不等于实际工具链可用。
+普通 push/PR CI 不自动运行真实 ML。未来显式隔离验证还必须提供独立审查的完整提交 SHA，
+与运行和工作流源码一致；缺失或分支已移动即在容器准备前失败。
+[隔离计划](docs/evidence/T060-isolated-ci-plan-2026-11-04.md)仍是静态审查方案，实际隔离/ML 未执行。
+请勿用手写能力记录、测试替身或默认外连执行替代该验收。
