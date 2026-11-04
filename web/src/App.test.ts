@@ -3,6 +3,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
+import { datasetApi } from './api'
 
 const admin = { id: '00000000-0000-4000-8000-000000000001', username: 'root', role: 'admin', is_active: true, created_at: '2026-11-04T00:00:00Z' }
 const emptyPage = { items: [], total: 0, page: 1, page_size: 20 }
@@ -180,5 +181,77 @@ describe('authenticated workspace state', () => {
     await settle()
     expect(wrapper.text()).toContain('登录工作区')
     expect(wrapper.text()).toContain('Session expired')
+  })
+})
+
+describe('dataset upload client', () => {
+  it('lets the browser set the multipart boundary and sends CSRF', async () => {
+    document.cookie = 'edgevision_csrf=dataset-csrf; path=/'
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe('POST')
+      expect(init?.body).toBeInstanceOf(FormData)
+      const headers = new Headers(init?.headers)
+      expect(headers.has('Content-Type')).toBe(false)
+      expect(headers.get('X-CSRF-Token')).toBe('dataset-csrf')
+      const body = init?.body as FormData
+      expect((body.get('file') as File).name).toBe('tiny.zip')
+      return Promise.resolve(json({
+        id: '20000000-0000-4000-8000-000000000001', project_id: '10000000-0000-4000-8000-000000000001',
+        name: 'tiny', state: 'pending', version: 1, sha256: '0'.repeat(64), size_bytes: 3,
+        classes: [], counts: null, created_at: '2026-11-04T00:00:00Z',
+      }, 201))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await datasetApi.upload(
+      '10000000-0000-4000-8000-000000000001',
+      new File([new Uint8Array([1, 2, 3])], 'tiny.zip', { type: 'application/zip' }),
+    )
+    expect(result.state).toBe('pending')
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('project switching clears stale upload state and ignores its late response', async () => {
+    document.cookie = 'edgevision_csrf=dataset-csrf; path=/'
+    const firstProject = { id: '30000000-0000-4000-8000-000000000001', owner_id: admin.id, name: 'first', description: '', archived_at: null, created_at: admin.created_at, updated_at: admin.created_at }
+    const secondProject = { ...firstProject, id: '30000000-0000-4000-8000-000000000002', name: 'second' }
+    const lateUpload = deferred<Response>()
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
+      if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
+      if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
+      if (url.endsWith('/auth/me')) return Promise.resolve(json(admin))
+      if (url.includes('/projects?page=')) return Promise.resolve(json({ ...emptyPage, items: [firstProject, secondProject], total: 2 }))
+      if (url.includes('/admin/users?page=')) return Promise.resolve(json(emptyPage))
+      if (url.includes(`/projects/${firstProject.id}/datasets`) && init?.method === 'POST') return lateUpload.promise
+      if (url.includes(`/projects/${firstProject.id}/datasets?`)) return Promise.resolve(json(emptyPage))
+      if (url.includes(`/projects/${secondProject.id}/datasets?`)) return Promise.resolve(json(emptyPage))
+      throw new Error(`unhandled ${init?.method ?? 'GET'} ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = mount(App)
+    await settle()
+    const picker = wrapper.get('select').findAll('option').some(option => option.text() === 'first')
+      ? wrapper.findAll('select').find(select => select.findAll('option').some(option => option.text() === 'first'))!
+      : wrapper.get('select')
+    await picker.setValue(firstProject.id)
+    await settle()
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [new File([new Uint8Array([1])], 'tiny.zip', { type: 'application/zip' })] })
+    await input.trigger('change')
+    await wrapper.get('form.dataset-upload').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('form.dataset-upload button[type="submit"]').text()).toContain('上传中')
+    await picker.setValue(secondProject.id)
+    await settle()
+    expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('form.dataset-upload button[type="submit"]').text()).toContain('上传新快照')
+    lateUpload.resolve(json({
+      id: '40000000-0000-4000-8000-000000000001', project_id: firstProject.id, name: 'tiny', state: 'pending',
+      version: 1, sha256: '0'.repeat(64), size_bytes: 1, classes: [], counts: null, created_at: admin.created_at,
+    }, 201))
+    await settle()
+    expect(wrapper.text()).toContain('这个项目还没有数据集')
+    expect(wrapper.text()).not.toContain('tiny · v1')
   })
 })

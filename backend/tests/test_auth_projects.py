@@ -248,8 +248,14 @@ def test_cross_owner_derived_resource_guards_precede_unimplemented(data_root):
         connection.execute("INSERT INTO jobs (id,project_id,owner_id,kind,status,payload_json,created_at) VALUES (?,?,?,?,?,?,?)", (job_id, project_id, alice["id"], "train", "queued", "{}", now))
         connection.execute("INSERT INTO artifacts (id,project_id,job_id,parent_id,kind,format,storage_key,sha256,size_bytes,validation_status,metadata_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (artifact_id, project_id, job_id, None, "dataset_report", "json", "report", "0" * 64, 1, "unverified", "{}", now))
 
+    dataset = owner.get(f"/api/v1/datasets/{dataset_id}")
+    assert dataset.status_code == 200 and dataset.json()["state"] == "pending"
+    pending_samples = owner.get(f"/api/v1/datasets/{dataset_id}/samples")
+    assert pending_samples.status_code == 409 and pending_samples.json()["error"]["code"] == "DATASET_NOT_READY"
+    assert other.get(f"/api/v1/datasets/{dataset_id}").status_code == 404
+    assert other.get(f"/api/v1/datasets/{dataset_id}/samples").status_code == 404
     for path in (
-        f"/api/v1/datasets/{dataset_id}", f"/api/v1/jobs/{job_id}", f"/api/v1/jobs/{job_id}/logs",
+        f"/api/v1/jobs/{job_id}", f"/api/v1/jobs/{job_id}/logs",
         f"/api/v1/jobs/{job_id}/metrics", f"/api/v1/artifacts/{artifact_id}", f"/api/v1/artifacts/{artifact_id}/download",
     ):
         assert owner.get(path).status_code == 501

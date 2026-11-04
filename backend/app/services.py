@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
 from fastapi import HTTPException
@@ -34,6 +35,30 @@ def project_public(row: sqlite3.Row) -> dict:
         "archived_at": row["archived_at"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+    }
+
+
+def dataset_public(row: sqlite3.Row) -> dict:
+    try:
+        classes = json.loads(row["classes_json"])
+        counts = json.loads(row["counts_json"])
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise HTTPException(500, {"code": "DATASET_RECORD_INVALID", "message": "Dataset metadata is not readable"}) from exc
+    if not isinstance(classes, list) or not all(isinstance(name, str) for name in classes):
+        raise HTTPException(500, {"code": "DATASET_RECORD_INVALID", "message": "Dataset class metadata is invalid"})
+    if not isinstance(counts, dict) or any(not isinstance(key, str) or isinstance(value, bool) or not isinstance(value, int) or value < 0 for key, value in counts.items()):
+        raise HTTPException(500, {"code": "DATASET_RECORD_INVALID", "message": "Dataset count metadata is invalid"})
+    return {
+        "id": row["id"],
+        "project_id": row["project_id"],
+        "name": row["name"],
+        "state": row["status"],
+        "version": row["version"],
+        "sha256": row["sha256"],
+        "size_bytes": row["size_bytes"],
+        "classes": classes,
+        "counts": counts if row["status"] in {"ready", "invalid"} else None,
+        "created_at": row["created_at"],
     }
 
 

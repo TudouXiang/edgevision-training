@@ -43,8 +43,8 @@ def test_live_is_not_readiness_or_a_business_result(tmp_path, monkeypatch):
         assert invalid.json()["error"]["code"] == "VALIDATION_ERROR"
         assert client.get("/api/v1/unknown-path").status_code == 404
         features = client.get("/api/v1/capabilities").json()["features"]
-        assert features["auth"]["available"] and features["projects"]["available"]
-        assert not any(value["available"] for key, value in features.items() if key not in {"auth", "projects"})
+        assert features["auth"]["available"] and features["projects"]["available"] and features["datasets"]["available"]
+        assert not any(value["available"] for key, value in features.items() if key not in {"auth", "projects", "datasets"})
         migrate(tmp_path)
         assert client.get("/api/v1/health/ready").json()["status"] == "ready"
         assert client.get("/api/v1/jobs/" + str(uuid4()) + "/logs").status_code == 401

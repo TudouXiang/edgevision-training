@@ -1,4 +1,4 @@
-"""Run the real T020 browser suite against disposable local services.
+"""Run the real T020/T030 browser suite against disposable local services.
 
 The harness owns its temporary database and generated credentials. It never
 loads a developer database, changes the production startup path, or writes
@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from io import BytesIO
 import secrets
 import shutil
 import signal
@@ -22,11 +23,35 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 WEB = ROOT / "web"
+
+
+def create_dataset_fixture(path: Path) -> None:
+    """Create a deterministic tiny synthetic dataset inside the disposable runtime."""
+    from PIL import Image
+
+    def raster(format_name: str) -> bytes:
+        output = BytesIO()
+        Image.new("RGB", (8, 8), (30, 100, 150)).save(output, format=format_name)
+        return output.getvalue()
+
+    values = {
+        "data.yaml": b"train: images/train\nval: images/val\nnames: [object]\nnc: 1\n",
+        "images/train/a.png": raster("PNG"),
+        "labels/train/a.txt": b"0 0.5 0.5 0.5 0.5\n",
+        "images/val/b.jpg": raster("JPEG"),
+        "labels/val/b.txt": b"",
+    }
+    with ZipFile(path, "w", ZIP_DEFLATED) as archive:
+        for name, content in values.items():
+            info = ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            archive.writestr(info, content)
 
 
 def backend_python() -> Path:
@@ -109,7 +134,7 @@ def safe_summary(report_dir: Path, stage: str, status: str) -> None:
         payload["browser_status"] = "NOT_RUN"
     (report_dir / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     (report_dir / "summary.md").write_text(
-        f"# T020 browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs and database files are excluded.\n",
+        f"# T020/T030 browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
         encoding="utf-8",
     )
 
@@ -148,6 +173,8 @@ def main(argv: list[str]) -> int:
         data_root = runtime / "data"
         data_root.mkdir()
         output_dir = runtime / "playwright-output"
+        dataset_fixture = runtime / "tiny-dataset.zip"
+        create_dataset_fixture(dataset_fixture)
         api_port, web_port = available_port(), available_port()
         while web_port == api_port:
             web_port = available_port()
@@ -217,6 +244,7 @@ def main(argv: list[str]) -> int:
             "EDGEVISION_E2E_ROTATED_PASSWORD": rotated_password,
             "EDGEVISION_E2E_REPORT_DIR": str(report_dir),
             "EDGEVISION_E2E_OUTPUT_DIR": str(output_dir),
+            "EDGEVISION_E2E_DATASET_ZIP": str(dataset_fixture),
         }
         safe_summary(report_dir, run_stage, "running")
         result = subprocess.run(

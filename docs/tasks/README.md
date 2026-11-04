@@ -7,7 +7,7 @@
 |T000 盘点与规范合并|GPT6|实际目标目录已确认|review_required，ML_CHECK_PENDING|
 |T010 可启动骨架与精确契约|GPT6/Codex|T000相关轻量环境就绪|accepted，Windows A01–A04 PASS，独立审查 accept|
 |T020 身份与项目|实现Agent|T010审查通过|accepted，Linux CI 真浏览器通过，见 T020-browser-acceptance 报告|
-|T030 数据导入/校验核心|实现Agent|T020通过|ready，未领取|
+|T030 数据导入/校验核心|实现Agent|T020通过|review_required，候选实现/本机检查完成，待当前提交真实浏览器 CI|
 |T040 Worker与校验任务接线|实现Agent|T030通过、进程方案明确|blocked|
 |T050 真实训练|实现Agent|T040通过、ML链路已核验|blocked|
 |T060 ONNX/推理/部署包|实现Agent|T050通过|blocked|

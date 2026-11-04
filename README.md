@@ -1,6 +1,6 @@
 # EdgeVision — 边缘视觉模型管理与部署平台
 
-EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环境串起数据、训练、模型、ONNX 验证与部署生命周期；ONNX 是部署主线，RKNN 仅保留未验证的扩展边界，不冒充实机能力。本仓库已交付范围/存储/接口基线、API 与 Worker 骨架以及迁移/测试基础。T020 真实身份、管理员账号管理与项目闭环已通过独立审查及 Linux CI 真实浏览器验收；数据集、训练、模型和部署业务仍明确未实现。状态见 `docs/status.md` 与 `docs/evidence/T020-browser-acceptance-2026-11-04.md`。
+EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环境串起数据、训练、模型、ONNX 验证与部署生命周期；ONNX 是部署主线，RKNN 仅保留未验证的扩展边界，不冒充实机能力。本仓库已交付范围/存储/接口基线、API 与 Worker 骨架以及迁移/测试基础。T020 真实身份、管理员账号管理与项目闭环已通过独立审查及 Linux CI 真实浏览器验收；T030 受限数据集上传、版本记录与纯校验核心已形成待审查候选；异步校验、训练、模型和部署仍明确未实现。状态见 `docs/status.md` 与 `docs/evidence/T020-browser-acceptance-2026-11-04.md`。
 
 ## 目录
 
@@ -73,7 +73,7 @@ python3 scripts/dev.py check
 
 `contract-generate` 从 FastAPI OpenAPI 生成 TS；`contract-check` 不修改跟踪产物。`check` 包括纯契约/脚本测试、后端 pytest、前端构建和契约漂移检查。兼容的 Bash 入口仍可使用 `bash scripts/dev.sh <命令>`。Windows 本机的运行结果见 `docs/evidence/T010-windows-2026-09-28.md`；此前 Linux 容器缺依赖的结论只适用于当时环境。
 
-T020 的真实浏览器回归使用锁定的 Playwright/Chromium，并且只连接测试入口创建的临时迁移数据库。先安装项目依赖和与锁文件匹配的浏览器，再执行包装脚本；包装脚本会生成内存测试凭据、启动真实 Uvicorn 与 Vite 同源代理，并在结束时停止服务和删除临时数据库：
+T020 身份/项目与 T030 上传/pending 版本的真实浏览器回归使用锁定的 Playwright/Chromium，并且只连接测试入口创建的临时迁移数据库。先安装项目依赖和与锁文件匹配的浏览器，再执行包装脚本；包装脚本会生成内存测试凭据、启动真实 Uvicorn 与 Vite 同源代理，并在结束时停止服务和删除临时数据库：
 
 ```bash
 cd web && ./node_modules/.bin/playwright install chromium && cd ..

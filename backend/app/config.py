@@ -3,11 +3,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-# Documented T010 ceilings. Upload/worker enforcement is T030/T040, not active.
+# Dataset limits are enforced by the T030 staging/validation core. T040 owns
+# invoking the full validator from a Worker and publishing a ready snapshot.
 MAX_DATASET_ZIP_BYTES = 512 * 1024 * 1024
 MAX_ARCHIVE_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 20_000
+MAX_ARCHIVE_CENTRAL_DIRECTORY_BYTES = 32 * 1024 * 1024
+MAX_ARCHIVE_MEMBER_BYTES = 512 * 1024 * 1024
+MAX_ARCHIVE_COMPRESSION_RATIO = 200
 MAX_IMAGE_PIXELS = 30_000_000
+MAX_IMAGE_FILE_BYTES = 50 * 1024 * 1024
+MAX_DATASET_YAML_BYTES = 64 * 1024
+MAX_LABEL_FILE_BYTES = 4 * 1024 * 1024
+MAX_LABEL_LINE_BYTES = 4096
+MAX_LABELS_PER_FILE = 100_000
+MAX_PREVIEW_SAMPLES = 100
+MAX_PREVIEW_ANNOTATIONS = 200
+MAX_MULTIPART_OVERHEAD_BYTES = 128 * 1024
 
 SESSION_COOKIE_NAME = "edgevision_session"
 CSRF_COOKIE_NAME = "edgevision_csrf"

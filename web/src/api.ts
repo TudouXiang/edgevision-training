@@ -5,7 +5,11 @@ type ReadyResponse = components['schemas']['ReadyResponse']
 export type Capabilities = components['schemas']['CapabilitiesResponse']
 export type User = components['schemas']['UserPublic']
 export type Project = components['schemas']['ProjectPublic']
+export type Dataset = components['schemas']['DatasetPublic']
+export type DatasetSample = components['schemas']['DatasetSamplePublic']
 type ProjectPage = components['schemas']['Page_ProjectPublic_']
+type DatasetPage = components['schemas']['Page_DatasetPublic_']
+type DatasetSamplePage = components['schemas']['Page_DatasetSamplePublic_']
 type UserPage = components['schemas']['Page_UserPublic_']
 type LoginBody = components['schemas']['LoginRequest']
 type ProjectCreateBody = components['schemas']['ProjectCreate']
@@ -27,7 +31,7 @@ function cookie(name: string): string | null {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase()
   const headers = new Headers(options.headers)
-  if (options.body !== undefined) headers.set('Content-Type', 'application/json')
+  if (options.body !== undefined && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && path !== '/auth/login') {
     const csrf = cookie('edgevision_csrf')
     if (csrf) headers.set('X-CSRF-Token', csrf)
@@ -64,6 +68,16 @@ export const projectApi = {
   create: (body: ProjectCreateBody, signal?: AbortSignal) => request<Project>('/projects', { method: 'POST', body: JSON.stringify(body), signal }),
   update: (id: string, body: ProjectUpdateBody, signal?: AbortSignal) => request<Project>(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body), signal }),
   archive: (id: string, signal?: AbortSignal) => request<Project>(`/projects/${id}/archive`, { method: 'POST', signal }),
+}
+
+export const datasetApi = {
+  list: (projectId: string, page = 1, pageSize = 20, signal?: AbortSignal) => request<DatasetPage>(`/projects/${projectId}/datasets?page=${page}&page_size=${pageSize}`, { signal }),
+  upload: (projectId: string, file: File, signal?: AbortSignal) => {
+    const body = new FormData()
+    body.append('file', file, file.name)
+    return request<Dataset>(`/projects/${projectId}/datasets`, { method: 'POST', body, signal })
+  },
+  samples: (datasetId: string, page = 1, pageSize = 12, signal?: AbortSignal) => request<DatasetSamplePage>(`/datasets/${datasetId}/samples?page=${page}&page_size=${pageSize}`, { signal }),
 }
 
 export const adminApi = {
