@@ -58,3 +58,26 @@ it('reads final metrics and renders no fabricated value',async()=>{
  const wrapper=create();await flushPromises();expect(wrapper.text()).toContain('最终指标已读取');expect(wrapper.text()).toContain('0.75000')
  await vi.advanceTimersByTimeAsync(2000);expect(jobApi.metrics).toHaveBeenCalledTimes(1)
 })
+it('ignores a late accepted submission after choosing another training job', async () => {
+ mocks();let resolve!:(value:{job_id:string,state:'queued'})=>void
+ vi.spyOn(jobApi,'train').mockReturnValue(new Promise(done=>resolve=done))
+ const wrapper=create();await flushPromises();await wrapper.find('select').setValue('d')
+ await wrapper.find('form').trigger('submit')
+ await wrapper.findAll('button').find(b=>b.text()==='b · running')!.trigger('click');await flushPromises()
+ resolve({job_id:'late-submission',state:'queued'});await flushPromises()
+ expect(jobApi.detail).not.toHaveBeenCalledWith('late-submission',expect.anything())
+ await vi.advanceTimersByTimeAsync(2000);await flushPromises()
+ expect(vi.mocked(jobApi.detail).mock.calls.at(-1)?.[0]).toBe('b')
+})
+it('ignores a late submission detail and error after newer selection', async () => {
+ mocks();let reject!:(error:Error)=>void
+ vi.spyOn(jobApi,'train').mockResolvedValue({job_id:'late-submission',state:'queued'})
+ vi.mocked(jobApi.detail).mockImplementation(id=>id==='late-submission'?new Promise((_,no)=>reject=no):Promise.resolve(job(id)))
+ const wrapper=create();await flushPromises();await wrapper.find('select').setValue('d')
+ await wrapper.find('form').trigger('submit');await flushPromises()
+ await wrapper.findAll('button').find(b=>b.text()==='b · running')!.trigger('click');await flushPromises()
+ reject(new Error('stale failure'));await flushPromises()
+ expect(wrapper.text()).not.toContain('stale failure')
+ await vi.advanceTimersByTimeAsync(2000);await flushPromises()
+ expect(vi.mocked(jobApi.detail).mock.calls.at(-1)?.[0]).toBe('b')
+})

@@ -60,7 +60,7 @@ async function poll() {
       }
     }
     warning.value = ''; delay = 2000; succeeded = true
-  } catch (value) { error(value); delay = Math.min(delay * 2, 15000) }
+  } catch (value) { if (expected === revision) { error(value); delay = Math.min(delay * 2, 15000) } }
   finally {
     busy = false
     if (!controller.signal.aborted) { clearTimeout(timer); timer = setTimeout(() => void poll(), succeeded && chosen.value && terminal(chosen.value) && !done.value ? 100 : delay) }
@@ -72,15 +72,16 @@ async function submit(source?: string) {
   const body = JSON.stringify({params, source})
   if (!pending || pending.body !== body) pending = {body, key: crypto.randomUUID()}
   submitting.value = true
+  const expected = ++revision
   try {
     const accepted = await jobApi.train(props.project.id, params, pending.key, controller.signal, source)
-    if (controller.signal.aborted) return
+    if (controller.signal.aborted || revision !== expected) return
     const detail = await jobApi.detail(accepted.job_id, controller.signal)
-    if (controller.signal.aborted) return
+    if (controller.signal.aborted || revision !== expected) return
     pending = null
     page.value = 1; choose(detail)
-  } catch (value) { error(value) }
-  finally { submitting.value = false }
+  } catch (value) { if (revision === expected) error(value) }
+  finally { if (!controller.signal.aborted) submitting.value = false }
 }
 async function cancel() {
   if (!chosen.value || cancelling.value || terminal(chosen.value)) return
@@ -88,8 +89,8 @@ async function cancel() {
   const id = chosen.value.id
   const expected = ++revision
   try { const result = await jobApi.cancel(id, controller.signal); if (!controller.signal.aborted && chosen.value?.id === id && revision === expected) chosen.value = result }
-  catch (value) { error(value) }
-  finally { cancelling.value = false }
+  catch (value) { if (revision === expected) error(value) }
+  finally { if (!controller.signal.aborted) cancelling.value = false }
 }
 function changePage(next: number) {
   if (next < 1 || next > Math.max(1, Math.ceil(total.value / 20))) return

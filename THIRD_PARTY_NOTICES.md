@@ -61,7 +61,21 @@ type-fest 4.41.0（MIT OR CC0-1.0）以及六个 BlueOak 路径。包级字段�
 嵌入作品；Lucide 的完整 LICENSE 同时保留 Lucide Icons and Contributors 与 Cole Bemis /
 Feather 的声明，Playwright 的 NOTICE 包含 Puppeteer 来源说明，均须随实际分发内容保留。
 
-## 计划中的 ML 组件：尚未接入项目锁文件
+## T060 重建联合锁的新增边界
+
+当前源码另有 `backend/requirements-ml-linux-cpu.lock` 与
+`backend/requirements-delivery-linux-cpu.lock`。后者保留训练锁的全部固定条目，
+新增 ONNX 1.23.2、ONNX Runtime 1.31.1、protobuf 7.36.2、ml_dtypes 0.6.0 与
+flatbuffers 25.12.19。官方发行元数据与文件摘要的本轮核对见
+[依赖重建计划](docs/evidence/T060-rebuild-dependency-plan.md)。这里只发布依赖清单，
+不随源码发布其 wheel、原生库、模型权重或镜像；未把元数据核对说成安装/运行或完整许可审计。
+
+本轮没有改变项目 AGPL-3.0-only 选择，亦未覆盖第三方许可。未来二进制/部署包交付前，
+必须按实际装入的精确 wheel 和组件收集原始 LICENSE、NOTICE 与适用版权声明，
+单独核对输入权重及用户产物的权利。T060 的该发行审计仍待完成；下节保留早期规划记录，
+其中“尚未接入”仅描述当时状态，不覆盖上述联合锁。
+
+## 历史 ML 规划记录：当时尚未接入项目锁文件
 
 当前两个锁文件均未引入下列组件。这里记录官方上游的许可方向，不宣称具体版本、wheel、
 模型权重或数据集已经获准使用。

@@ -526,44 +526,11 @@ export interface components {
              */
             request_id: string;
         };
-        /** ArtifactPublic */
-        ArtifactPublic: {
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Format */
-            format: string;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Job Id */
-            job_id: string | null;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "dataset_report" | "pt_best" | "pt_last" | "onnx" | "inference_input" | "inference_result" | "deployment_zip";
-            /** Metadata */
-            metadata: components["schemas"]["TrainingArtifactMetadata"] | components["schemas"]["ModelMetadata"] | {
-                [key: string]: unknown;
-            };
-            /** Metadata Schema Version */
-            metadata_schema_version: number;
-            /**
-             * Project Id
-             * Format: uuid
-             */
-            project_id: string;
-            /** Sha256 */
-            sha256: string;
-            /** Size Bytes */
-            size_bytes: number;
-            validation_state: components["schemas"]["ValidationState"];
-        };
+        /**
+         * ArtifactPublic
+         * @description Kind-discriminated public schema: malformed ONNX never falls back to dict.
+         */
+        ArtifactPublic: components["schemas"]["TrainingArtifactPublic"] | components["schemas"]["OnnxArtifactPublic"] | components["schemas"]["OtherArtifactPublic"];
         /** CapabilitiesResponse */
         CapabilitiesResponse: {
             /** Features */
@@ -765,6 +732,26 @@ export interface components {
             kind: "export_onnx";
             params: components["schemas"]["ExportOnnxParams"];
         };
+        /** ExportJobSource */
+        ExportJobSource: {
+            /** Code Version */
+            code_version: string;
+            params: components["schemas"]["ExportOnnxParams"];
+            /** Runtime Binding */
+            runtime_binding: string;
+            /**
+             * Source Artifact Id
+             * Format: uuid
+             */
+            source_artifact_id: string;
+            /**
+             * Source Job Id
+             * Format: uuid
+             */
+            source_job_id: string;
+            /** Source Sha256 */
+            source_sha256: string;
+        };
         /** ExportOnnxParams */
         ExportOnnxParams: {
             /**
@@ -790,6 +777,207 @@ export interface components {
              * @constant
              */
             precision: "fp32";
+        };
+        /** ExportProvenance */
+        ExportProvenance: {
+            /** Code Version */
+            code_version: string;
+            /** Input Sha256 */
+            input_sha256: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * Parent Artifact Id
+             * Format: uuid
+             */
+            parent_artifact_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Runtime Binding */
+            runtime_binding: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Source Job Id
+             * Format: uuid
+             */
+            source_job_id: string;
+            /** Source Metadata Sha256 */
+            source_metadata_sha256: string;
+            /** Source Sha256 */
+            source_sha256: string;
+            /** Source Size Bytes */
+            source_size_bytes: number;
+            /** Source Training Input Sha256 */
+            source_training_input_sha256: string;
+            training: components["schemas"]["TrainingProvenance"];
+        };
+        /** ExportRuntime */
+        ExportRuntime: {
+            /**
+             * Device
+             * @constant
+             */
+            device: "cpu";
+            /**
+             * Dynamic
+             * @constant
+             */
+            dynamic: false;
+            /**
+             * Ir Version
+             * @constant
+             */
+            ir_version: 8;
+            /**
+             * Nms
+             * @constant
+             */
+            nms: false;
+            /**
+             * Opset
+             * @constant
+             */
+            opset: 18;
+            /**
+             * Precision
+             * @constant
+             */
+            precision: "fp32";
+            /**
+             * Provider
+             * @constant
+             */
+            provider: "CPUExecutionProvider";
+            /**
+             * Simplify
+             * @constant
+             */
+            simplify: false;
+            /**
+             * Threads
+             * @constant
+             */
+            threads: 2;
+            versions: components["schemas"]["ExportVersions"];
+        };
+        /** ExportValidation */
+        ExportValidation: {
+            /**
+             * Atol
+             * @constant
+             */
+            atol: 0.0001;
+            /**
+             * Checker Passed
+             * @constant
+             */
+            checker_passed: true;
+            /** Classes */
+            classes: string[];
+            /**
+             * Dtype
+             * @constant
+             */
+            dtype: "float32";
+            /**
+             * Input Name
+             * @constant
+             */
+            input_name: "images";
+            /** Input Sha256 */
+            input_sha256: string;
+            /** Input Shape */
+            input_shape: [
+                1,
+                3,
+                640,
+                640
+            ];
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Model Sha256 */
+            model_sha256: string;
+            /** Model Size Bytes */
+            model_size_bytes: number;
+            /** Original Graph Sha256 */
+            original_graph_sha256: string;
+            /**
+             * Output Name
+             * @constant
+             */
+            output_name: "output0";
+            /** Output Shape */
+            output_shape: [
+                1,
+                number,
+                8400
+            ];
+            /**
+             * Rtol
+             * @constant
+             */
+            rtol: 0.0001;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            runtime: components["schemas"]["ExportRuntime"];
+            /** Samples */
+            samples: components["schemas"]["TensorComparison"][];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /** Source Sha256 */
+            source_sha256: string;
+            /**
+             * Tensor Protocol
+             * @constant
+             */
+            tensor_protocol: "rgb-fixed-v1";
+        };
+        /** ExportVersions */
+        ExportVersions: {
+            /**
+             * Onnx
+             * @constant
+             */
+            onnx: "1.23.2";
+            /**
+             * Onnxruntime
+             * @constant
+             */
+            onnxruntime: "1.31.1";
+            /**
+             * Torch
+             * @constant
+             */
+            torch: "2.15.0+cpu";
+            /**
+             * Torchvision
+             * @constant
+             */
+            torchvision: "0.29.2+cpu";
+            /**
+             * Ultralytics
+             * @constant
+             */
+            ultralytics: "8.4.202";
         };
         /** FeatureCapability */
         FeatureCapability: {
@@ -930,6 +1118,7 @@ export interface components {
             created_by: string;
             /** Error Code */
             error_code: string | null;
+            export?: components["schemas"]["ExportJobSource"] | null;
             /** Finished At */
             finished_at: string | null;
             /**
@@ -993,35 +1182,8 @@ export interface components {
             /** Value */
             value: number;
         };
-        /** ModelInput */
-        ModelInput: {
-            /**
-             * Color
-             * @enum {string}
-             */
-            color: "RGB" | "BGR";
-            /**
-             * Layout
-             * @constant
-             */
-            layout: "NCHW";
-            /** Letterbox */
-            letterbox: boolean;
-            /**
-             * Normalization
-             * @constant
-             */
-            normalization: "0..1";
-            /** Shape */
-            shape: [
-                number,
-                number,
-                number,
-                number
-            ];
-        };
-        /** ModelMetadata */
-        ModelMetadata: {
+        /** OnnxArtifactMetadata */
+        OnnxArtifactMetadata: {
             /**
              * Architecture
              * @constant
@@ -1029,77 +1191,108 @@ export interface components {
             architecture: "yolo11n";
             /** Classes */
             classes: string[];
-            /**
-             * Dataset Id
-             * Format: uuid
-             */
-            dataset_id: string;
-            /**
-             * Family
-             * @constant
-             */
-            family: "YOLO";
-            /** Framework */
-            framework: string;
-            /** Framework Version */
-            framework_version: string;
-            input: components["schemas"]["ModelInput"];
-            output: components["schemas"]["ModelOutput"];
-            /** Parent Artifact Id */
-            parent_artifact_id: string | null;
+            provenance: components["schemas"]["ExportProvenance"];
             /**
              * Schema Version
              * @constant
              */
             schema_version: 1;
             /**
-             * Source
-             * @enum {string}
-             */
-            source: "trained_best" | "trained_last" | "exported_onnx";
-            /**
-             * Source Job Id
-             * Format: uuid
-             */
-            source_job_id: string;
-            target: components["schemas"]["ModelTarget"];
-            /**
              * Task
              * @constant
              */
             task: "detection";
-            /** Training */
-            training: {
-                [key: string]: unknown;
-            };
-            validation: components["schemas"]["ModelValidation"];
+            validation: components["schemas"]["ExportValidation"];
+            /**
+             * Validation Scope
+             * @constant
+             */
+            validation_scope: "checker_ort_raw_tensor_equivalence";
+            /** Validation Sha256 */
+            validation_sha256: string;
         };
-        /** ModelOutput */
-        ModelOutput: {
-            /** Nms In Graph */
-            nms_in_graph: boolean | null;
-            /** Schema */
-            schema: string | null;
-        };
-        /** ModelTarget */
-        ModelTarget: {
-            /** Chip */
-            chip: string | null;
+        /** OnnxArtifactPublic */
+        OnnxArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
             /**
              * Format
+             * @constant
+             */
+            format: "onnx";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Id */
+            job_id: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            format: "pt" | "onnx" | "rknn";
-            /** Quantization */
-            quantization: string | null;
+            kind: "onnx";
+            metadata: components["schemas"]["OnnxArtifactMetadata"];
+            /**
+             * Metadata Schema Version
+             * @constant
+             */
+            metadata_schema_version: 1;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Validation State
+             * @constant
+             */
+            validation_state: "passed";
         };
-        /** ModelValidation */
-        ModelValidation: {
-            /** Evidence Key */
-            evidence_key: string | null;
-            result: components["schemas"]["ValidationState"];
-            /** Runtime */
-            runtime: string | null;
+        /** OtherArtifactPublic */
+        OtherArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Format */
+            format: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Id */
+            job_id: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "dataset_report" | "deployment_zip" | "inference_input" | "inference_result";
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Metadata Schema Version */
+            metadata_schema_version: number;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            validation_state: components["schemas"]["ValidationState"];
         };
         /** PackageJobCreate */
         PackageJobCreate: {
@@ -1248,6 +1441,31 @@ export interface components {
              */
             storage: "available";
         };
+        /** TensorComparison */
+        TensorComparison: {
+            /** Elements */
+            elements: number;
+            /** Input Sha256 */
+            input_sha256: string;
+            /** Max Absolute Error */
+            max_absolute_error: number;
+            /** Max Tolerance Ratio */
+            max_tolerance_ratio: number;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "zeros" | "gradient" | "pattern";
+            /** Ort Sha256 */
+            ort_sha256: string;
+            /**
+             * Passed
+             * @constant
+             */
+            passed: true;
+            /** Pt Sha256 */
+            pt_sha256: string;
+        };
         /** TrainJobCreate */
         TrainJobCreate: {
             /**
@@ -1321,6 +1539,44 @@ export interface components {
              * @constant
              */
             validation_scope: "weights_only_detection_checkpoint";
+        };
+        /** TrainingArtifactPublic */
+        TrainingArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Format
+             * @constant
+             */
+            format: "pt";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Id */
+            job_id: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "pt_best" | "pt_last";
+            metadata: components["schemas"]["TrainingArtifactMetadata"];
+            /** Metadata Schema Version */
+            metadata_schema_version: number;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            validation_state: components["schemas"]["ValidationState"];
         };
         /** TrainingProvenance */
         TrainingProvenance: {

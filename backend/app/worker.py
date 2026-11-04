@@ -198,7 +198,7 @@ def send_control(stream, command: bytes) -> bool:
 
 def process(job_id: str, run_id: str) -> None:
     job = get_job(job_id)
-    if job["kind"] not in {"dataset_check", "train"}:
+    if job["kind"] not in {"dataset_check", "train", "export_onnx"}:
         finish(job_id, run_id, "UNSUPPORTED_JOB")
         return
     # A claimed-only task cannot have launched a guardian. Prelaunch input errors
@@ -208,8 +208,11 @@ def process(job_id: str, run_id: str) -> None:
         if job["kind"] == "dataset_check":
             if fingerprint(resolve_storage_file(frozen["archive_key"])) != (frozen["size_bytes"], frozen["sha256"]):
                 raise ValueError("archive fingerprint changed")
-        else:
+        elif job["kind"] == "train":
             from .training_inputs import verify_input
+            verify_input(frozen)
+        else:
+            from .export_inputs import verify_input
             verify_input(frozen)
         directory = run_directory(job_id, run_id, create=True)
         atomic_json(directory / "input.json", {"schema_version": 1, "job_id": job_id, "run_id": run_id, "kind": job["kind"], "input": frozen})
@@ -302,6 +305,7 @@ def process(job_id: str, run_id: str) -> None:
         finish(job_id, run_id, "RUNNER_FAILED")
     elif receipt["exit_code"] not in ({0, 2} if job["kind"] == "dataset_check" else {0}):
         reason = {65: "INPUT_INVALID", 66: "INPUT_CHANGED", 70: "STORAGE_UNAVAILABLE", 71: "OUTPUT_CAPACITY_LIMIT", 67: "RUNTIME_CHANGED", 68: "TRAINING_POLICY_FAILED"}.get(receipt["exit_code"], "RUNNER_FAILED")
+        if receipt["exit_code"] == 68 and job["kind"] == "export_onnx": reason = "EXPORT_POLICY_FAILED"
         finish(job_id, run_id, reason)
     else:
         from .publication import publish
@@ -309,6 +313,9 @@ def process(job_id: str, run_id: str) -> None:
             if job["kind"] == "train":
                 from .training_publication import publish as publish_train
                 published = publish_train(job)
+            elif job["kind"] == "export_onnx":
+                from .export_publication import publish as publish_export
+                published = publish_export(job)
             else:
                 published = publish(job, receipt["exit_code"])
             if not published:

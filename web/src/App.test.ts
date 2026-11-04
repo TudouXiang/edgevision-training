@@ -106,7 +106,7 @@ describe('authenticated workspace state', () => {
     await settle()
     expect(wrapper.text()).toContain('项目工作区')
     expect(wrapper.text()).toContain('API 已响应')
-    expect(wrapper.text()).toContain('数据集 · 未实现')
+    expect(wrapper.text()).toContain('数据集 · 不可用')
 
     const projectInputs = wrapper.findAll('.grid-form input')
     await projectInputs[0].setValue('secret project draft')
@@ -259,4 +259,35 @@ describe('dataset upload client', () => {
     expect(wrapper.text()).toContain('这个项目还没有数据集')
     expect(wrapper.text()).not.toContain('tiny · v1')
   })
+})
+
+it('remounts task panels on stage navigation and ignores the old route request', async () => {
+  const { createRouter, createMemoryHistory } = await import('vue-router')
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:stage?', component: App }] })
+  await router.push('/training'); await router.isReady()
+  const staleJobs = deferred<Response>()
+  const project = { id: 'route-project', owner_id: admin.id, name: 'Route project', description: '', archived_at: null, created_at: '2026-11-04T00:00:00Z', updated_at: '2026-11-04T00:00:00Z' }
+  let oldSignal: AbortSignal | undefined, jobReads = 0
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
+    if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
+    if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
+    if (url.endsWith('/auth/me')) return Promise.resolve(json(admin))
+    if (url.includes('/projects?page=')) return Promise.resolve(json({ ...emptyPage, items: [project], total: 1 }))
+    if (url.includes('/jobs?')) {
+      jobReads++
+      if (jobReads === 1) { oldSignal = init?.signal as AbortSignal; return staleJobs.promise }
+      return Promise.resolve(json(emptyPage))
+    }
+    if (url.includes('/datasets?') || url.includes('/artifacts?') || url.includes('/admin/users?')) return Promise.resolve(json(emptyPage))
+    throw new Error(`unhandled ${url}`)
+  }))
+  const wrapper = mount(App, { global: { plugins: [router], stubs: { TrainingPanel: true, JobPanel: true } } })
+  await settle(); await wrapper.find('.project-picker select').setValue('route-project'); await settle()
+  await router.push('/onnx'); await settle()
+  expect(oldSignal?.aborted).toBe(true); expect(jobReads).toBe(2)
+  staleJobs.resolve(json({ ...emptyPage, total: 1, items: [{ id: 'old-route-export', project_id: project.id, kind: 'export_onnx', state: 'running' }] })); await settle()
+  expect(wrapper.text()).not.toContain('old-route-export'); expect(wrapper.find('.export-panel').exists()).toBe(true)
+  wrapper.unmount()
 })

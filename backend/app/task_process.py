@@ -15,6 +15,10 @@ def execute(job_id: str, run_id: str) -> int:
     kind = read_json(run_directory(job_id, run_id) / "input.json").get("kind")
     if kind == "train":
         from .training_runner import run
+    elif kind == "export_onnx":
+        from .export_runner import run
+    elif kind == "export_probe":
+        from .export_probe import probe_child as run
     elif kind == "ml_probe":
         from .training_probe import probe_child as run
     elif kind != "dataset_check":

@@ -11,6 +11,7 @@ export type JobLog = components['schemas']['JobLog']
 export type Metric = components['schemas']['Metric']
 export type Artifact = components['schemas']['ArtifactPublic']
 export type TrainParams = components['schemas']['TrainParams']
+export type ExportOnnxParams = components['schemas']['ExportOnnxParams']
 export type JobAccepted = components['schemas']['JobAccepted']
 type JobPage = components['schemas']['Page_JobPublic_']
 type JobLogs = components['schemas']['Incremental_JobLog_']
@@ -79,6 +80,7 @@ export const projectApi = {
 }
 
 export const jobApi = {
+  exportOnnx: (projectId: string, params: ExportOnnxParams, key: string, signal?: AbortSignal) => request<JobAccepted>(`/projects/${projectId}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'export_onnx', params}), headers: {'Idempotency-Key': key}, signal }),
   train: (projectId: string, params: TrainParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${projectId}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'train', params, source_job_id}), headers: {'Idempotency-Key': key}, signal }),
   metrics: (id: string, cursor: string | null, signal?: AbortSignal) => request<components['schemas']['Incremental_Metric_']>(`/jobs/${id}/metrics?limit=500${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { signal }),
   artifacts: (projectId: string, signal?: AbortSignal, page = 1) => request<components['schemas']['Page_ArtifactPublic_']>(`/projects/${projectId}/artifacts?page=${page}&page_size=100`, { signal }),

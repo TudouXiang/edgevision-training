@@ -42,7 +42,7 @@ def runtime_identity():
         if not record: raise ValueError("installed distribution record unavailable")
         packages[name] = {"version": version, "record_sha256": sha256(record.encode()).hexdigest()}
     source = {}
-    for name in ("training_runtime.py", "training_runner.py", "training_assets.py", "training_contract.py", "training_inputs.py", "training_probe.py", "schemas.py", "task_process.py"):
+    for name in ("ml_privacy.py", "python_launch.py", "training_runtime.py", "training_runner.py", "training_assets.py", "training_contract.py", "training_inputs.py", "training_probe.py", "schemas.py", "task_process.py"):
         source[name] = fingerprint(Path(__file__).parent / name)[1]
     return {"python": platform.python_version(), "platform": sys.platform, "machine": platform.machine(),
             "executable": str(Path(sys.executable).absolute()), "executable_sha256": fingerprint(Path(sys.executable).resolve())[1],

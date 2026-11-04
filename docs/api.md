@@ -40,3 +40,19 @@ CUDA 返回 DEVICE_UNAVAILABLE，未 ready 返回 DATASET_NOT_READY。公共 Job
 只含白名单资源 ID、摘要、参数和类别；PT metadata 使用 TrainingArtifactMetadata/TrainingRuntime。
 日志仍单独有界；metric journal 独立配额，单调 epoch/seq、有限值和名称白名单。终态指标也必须读取至 eof。
 best/last 下载根据同一个已核验文件描述符流式读取，最大 128 MiB，断线关闭资源。
+
+## T060 E 重建候选：固定 ONNX 导出（实际 ML 未执行）
+
+`POST /projects/{id}/jobs` 的 `kind=export_onnx` 已接入同一队列；参数仅为
+`model_artifact_id`、`imgsz=640`、`batch=1`、`precision=fp32`。未知参数、布尔维度、动态尺寸、简化和量化均拒绝。
+来源必须同项目、`pt_best/pt_last`、`passed`，且所属训练 Job 为 `succeeded`；原训练发布 intent、原 metadata 文件、源 PT、完整冻结数据及报告均复核。
+需要当前固定联合环境的受管导出探针，否则返回 `409 DELIVERY_SETUP_REQUIRED`，不因安装 ONNX 就宣称可用。
+其他来源完整性问题返回 `409 EXPORT_INPUT_UNAVAILABLE`。幂等键同请求返回既有 Job，冲突为 409；已有幂等任务可在项目归档后读取，不新建工作。
+
+`JobPublic.export` 提供不含服务器路径的冻结源模型 ID、源训练 Job、源摘要、参数与代码/运行绑定。
+`ArtifactPublic` 是按 `kind` 判别的严格联合类型。ONNX 分支必须为 `OnnxArtifactMetadata`，不能落入通用字典分支。
+`GET /artifacts/{id}/download` 对 ONNX 校验成功任务、发布 intent、metadata/validation 文件和完整绑定，并校验模型文件后从同一描述符有界返回。
+跨用户与跨项目资源仍 404；损坏产物返回 `409 ARTIFACT_UNAVAILABLE`。下载历史模型不要求当前代码探针仍有效。
+
+`/capabilities.features.onnx_export` 取自独立 `delivery-capability.json` 的当前绑定；`models` 表示已有模型列表/下载实现，不表示 ML 环境可用。
+`infer`、`package` 及对应能力仍为 501/不可用。E 源码与轻量验证不等于真实 ONNX 验收。

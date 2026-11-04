@@ -38,3 +38,21 @@ T040 单个协议文档/报告上限 16 MiB，可能先于 20000 个条目触发
 框架运行目录和单独有界 `metrics.jsonl`。仅 `best.pt`、`last.pt`、`metadata.json` 组成可发布 bundle，
 同卷 rename 到 `trained/{job_id}/{run_id}` 后短事务同时登记两条 PT Artifact 与成功终态。
 物理孤儿清理没有自动实现；不会用孤儿文件重建成功。新增记录复用现有 JSON 列与 metrics 表，无迁移。
+
+## T060 E 导出束（重建候选）
+
+不增加数据库迁移。导出输入冻结在既有 Job 的 `input_snapshot_json`，包含严格训练来源、发布源指纹、完整数据清单及联合环境绑定。
+任务临时目录仍为 `jobs/{job_id}/runs/{run_id}/`。固定 runner 仅写 `bundle/model.onnx`、`bundle/metadata.json`、`bundle/validation.json`，另写有界 `evidence.json`。
+模型上限 128 MiB，解析前检查；两个 JSON 文档各上限 1 MiB。束不接受链接、目录、额外成员或重复/缺少文件。
+
+成功发布须先取得整树退出 receipt 和 guardian 退出证明，再核验源输入、运行绑定、三个文件与数值验证绑定。
+发布使用 intent → 同卷 rename 到 `exports/{job_id}/{run_id}/` → 再验证目标 → 短事务登记唯一 ONNX Artifact 并 CAS 成功。
+取消抢先不产生 Artifact。rename 后崩溃留下的目录不自动升级为成功，保留诊断并按既有恢复协议处理。
+模型原始图、checker 输入、ORT 输入和发布文件摘要必须相同，禁止修改 IR 或回退 PT。
+
+训练探针和独立导出探针共用 `worker.lock` 与 `training-probe-active.json`，从写入启动歧义到 drain 确认都阻止重叠运行。
+能力分别写 `training-capability.json` 和 `delivery-capability.json`；源代码/解释器/发行 RECORD/完整锁变化使旧探针失效。
+这些运行文件与私有诊断、临时会话不进入仓库或公开验收报告。
+
+全量数据、PT、ONNX 文件与运行身份校验在 SQLite 只读快照下完成，不能持有唯一 writer 做长时间 hash。
+提交与发布最终事务仅做已验证数据库行的精确比较、当前授权/状态/幂等检查及插入/CAS。并发取消、项目归档、用户禁用和会话撤销可在 hash 期间完成，并在最终事务被识别。

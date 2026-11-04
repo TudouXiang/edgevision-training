@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { verifyExport } from './t060-export'
 function required(name: string) { const value = process.env[name]; if (!value) throw new Error(`Harness must provide ${name}`); return value }
-test('real one-epoch CPU training persists metrics, reloads final weights and downloads both models', async ({ page }) => {
+test('real one-epoch CPU training persists metrics, reloads final weights and downloads both models, then optionally verifies ONNX export', async ({ page }) => {
   test.skip(process.env.EDGEVISION_E2E_ML !== '1', 'Requires explicit hash-locked Linux CPU environment')
-  test.setTimeout(180_000)
+  test.setTimeout(process.env.EDGEVISION_E2E_DELIVERY === '1' ? 360_000 : 180_000)
   await page.goto('/')
   await page.getByLabel('用户名', {exact:true}).fill(required('EDGEVISION_E2E_ADMIN_USERNAME'))
   await page.getByLabel('密码', {exact:true}).fill(required('EDGEVISION_E2E_ADMIN_PASSWORD'))
@@ -35,6 +36,7 @@ test('real one-epoch CPU training persists metrics, reloads final weights and do
   expect(metrics.items).toHaveLength(10);expect(metrics.items.every((item:{epoch:number,value:number})=>item.epoch===1&&Number.isFinite(item.value))).toBe(true)
   await page.reload();await page.getByLabel('所属项目').selectOption(project.id)
   await expect(page.locator('.training-panel')).toContainText('最终指标已读取')
+  if (process.env.EDGEVISION_E2E_DELIVERY === '1') await verifyExport(page, project.id, job.job_id)
   await page.setViewportSize({width:375,height:812})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
 })

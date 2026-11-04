@@ -26,6 +26,8 @@ def prepare_environment(root):
         "YOLO_OFFLINE": "True", "YOLO_AUTOINSTALL": "False", "ULTRALYTICS_SAFE_LOAD": "True", "CUDA_VISIBLE_DEVICES": "",
         "OMP_NUM_THREADS": "2", "MKL_NUM_THREADS": "2", "OPENBLAS_NUM_THREADS": "2", "NUMEXPR_NUM_THREADS": "2",
         "NUMEXPR_MAX_THREADS": "2", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"})
+    from .ml_privacy import prepare_ort_privacy
+    prepare_ort_privacy()
     sys.dont_write_bytecode = True
     settings = {"settings_version": "0.0.8", "datasets_dir": str(root / "dataset"), "weights_dir": str(root),
         "runs_dir": str(root / "runs"), "uuid": "00000000000000000000000000000000", "sync": False, "api_key": "", "openai_api_key": ""}
@@ -35,6 +37,8 @@ def prepare_environment(root):
 
 
 def initialize(root, allowed):
+    from .ml_privacy import prepare_ort_privacy
+    prepare_ort_privacy()
     fatal = []
     def fail(reason):
         fatal.append(reason)

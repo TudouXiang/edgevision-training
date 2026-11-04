@@ -1,4 +1,4 @@
-"""Run the real T020/T030/T040 browser suite against disposable local services.
+"""Run the real T020–T060 browser suite against disposable local services.
 
 The harness owns its temporary database and generated credentials. It never
 loads a developer database, changes the production startup path, or writes
@@ -56,13 +56,14 @@ def create_dataset_fixture(path: Path, invalid: bool = False) -> None:
 
 def backend_python() -> Path:
     relative = Path("Scripts/python.exe") if os.name == "nt" else Path("bin/python")
-    return BACKEND / (".venv-ml" if "--ml" in sys.argv else ".venv") / relative
+    environment = ".venv-delivery" if "--delivery" in sys.argv else ".venv-ml" if "--ml" in sys.argv else ".venv"
+    return BACKEND / environment / relative
 
 
 def ensure_backend_python() -> None:
     expected = backend_python()
     if not expected.is_file():
-        raise RuntimeError("backend/.venv is missing; run scripts/install_deps.py first")
+        raise RuntimeError("selected backend environment is missing; install the matching locked environment first")
     if os.environ.get("EDGEVISION_E2E_REEXEC") == "1":
         return
     environment = {**os.environ, "EDGEVISION_E2E_REEXEC": "1"}
@@ -149,7 +150,7 @@ def safe_summary(report_dir: Path, stage: str, status: str) -> None:
         payload["browser_status"] = "NOT_RUN"
     (report_dir / "summary.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     (report_dir / "summary.md").write_text(
-        f"# T020/T030/T040 browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
+        f"# EdgeVision isolated browser validation\n\n- Stage: `{stage}`\n- Status: `{status}`\n- Credentials, cookies, traces, screenshots, service logs, uploaded fixtures and database files are excluded.\n",
         encoding="utf-8",
     )
 
@@ -175,14 +176,35 @@ def main(argv: list[str]) -> int:
     signal.signal(signal.SIGTERM, interrupt_for_cleanup)
     parser = argparse.ArgumentParser(description="Run isolated EdgeVision browser end-to-end tests")
     parser.add_argument("--report-dir", type=Path, default=WEB / "playwright-report")
-    parser.add_argument("--ml", action="store_true", help="Run verified optional Linux CPU training browser scenario")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--ml", action="store_true", help="Run verified optional Linux CPU training browser scenario")
+    mode.add_argument("--delivery", action="store_true", help="Run one-epoch training and ONNX export in the separately authorized isolated delivery environment")
     parser.add_argument("--ml-asset", type=Path, help="Separately downloaded fixed official YOLO11n asset")
     parser.add_argument("--list", action="store_true", help="discover tests without launching a browser")
     options = parser.parse_args(argv)
+    training = options.ml or options.delivery
     playwright_args = ["--list"] if options.list else []
     run_stage = "discovery" if options.list else "browser"
     report_dir = options.report_dir.expanduser().resolve()
     safe_summary(report_dir, "bootstrap", "running")
+
+    # Discovery is read-only: no Python environment, services, dataset or credentials.
+    if options.list:
+        npm = shutil.which("npm")
+        if npm is None:
+            safe_summary(report_dir, "discovery", "failed")
+            return 2
+        result = subprocess.run(
+            [npm, "run", "test:e2e:list"], cwd=WEB,
+            env={**os.environ, "EDGEVISION_E2E_REPORT_DIR": str(report_dir)}, check=False,
+        )
+        if result.returncode:
+            safe_summary(report_dir, "discovery", "failed")
+        return result.returncode
+    if training and (options.ml_asset is None or not options.ml_asset.is_file()):
+        safe_summary(report_dir, "bootstrap", "failed")
+        print("browser_e2e bootstrap_failed: training/delivery requires an existing --ml-asset", file=sys.stderr)
+        return 2
 
     try:
         ensure_backend_python()
@@ -203,6 +225,7 @@ def main(argv: list[str]) -> int:
     web_process: subprocess.Popen[bytes] | None = None
     worker_process: subprocess.Popen[bytes] | None = None
     runtime: Path | None = None
+    managed_probe_started = False
     try:
         runtime = Path(tempfile.mkdtemp(prefix="edgevision-e2e-"))
         data_root = runtime / "data"
@@ -211,7 +234,7 @@ def main(argv: list[str]) -> int:
         dataset_fixture = runtime / "tiny-dataset.zip"
         create_dataset_fixture(dataset_fixture)
         training_fixture = runtime / "training-dataset.zip"
-        if options.ml:
+        if training:
             from PIL import Image, ImageDraw
             with ZipFile(training_fixture, "w", ZIP_DEFLATED) as archive:
                 archive.writestr("data.yaml", "train: images/train\nval: images/val\nnames: [object]\nnc: 1\n")
@@ -230,6 +253,7 @@ def main(argv: list[str]) -> int:
         origin = f"http://127.0.0.1:{web_port}"
         service_environment = {
             **os.environ,
+            "ORT_DISABLE_TELEMETRY": "1",
             "PLATFORM_DATA_ROOT": str(data_root),
             "EDGEVISION_ALLOWED_ORIGINS": origin,
             "EDGEVISION_COOKIE_SECURE": "false",
@@ -250,6 +274,7 @@ def main(argv: list[str]) -> int:
             raise RuntimeError(f"migration failed (code {migration.returncode})")
 
         os.environ.update({
+            "ORT_DISABLE_TELEMETRY": "1",
             "PLATFORM_DATA_ROOT": str(data_root),
             "EDGEVISION_ALLOWED_ORIGINS": origin,
             "EDGEVISION_COOKIE_SECURE": "false",
@@ -266,9 +291,17 @@ def main(argv: list[str]) -> int:
         rotated_password = f"E2e-{secrets.token_urlsafe(24)}-Cc3!"
         create_admin(admin_username, admin_password)
 
-        if options.ml and not options.list:
-            if not options.ml_asset: raise RuntimeError("--ml requires --ml-asset")
-            subprocess.run([str(python), "-m", "app.training_probe", "--asset", str(options.ml_asset.resolve())], cwd=BACKEND, env=service_environment, check=True, timeout=100)
+        if training:
+            assert options.ml_asset is not None
+            probes = [[str(python), "-m", "app.training_probe", "--asset", str(options.ml_asset.resolve())]]
+            if options.delivery:
+                probes.append([str(python), "-m", "app.export_probe"])
+            for probe in probes:
+                managed_probe_started = True
+                result = subprocess.run(probe, cwd=BACKEND, env=service_environment, check=False,
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=360)
+                if result.returncode:
+                    raise RuntimeError("managed capability probe failed; browser was not started")
         api_process = start_process(
             [
                 str(python), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1",
@@ -299,7 +332,8 @@ def main(argv: list[str]) -> int:
             "EDGEVISION_E2E_REPORT_DIR": str(report_dir),
             "EDGEVISION_E2E_OUTPUT_DIR": str(output_dir),
             "EDGEVISION_E2E_DATASET_ZIP": str(dataset_fixture),
-            "EDGEVISION_E2E_ML": "1" if options.ml else "0",
+            "EDGEVISION_E2E_ML": "1" if training else "0",
+            "EDGEVISION_E2E_DELIVERY": "1" if options.delivery else "0",
             "EDGEVISION_E2E_TRAINING_ZIP": str(training_fixture),
             "EDGEVISION_E2E_INVALID_DATASET_ZIP": str(invalid_fixture),
         }
@@ -321,17 +355,22 @@ def main(argv: list[str]) -> int:
     except KeyboardInterrupt:
         safe_summary(report_dir, run_stage, "interrupted")
         return 130
+    except subprocess.TimeoutExpired:
+        safe_summary(report_dir, "bootstrap", "failed")
+        print("browser_e2e bootstrap_failed: managed capability probe timed out", file=sys.stderr)
+        return 2
     except (OSError, RuntimeError) as exc:
         safe_summary(report_dir, "bootstrap", "failed")
         print(f"browser_e2e bootstrap_failed: {exc}", file=sys.stderr)
         return 2
     finally:
         cleanup_safe = stop_owned((web_process, api_process, worker_process))
-        if worker_process is not None and runtime is not None:
+        if runtime is not None and (worker_process is not None or managed_probe_started):
             try:
                 from app.worker import recover, worker_lock
+                from app.training_probe import recover_probe
                 with worker_lock(runtime / "data"):
-                    cleanup_safe = (not recover()) and cleanup_safe
+                    cleanup_safe = recover_probe() and (not recover()) and cleanup_safe
             except Exception:
                 cleanup_safe = False
         if not cleanup_safe:
