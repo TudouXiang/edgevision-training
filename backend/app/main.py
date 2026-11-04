@@ -113,11 +113,12 @@ def available() -> FeatureCapability:
 
 @app.get(API + "/capabilities", response_model=CapabilitiesResponse)
 def capabilities():
+    from .training_assets import capability
     return {
         "schema_version": 1,
         "features": {
             "auth": available(), "projects": available(), "datasets": available(),
-            "training_cpu": unavailable("ultralytics"), "training_cuda": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="CUDA device not verified", detected_version=None),
+            "training_cpu": capability(), "training_cuda": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="CUDA device not verified", detected_version=None),
             "events": available(), "dataset_check": available(), "models": unavailable(), "onnx_export": unavailable("onnx"),
             "pt_inference": unavailable("ultralytics"), "onnx_inference": unavailable("onnxruntime"),
             "deployment": unavailable(), "rknn": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="No RKNN target or board verification", detected_version=None),
@@ -443,6 +444,9 @@ def create_job(project_id: UUID, body: JobCreate, request: Request, idempotency_
         begin_write(connection)
         actor = require_actor(connection, request, csrf=True)
         project = project_for_actor(connection, str(project_id), actor)
+        if body.kind == JobKind.TRAIN:
+            from .training_service import submit_train
+            return submit_train(connection, actor, str(project_id), body.params, str(body.source_job_id) if body.source_job_id else None, idempotency_key, request.url.path)
         if body.kind != JobKind.DATASET_CHECK:
             active_project(project)
             not_implemented()
@@ -517,6 +521,9 @@ def download_artifact(artifact_id: UUID, request: Request):
         actor = require_actor(connection, request)
         project_for_resource(connection, "artifacts", str(artifact_id), actor)
         row = connection.execute("SELECT * FROM artifacts WHERE id=?", (str(artifact_id),)).fetchone()
+    if row["kind"] in {"pt_best", "pt_last"}:
+        from .training_download import download_pt
+        return download_pt(row, str(artifact_id))
     if row["kind"] != "dataset_report":
         not_implemented()
     if row["validation_status"] != "passed":

@@ -14,3 +14,5 @@ data/
 *.db-wal
 *.log
 .env
+
+backend/.venv-ml/

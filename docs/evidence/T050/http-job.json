@@ -1,0 +1,47 @@
+{
+  "id": "860650a5-6380-461b-abf5-4d16790d70b1",
+  "project_id": "1dd7a543-f8e5-44d2-96af-f2aa07b7fad2",
+  "created_by": "8b801ae4-3a7e-47a5-b84a-216b23740920",
+  "kind": "train",
+  "state": "succeeded",
+  "params_schema_version": 1,
+  "created_at": "2026-11-04T09:25:17.002475Z",
+  "started_at": "2026-11-04T09:25:17.240676Z",
+  "finished_at": "2026-11-04T09:25:24.139731Z",
+  "error_code": null,
+  "source_job_id": null,
+  "training": {
+    "schema_version": 1,
+    "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+    "dataset_version": 1,
+    "archive_sha256": "8ec5e197d4376396407815f2a12bcd2be64ff9ea5866ff77cae5453997ac8349",
+    "snapshot_sha256": "9dd06f2317fea51740fe8ca585bdf0cb2ef7be8fa63d719bf405c839a01b2588",
+    "report_artifact_id": "9c861793-900c-4dc1-97ea-3a7ec389ea44",
+    "report_sha256": "2a5b7d8ac45388e9ce4517d8152a292c9459d44bde97cdf17c48b5359befa306",
+    "classes": [
+      "object"
+    ],
+    "counts": {
+      "annotations": 8,
+      "background_images": 0,
+      "images": 8,
+      "test_images": 0,
+      "train_images": 4,
+      "val_images": 4
+    },
+    "params": {
+      "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+      "experiment_name": "bounded synthetic smoke",
+      "base_model": "yolo11n.pt",
+      "epochs": 1,
+      "batch": 1,
+      "imgsz": 320,
+      "device": "cpu",
+      "seed": 0,
+      "learning_rate": 0.01
+    },
+    "base_manifest_sha256": "f974d5c24a4607ea68d458be26141aa07ebbf4b678abab1e24ddd6feeba5298d",
+    "runtime_binding": "24aba3b4f5ddb26162e8a10e07792034a6f8ad8d1664df42e160f3263c9861d6",
+    "code_version": "873e98706bdd2abc14f45b9e9aeb027d0676c4710bd02b0dffcfabc32166875a"
+  }
+}

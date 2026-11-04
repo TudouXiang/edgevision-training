@@ -58,8 +58,8 @@ def test_unimplemented_worker_cannot_report_success(tmp_path, monkeypatch):
         db.execute("PRAGMA foreign_keys=ON")
         db.execute("INSERT INTO users (id,username,password_hash,role,is_active,created_at) VALUES (?,?,?,?,?,?)", ("u", "isolated_test", "test-only", "user", True, "2026-09-23T00:00:00Z"))
         db.execute("INSERT INTO projects (id,owner_id,name,description,task_type,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)", ("p", "u", "test", "", "detection", "active", "2026-09-23T00:00:00Z", "2026-09-23T00:00:00Z"))
-        db.execute("INSERT INTO jobs (id,project_id,owner_id,kind,status,payload_json,created_at) VALUES (?,?,?,?,?,?,?)", (first_job, "p", "u", "train", "queued", "{}", "2026-09-23T00:00:00Z"))
-        db.execute("INSERT INTO jobs (id,project_id,owner_id,kind,status,payload_json,created_at) VALUES (?,?,?,?,?,?,?)", (second_job, "p", "u", "train", "queued", "{}", "2026-09-23T00:00:01Z"))
+        db.execute("INSERT INTO jobs (id,project_id,owner_id,kind,status,payload_json,created_at) VALUES (?,?,?,?,?,?,?)", (first_job, "p", "u", "export_onnx", "queued", "{}", "2026-09-23T00:00:00Z"))
+        db.execute("INSERT INTO jobs (id,project_id,owner_id,kind,status,payload_json,created_at) VALUES (?,?,?,?,?,?,?)", (second_job, "p", "u", "export_onnx", "queued", "{}", "2026-09-23T00:00:01Z"))
     env = {**os.environ, "PLATFORM_DATA_ROOT": str(tmp_path)}
     result = subprocess.run([sys.executable, "-m", "app.worker", "--once"], cwd=BACKEND, env=env, capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stderr

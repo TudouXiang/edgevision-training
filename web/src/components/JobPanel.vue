@@ -69,6 +69,7 @@ async function poll() {
   if (!current() || polling) return
   polling = true
   loading.value = true
+  let succeeded = false
   try {
     const expected = revision
     const result = await jobApi.list(props.projectId, controller.signal, page.value)
@@ -80,12 +81,13 @@ async function poll() {
     await readLogs() // Always read again after seeing terminal, until server eof.
     warning.value = ''
     delay = 2000
+    succeeded = true
   } catch (value) { error(value); delay = Math.min(delay * 2, 15000) }
   finally {
     polling = false
     if (current()) {
       loading.value = false
-      schedule(terminal(jobs.value.find(job => job.id === selected.value)?.state ?? 'queued') && !logDone.value ? 100 : delay)
+      schedule(succeeded && terminal(jobs.value.find(job => job.id === selected.value)?.state ?? 'queued') && !logDone.value ? 100 : delay)
     }
   }
 }
@@ -159,12 +161,12 @@ onUnmounted(() => { controller.abort(); clearTimeout(timer); logRevision += 1 })
 </script>
 
 <template>
-  <section class="job-panel" aria-label="校验任务">
-    <div class="section-title"><h3>校验任务</h3><span>全局单任务顺序执行</span><button :disabled="loading" @click="poll">刷新任务</button></div>
+  <section class="job-panel" aria-label="后台任务">
+    <div class="section-title"><h3>后台任务</h3><span>全局单任务顺序执行</span><button :disabled="loading" @click="poll">刷新任务</button></div>
     <p v-if="warning" class="error" role="alert">{{ warning }}</p>
-    <p v-if="!jobs.length" class="note">尚无校验任务。上传后点击“开始校验”。</p>
+    <p v-if="!jobs.length" class="note">尚无任务。上传数据后开始校验，或创建训练。</p>
     <article v-for="job in jobs" :key="job.id" class="job-row">
-      <div><strong>{{ job.kind }}</strong><span :class="job.state">{{ job.state }}</span><small>{{ job.id.slice(0, 8) }} · {{ job.error_code ?? (job.state === 'queued' ? '等待 Worker 领取' : '真实任务状态') }}</small></div>
+      <div><strong>{{ job.kind === 'train' ? '训练 · ' + (job.training?.params.experiment_name ?? job.id.slice(0, 8)) : job.kind }}</strong><span :class="job.state">{{ job.state }}</span><small>{{ job.id.slice(0, 8) }} · {{ job.error_code ?? (job.state === 'queued' ? '等待 Worker 领取' : '真实任务状态') }}</small></div>
       <div class="actions"><button @click="select(job.id)">查看日志</button><button :disabled="terminal(job.state) || job.state === 'cancelling' || cancelling === job.id" @click="cancel(job)">{{ job.state === 'cancelling' ? '正在停止…' : '取消任务' }}</button></div>
     </article>
     <div v-if="total > 20" class="actions job-pagination"><button :disabled="page === 1 || loading" @click="changePage(page - 1)">上一页任务</button><span>第 {{ page }} / {{ Math.ceil(total / 20) }} 页 · 共 {{ total }} 条</span><button :disabled="page * 20 >= total || loading" @click="changePage(page + 1)">下一页任务</button></div>

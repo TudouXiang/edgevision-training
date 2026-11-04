@@ -31,3 +31,12 @@ JobCreate.kind 只接受 dataset_check/train/export_onnx/infer/package 且 param
 T040 DatasetPublic 新增可空 validation_job_id/report_artifact_id；当前报告指针不指向上一次尝试。同一 Dataset 有 queued/running/cancelling 时不同键复用该活动 Job；ready 不能重新校验，上传新版本才能变更。取消/中断/基础设施失败恢复 pending，真实内容错误为 invalid + DATASET_INVALID 报告。归档拒绝全新提交，不影响已有任务完成/取消；同键重放仍可读取原任务。
 
 日志游标是 v1:job-uuid:log-or-metric:seq，绑定任务和流，越界/畸形为 422 CURSOR_INVALID；每次最多 64 KiB（且不超过 limit 项），高水位内单调。终态 eof 仅在日志读完时为 true，客户端必须最终读取。捕获最多 512 KiB/2000 项加一条截断提示，超限仍 drain 子进程输出；用户界面最多保留 500 行。只有固定脱敏 adapter 日志可见，任意 stdout/traceback 被替换。报告最大 16 MiB，下载返回已核对 size/SHA 的同一字节，不暴露存储路径。
+
+## T050 训练增量（实现待最终 CI 验收）
+
+POST `/projects/{id}/jobs` 放开 train，额外可空 source_job_id 只允许同项目终态 train，用于新任务来源而非恢复。
+提交冻结 ready Dataset 的完整报告/清单、资产和环境指纹；CPU 探针缺失或过期返回 TRAINING_SETUP_REQUIRED，
+CUDA 返回 DEVICE_UNAVAILABLE，未 ready 返回 DATASET_NOT_READY。公共 Job.training 为生成的 TrainingProvenance，
+只含白名单资源 ID、摘要、参数和类别；PT metadata 使用 TrainingArtifactMetadata/TrainingRuntime。
+日志仍单独有界；metric journal 独立配额，单调 epoch/seq、有限值和名称白名单。终态指标也必须读取至 eof。
+best/last 下载根据同一个已核验文件描述符流式读取，最大 128 MiB，断线关闭资源。

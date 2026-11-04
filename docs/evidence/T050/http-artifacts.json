@@ -1,0 +1,195 @@
+[
+  {
+    "id": "9ee3dcdf-1bc2-46f7-94ba-ef9172d59d9b",
+    "project_id": "1dd7a543-f8e5-44d2-96af-f2aa07b7fad2",
+    "job_id": "860650a5-6380-461b-abf5-4d16790d70b1",
+    "kind": "pt_best",
+    "format": "pt",
+    "sha256": "80b87ee4c792efcbc086a109408c752d459d54c3bedad7ca171de5e4edab4e70",
+    "size_bytes": 5455706,
+    "metadata_schema_version": 1,
+    "validation_state": "passed",
+    "metadata": {
+      "architecture": "yolo11n",
+      "classes": [
+        "object"
+      ],
+      "provenance": {
+        "archive_sha256": "8ec5e197d4376396407815f2a12bcd2be64ff9ea5866ff77cae5453997ac8349",
+        "base_manifest_sha256": "f974d5c24a4607ea68d458be26141aa07ebbf4b678abab1e24ddd6feeba5298d",
+        "classes": [
+          "object"
+        ],
+        "code_version": "873e98706bdd2abc14f45b9e9aeb027d0676c4710bd02b0dffcfabc32166875a",
+        "counts": {
+          "annotations": 8,
+          "background_images": 0,
+          "images": 8,
+          "test_images": 0,
+          "train_images": 4,
+          "val_images": 4
+        },
+        "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+        "dataset_version": 1,
+        "params": {
+          "base_model": "yolo11n.pt",
+          "batch": 1,
+          "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+          "device": "cpu",
+          "epochs": 1,
+          "experiment_name": "bounded synthetic smoke",
+          "imgsz": 320,
+          "learning_rate": 0.01,
+          "seed": 0
+        },
+        "report_artifact_id": "9c861793-900c-4dc1-97ea-3a7ec389ea44",
+        "report_sha256": "2a5b7d8ac45388e9ce4517d8152a292c9459d44bde97cdf17c48b5359befa306",
+        "runtime_binding": "24aba3b4f5ddb26162e8a10e07792034a6f8ad8d1664df42e160f3263c9861d6",
+        "schema_version": 1,
+        "snapshot_sha256": "9dd06f2317fea51740fe8ca585bdf0cb2ef7be8fa63d719bf405c839a01b2588"
+      },
+      "runtime": {
+        "completed_epochs": 1,
+        "device": "cpu",
+        "effective": {
+          "amp": false,
+          "batch": 1,
+          "cache": false,
+          "deterministic": true,
+          "device": "cpu",
+          "epochs": 1,
+          "imgsz": 320,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "nbs": 64,
+          "optimizer": "SGD",
+          "plots": false,
+          "seed": 0,
+          "warmup_bias_lr": 0.1,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "weight_decay": 0.0005,
+          "workers": 0
+        },
+        "optimizer_steps": 1,
+        "safe_load_count": 9,
+        "threads": 2,
+        "versions": {
+          "torch": "2.15.0+cpu",
+          "torchvision": "0.29.2+cpu",
+          "ultralytics": "8.4.202"
+        }
+      },
+      "schema_version": 1,
+      "task": "detection",
+      "validation_scope": "weights_only_detection_checkpoint"
+    },
+    "created_at": "2026-11-04T09:25:24.139485Z"
+  },
+  {
+    "id": "91af641a-ef56-40dd-9451-8af0d80e58ca",
+    "project_id": "1dd7a543-f8e5-44d2-96af-f2aa07b7fad2",
+    "job_id": "860650a5-6380-461b-abf5-4d16790d70b1",
+    "kind": "pt_last",
+    "format": "pt",
+    "sha256": "3a8643f69acc1e7a2733f0e79f4128e8446d96632e496d81b78badebcb0e9663",
+    "size_bytes": 5455706,
+    "metadata_schema_version": 1,
+    "validation_state": "passed",
+    "metadata": {
+      "architecture": "yolo11n",
+      "classes": [
+        "object"
+      ],
+      "provenance": {
+        "archive_sha256": "8ec5e197d4376396407815f2a12bcd2be64ff9ea5866ff77cae5453997ac8349",
+        "base_manifest_sha256": "f974d5c24a4607ea68d458be26141aa07ebbf4b678abab1e24ddd6feeba5298d",
+        "classes": [
+          "object"
+        ],
+        "code_version": "873e98706bdd2abc14f45b9e9aeb027d0676c4710bd02b0dffcfabc32166875a",
+        "counts": {
+          "annotations": 8,
+          "background_images": 0,
+          "images": 8,
+          "test_images": 0,
+          "train_images": 4,
+          "val_images": 4
+        },
+        "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+        "dataset_version": 1,
+        "params": {
+          "base_model": "yolo11n.pt",
+          "batch": 1,
+          "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+          "device": "cpu",
+          "epochs": 1,
+          "experiment_name": "bounded synthetic smoke",
+          "imgsz": 320,
+          "learning_rate": 0.01,
+          "seed": 0
+        },
+        "report_artifact_id": "9c861793-900c-4dc1-97ea-3a7ec389ea44",
+        "report_sha256": "2a5b7d8ac45388e9ce4517d8152a292c9459d44bde97cdf17c48b5359befa306",
+        "runtime_binding": "24aba3b4f5ddb26162e8a10e07792034a6f8ad8d1664df42e160f3263c9861d6",
+        "schema_version": 1,
+        "snapshot_sha256": "9dd06f2317fea51740fe8ca585bdf0cb2ef7be8fa63d719bf405c839a01b2588"
+      },
+      "runtime": {
+        "completed_epochs": 1,
+        "device": "cpu",
+        "effective": {
+          "amp": false,
+          "batch": 1,
+          "cache": false,
+          "deterministic": true,
+          "device": "cpu",
+          "epochs": 1,
+          "imgsz": 320,
+          "lr0": 0.01,
+          "lrf": 0.01,
+          "momentum": 0.937,
+          "nbs": 64,
+          "optimizer": "SGD",
+          "plots": false,
+          "seed": 0,
+          "warmup_bias_lr": 0.1,
+          "warmup_epochs": 3.0,
+          "warmup_momentum": 0.8,
+          "weight_decay": 0.0005,
+          "workers": 0
+        },
+        "optimizer_steps": 1,
+        "safe_load_count": 9,
+        "threads": 2,
+        "versions": {
+          "torch": "2.15.0+cpu",
+          "torchvision": "0.29.2+cpu",
+          "ultralytics": "8.4.202"
+        }
+      },
+      "schema_version": 1,
+      "task": "detection",
+      "validation_scope": "weights_only_detection_checkpoint"
+    },
+    "created_at": "2026-11-04T09:25:24.139485Z"
+  },
+  {
+    "id": "9c861793-900c-4dc1-97ea-3a7ec389ea44",
+    "project_id": "1dd7a543-f8e5-44d2-96af-f2aa07b7fad2",
+    "job_id": "e45cb2cf-9801-4519-8567-82f937973544",
+    "kind": "dataset_report",
+    "format": "json",
+    "sha256": "2a5b7d8ac45388e9ce4517d8152a292c9459d44bde97cdf17c48b5359befa306",
+    "size_bytes": 2672,
+    "metadata_schema_version": 1,
+    "validation_state": "passed",
+    "metadata": {
+      "dataset_id": "0b9c821e-7c6b-4445-9177-b305a8088990",
+      "schema_version": 1,
+      "valid": true
+    },
+    "created_at": "2026-11-04T09:25:16.701855Z"
+  }
+]

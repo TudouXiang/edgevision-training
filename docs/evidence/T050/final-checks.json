@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "aggregate": {
+    "command": "bash scripts/dev.sh check",
+    "exit_code": 0,
+    "pure_contract_tests": 6,
+    "script_worker_tests": 11,
+    "pytest_passed": 143,
+    "pytest_optional_ml_skipped": 3,
+    "frontend_passed": 15,
+    "frontend_build": "PASS",
+    "contract_drift": "PASS"
+  },
+  "actual_ml_policy": {
+    "passed": 3,
+    "exit_code": 0,
+    "scope": "unknown safe class, batch drift, nonfinite EMA"
+  },
+  "real_http": {
+    "exit_code": 0,
+    "job_id": "fe86f46a-aaa0-42e1-a198-03c0bf952f0f",
+    "scope": "1 CPU epoch, generated 4+4 nested-path samples, actual managed Worker and authorized dual downloads"
+  },
+  "browser": {
+    "discovered": 5,
+    "typecheck": "PASS",
+    "execution": "NOT_RUN locally; CI pending"
+  },
+  "raw_evidence_sha256": {
+    "aggregate": "312ced454f8faee75c405413ad19bef533e7cfefc72410f9818dd3eb7342b4b4",
+    "actual_ml_policy": "29b1f58a63358a68b172eafab0e5f5bc69de1162abe240e7796125aa784e9be4",
+    "real_http": "6fdd0591e7b59365cd2a1458a88780b0be74eea0f79c6fad6dadc25df686425d",
+    "browser_discovery": "782acb3b2620d73319a268ccf19ae84a4eb04d475f86cecc42f2e3c0f66a4ab9"
+  }
+}

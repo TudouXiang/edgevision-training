@@ -198,17 +198,21 @@ def send_control(stream, command: bytes) -> bool:
 
 def process(job_id: str, run_id: str) -> None:
     job = get_job(job_id)
-    if job["kind"] != "dataset_check":
+    if job["kind"] not in {"dataset_check", "train"}:
         finish(job_id, run_id, "UNSUPPORTED_JOB")
         return
     # A claimed-only task cannot have launched a guardian. Prelaunch input errors
     # may safely terminalize; any attempted launch below requires a receipt.
     try:
         frozen = json.loads(job["input_snapshot_json"])
-        if fingerprint(resolve_storage_file(frozen["archive_key"])) != (frozen["size_bytes"], frozen["sha256"]):
-            raise ValueError("archive fingerprint changed")
+        if job["kind"] == "dataset_check":
+            if fingerprint(resolve_storage_file(frozen["archive_key"])) != (frozen["size_bytes"], frozen["sha256"]):
+                raise ValueError("archive fingerprint changed")
+        else:
+            from .training_inputs import verify_input
+            verify_input(frozen)
         directory = run_directory(job_id, run_id, create=True)
-        atomic_json(directory / "input.json", {"schema_version": 1, "job_id": job_id, "run_id": run_id, "kind": "dataset_check", "input": frozen})
+        atomic_json(directory / "input.json", {"schema_version": 1, "job_id": job_id, "run_id": run_id, "kind": job["kind"], "input": frozen})
     except Exception:
         finish(job_id, run_id, "INPUT_UNAVAILABLE")
         return
@@ -230,6 +234,7 @@ def process(job_id: str, run_id: str) -> None:
         with transaction() as connection:
             connection.execute("UPDATE jobs SET process_identity_json=? WHERE id=? AND run_id=?", (canonical({"schema_version": 1, "guardian": guardian_identity, "log_offset": 0}), job_id, run_id))
         prepared, stopping = False, False
+        metric_error = False
         began = time.monotonic()
         while child.poll() is None:
             current = get_job(job_id)
@@ -255,6 +260,15 @@ def process(job_id: str, run_id: str) -> None:
                         send_control(child.stdin, b"GO\n")
                 prepared = True
             ingest_logs(job_id, run_id)
+            if job["kind"] == "train":
+                from .training_metrics import ingest_metrics
+                if not metric_error:
+                    try:
+                        ingest_metrics(job_id, run_id)
+                    except Exception:
+                        metric_error = True
+                        send_control(child.stdin, b"STOP\n")
+                        stopping = True
             with transaction() as connection:
                 connection.execute("UPDATE jobs SET heartbeat_at=? WHERE id=? AND run_id=? AND status IN ('running','cancelling')", (now(), job_id, run_id))
             if time.monotonic() - began > 3630:
@@ -273,17 +287,31 @@ def process(job_id: str, run_id: str) -> None:
         raise RuntimeError("RECOVERY_BLOCKED_DRAIN_UNCONFIRMED")
     # Drain bounded persisted logs fully before the terminal event.
     ingest_all_logs(job_id, run_id)
+    if job["kind"] == "train":
+        from .training_metrics import ingest_metrics
+        try:
+            ingest_metrics(job_id, run_id, final=True)
+        except Exception:
+            finish(job_id, run_id, "METRICS_INVALID")
+            return
     if job["status"] == "cancelling":
         finish(job_id, run_id, "CANCELLED")
+    elif metric_error:
+        finish(job_id, run_id, "METRICS_INVALID")
     elif receipt["reason"] != "completed" or not receipt["logs_complete"]:
         finish(job_id, run_id, "RUNNER_FAILED")
-    elif receipt["exit_code"] not in {0, 2}:
-        reason = {65: "INPUT_INVALID", 66: "INPUT_CHANGED", 70: "STORAGE_UNAVAILABLE", 71: "OUTPUT_CAPACITY_LIMIT"}.get(receipt["exit_code"], "RUNNER_FAILED")
+    elif receipt["exit_code"] not in ({0, 2} if job["kind"] == "dataset_check" else {0}):
+        reason = {65: "INPUT_INVALID", 66: "INPUT_CHANGED", 70: "STORAGE_UNAVAILABLE", 71: "OUTPUT_CAPACITY_LIMIT", 67: "RUNTIME_CHANGED", 68: "TRAINING_POLICY_FAILED"}.get(receipt["exit_code"], "RUNNER_FAILED")
         finish(job_id, run_id, reason)
     else:
         from .publication import publish
         try:
-            if not publish(job, receipt["exit_code"]):
+            if job["kind"] == "train":
+                from .training_publication import publish as publish_train
+                published = publish_train(job)
+            else:
+                published = publish(job, receipt["exit_code"])
+            if not published:
                 finish(job_id, run_id, "CANCELLED")
         except Exception:
             finish(job_id, run_id, "OUTPUT_INVALID")
@@ -299,6 +327,10 @@ def main() -> int:
     try:
         marker = boot_id()
         with worker_lock(data_root()):
+            from .training_probe import recover_probe
+            if not recover_probe():
+                print("RECOVERY_BLOCKED_PROBE_DRAIN_UNCONFIRMED", file=sys.stderr)
+                return 4
             blocked = recover()
             if blocked:
                 for job_id, code in blocked:

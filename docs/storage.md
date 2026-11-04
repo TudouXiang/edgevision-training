@@ -30,3 +30,11 @@ data/
 
 
 T040 单个协议文档/报告上限 16 MiB，可能先于 20000 个条目触发（例如大量长路径/warnings），此时 Job OUTPUT_CAPACITY_LIMIT/failed、Dataset pending，不伪造 ready 或 invalid。每 run bundle 含 snapshot/report/manifest，树退出后重验输入及全部输出 SHA，先提交 publication intent，再同卷 rename，最后一个短条件事务发布。取消赢事务时不登记产物，可能留下未引用目录；这些目录隔离保留，不自动删除用户文件或重建成功。正式物理清理仍须后续明确保留策略。进程崩溃边界已测试，不声称硬件掉电保证。
+
+## T050 增量
+
+`models/base/{yolo11n.pt,manifest.json}` 仅操作员供给固定资产；`training-capability.json` 是受管实际探针产生的
+版本化能力记录，`training-probe-active.json` 保留探针执行身份/恢复入口。训练 run 内有独立 dataset、私有环境配置、
+框架运行目录和单独有界 `metrics.jsonl`。仅 `best.pt`、`last.pt`、`metadata.json` 组成可发布 bundle，
+同卷 rename 到 `trained/{job_id}/{run_id}` 后短事务同时登记两条 PT Artifact 与成功终态。
+物理孤儿清理没有自动实现；不会用孤儿文件重建成功。新增记录复用现有 JSON 列与 metrics 表，无迁移。

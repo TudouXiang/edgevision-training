@@ -548,7 +548,7 @@ export interface components {
              */
             kind: "dataset_report" | "pt_best" | "pt_last" | "onnx" | "inference_input" | "inference_result" | "deployment_zip";
             /** Metadata */
-            metadata: components["schemas"]["ModelMetadata"] | {
+            metadata: components["schemas"]["TrainingArtifactMetadata"] | components["schemas"]["ModelMetadata"] | {
                 [key: string]: unknown;
             };
             /** Metadata Schema Version */
@@ -693,6 +693,68 @@ export interface components {
                 number,
                 number
             ];
+        };
+        /** EffectiveTrainingParams */
+        EffectiveTrainingParams: {
+            /**
+             * Amp
+             * @constant
+             */
+            amp: false;
+            /** Batch */
+            batch: number;
+            /**
+             * Cache
+             * @constant
+             */
+            cache: false;
+            /**
+             * Deterministic
+             * @constant
+             */
+            deterministic: true;
+            /**
+             * Device
+             * @constant
+             */
+            device: "cpu";
+            /** Epochs */
+            epochs: number;
+            /** Imgsz */
+            imgsz: number;
+            /** Lr0 */
+            lr0: number;
+            /** Lrf */
+            lrf: number;
+            /** Momentum */
+            momentum: number;
+            /** Nbs */
+            nbs: number;
+            /**
+             * Optimizer
+             * @constant
+             */
+            optimizer: "SGD";
+            /**
+             * Plots
+             * @constant
+             */
+            plots: false;
+            /** Seed */
+            seed: number;
+            /** Warmup Bias Lr */
+            warmup_bias_lr: number;
+            /** Warmup Epochs */
+            warmup_epochs: number;
+            /** Warmup Momentum */
+            warmup_momentum: number;
+            /** Weight Decay */
+            weight_decay: number;
+            /**
+             * Workers
+             * @constant
+             */
+            workers: 0;
         };
         /** ExportJobCreate */
         ExportJobCreate: {
@@ -888,6 +950,7 @@ export interface components {
             /** Started At */
             started_at: string | null;
             state: components["schemas"]["JobState"];
+            training?: components["schemas"]["TrainingProvenance"] | null;
         };
         /**
          * JobState
@@ -1193,6 +1256,8 @@ export interface components {
              */
             kind: "train";
             params: components["schemas"]["TrainParams"];
+            /** Source Job Id */
+            source_job_id?: string | null;
         };
         /** TrainParams */
         TrainParams: {
@@ -1229,6 +1294,113 @@ export interface components {
             learning_rate?: number | null;
             /** Seed */
             seed: number;
+        };
+        /** TrainingArtifactMetadata */
+        TrainingArtifactMetadata: {
+            /**
+             * Architecture
+             * @constant
+             */
+            architecture: "yolo11n";
+            /** Classes */
+            classes: string[];
+            provenance: components["schemas"]["TrainingProvenance"];
+            runtime: components["schemas"]["TrainingRuntime"];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Task
+             * @constant
+             */
+            task: "detection";
+            /**
+             * Validation Scope
+             * @constant
+             */
+            validation_scope: "weights_only_detection_checkpoint";
+        };
+        /** TrainingProvenance */
+        TrainingProvenance: {
+            /** Archive Sha256 */
+            archive_sha256: string;
+            /** Base Manifest Sha256 */
+            base_manifest_sha256: string;
+            /** Base Model Sha256 */
+            base_model_sha256: string;
+            /** Classes */
+            classes: string[];
+            /** Code Version */
+            code_version: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Dataset Id
+             * Format: uuid
+             */
+            dataset_id: string;
+            /** Dataset Version */
+            dataset_version: number;
+            params: components["schemas"]["TrainParams"];
+            /**
+             * Report Artifact Id
+             * Format: uuid
+             */
+            report_artifact_id: string;
+            /** Report Sha256 */
+            report_sha256: string;
+            /** Runtime Binding */
+            runtime_binding: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /** Snapshot Sha256 */
+            snapshot_sha256: string;
+        };
+        /** TrainingRuntime */
+        TrainingRuntime: {
+            /** Completed Epochs */
+            completed_epochs: number;
+            /**
+             * Device
+             * @constant
+             */
+            device: "cpu";
+            effective: components["schemas"]["EffectiveTrainingParams"];
+            /** Optimizer Steps */
+            optimizer_steps: number;
+            /** Safe Load Count */
+            safe_load_count: number;
+            /**
+             * Threads
+             * @constant
+             */
+            threads: 2;
+            versions: components["schemas"]["TrainingVersions"];
+        };
+        /** TrainingVersions */
+        TrainingVersions: {
+            /**
+             * Torch
+             * @constant
+             */
+            torch: "2.15.0+cpu";
+            /**
+             * Torchvision
+             * @constant
+             */
+            torchvision: "0.29.2+cpu";
+            /**
+             * Ultralytics
+             * @constant
+             */
+            ultralytics: "8.4.202";
         };
         /** UserCreate */
         UserCreate: {

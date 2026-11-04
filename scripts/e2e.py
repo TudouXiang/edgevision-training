@@ -56,7 +56,7 @@ def create_dataset_fixture(path: Path, invalid: bool = False) -> None:
 
 def backend_python() -> Path:
     relative = Path("Scripts/python.exe") if os.name == "nt" else Path("bin/python")
-    return BACKEND / ".venv" / relative
+    return BACKEND / (".venv-ml" if "--ml" in sys.argv else ".venv") / relative
 
 
 def ensure_backend_python() -> None:
@@ -175,6 +175,8 @@ def main(argv: list[str]) -> int:
     signal.signal(signal.SIGTERM, interrupt_for_cleanup)
     parser = argparse.ArgumentParser(description="Run isolated EdgeVision browser end-to-end tests")
     parser.add_argument("--report-dir", type=Path, default=WEB / "playwright-report")
+    parser.add_argument("--ml", action="store_true", help="Run verified optional Linux CPU training browser scenario")
+    parser.add_argument("--ml-asset", type=Path, help="Separately downloaded fixed official YOLO11n asset")
     parser.add_argument("--list", action="store_true", help="discover tests without launching a browser")
     options = parser.parse_args(argv)
     playwright_args = ["--list"] if options.list else []
@@ -208,6 +210,18 @@ def main(argv: list[str]) -> int:
         output_dir = runtime / "playwright-output"
         dataset_fixture = runtime / "tiny-dataset.zip"
         create_dataset_fixture(dataset_fixture)
+        training_fixture = runtime / "training-dataset.zip"
+        if options.ml:
+            from PIL import Image, ImageDraw
+            with ZipFile(training_fixture, "w", ZIP_DEFLATED) as archive:
+                archive.writestr("data.yaml", "train: images/train\nval: images/val\nnames: [object]\nnc: 1\n")
+                for split in ("train", "val"):
+                    for index in range(4):
+                        image = Image.new("RGB", (64, 64), (20 + index * 10, 40, 80))
+                        ImageDraw.Draw(image).rectangle((16, 16, 48, 48), fill=(220, 100, 40))
+                        output = BytesIO(); image.save(output, format="PNG")
+                        archive.writestr(f"images/{split}/{index}.png", output.getvalue())
+                        archive.writestr(f"labels/{split}/{index}.txt", "0 0.5 0.5 0.5 0.5\n")
         invalid_fixture = runtime / "invalid-dataset.zip"
         create_dataset_fixture(invalid_fixture, invalid=True)
         api_port, web_port = available_port(), available_port()
@@ -252,6 +266,9 @@ def main(argv: list[str]) -> int:
         rotated_password = f"E2e-{secrets.token_urlsafe(24)}-Cc3!"
         create_admin(admin_username, admin_password)
 
+        if options.ml and not options.list:
+            if not options.ml_asset: raise RuntimeError("--ml requires --ml-asset")
+            subprocess.run([str(python), "-m", "app.training_probe", "--asset", str(options.ml_asset.resolve())], cwd=BACKEND, env=service_environment, check=True, timeout=100)
         api_process = start_process(
             [
                 str(python), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1",
@@ -282,6 +299,8 @@ def main(argv: list[str]) -> int:
             "EDGEVISION_E2E_REPORT_DIR": str(report_dir),
             "EDGEVISION_E2E_OUTPUT_DIR": str(output_dir),
             "EDGEVISION_E2E_DATASET_ZIP": str(dataset_fixture),
+            "EDGEVISION_E2E_ML": "1" if options.ml else "0",
+            "EDGEVISION_E2E_TRAINING_ZIP": str(training_fixture),
             "EDGEVISION_E2E_INVALID_DATASET_ZIP": str(invalid_fixture),
         }
         safe_summary(report_dir, run_stage, "running")

@@ -141,12 +141,12 @@ class TrainParams(StrictModel):
     dataset_id: UUID
     experiment_name: str = Field(min_length=1, max_length=160)
     base_model: Literal["yolo11n.pt"] = "yolo11n.pt"
-    epochs: int = Field(ge=1, le=100)
-    batch: int = Field(ge=1, le=16)
+    epochs: int = Field(strict=True, ge=1, le=100)
+    batch: int = Field(strict=True, ge=1, le=16)
     imgsz: Literal[320, 640] = 640
     device: Literal["cpu", "cuda:0"] = "cpu"
-    seed: int = Field(ge=0, le=4294967295)
-    learning_rate: FiniteFloat | None = Field(default=None, ge=0.000001, le=0.1)
+    seed: int = Field(strict=True, ge=0, le=4294967295)
+    learning_rate: FiniteFloat | None = Field(strict=True, default=None, ge=0.000001, le=0.1)
 
 
 class ExportOnnxParams(StrictModel):
@@ -176,6 +176,7 @@ class DatasetCheckJobCreate(StrictModel):
 class TrainJobCreate(StrictModel):
     kind: Literal[JobKind.TRAIN]
     params: TrainParams
+    source_job_id: UUID | None = None
 
 
 class ExportJobCreate(StrictModel):
@@ -204,6 +205,23 @@ class JobAccepted(StrictModel):
     state: JobState
 
 
+class TrainingProvenance(StrictModel):
+    schema_version: Literal[1]
+    dataset_id: UUID
+    dataset_version: int = Field(ge=1)
+    archive_sha256: str
+    snapshot_sha256: str
+    report_artifact_id: UUID
+    report_sha256: str
+    classes: list[str]
+    counts: dict[str, int]
+    params: TrainParams
+    base_manifest_sha256: str
+    base_model_sha256: str
+    runtime_binding: str
+    code_version: str
+
+
 class JobPublic(StrictModel):
     id: UUID
     project_id: UUID
@@ -216,6 +234,7 @@ class JobPublic(StrictModel):
     finished_at: AwareDatetime | None
     error_code: str | None
     source_job_id: UUID | None
+    training: TrainingProvenance | None = None
 
 
 class JobLog(StrictModel):
@@ -294,6 +313,54 @@ class ModelMetadata(StrictModel):
     target: ModelTarget
 
 
+class EffectiveTrainingParams(StrictModel):
+    optimizer: Literal["SGD"]
+    lr0: FiniteFloat
+    lrf: FiniteFloat
+    warmup_epochs: FiniteFloat
+    warmup_bias_lr: FiniteFloat
+    warmup_momentum: FiniteFloat
+    momentum: FiniteFloat
+    weight_decay: FiniteFloat
+    nbs: int
+    seed: int
+    batch: int
+    epochs: int
+    imgsz: int
+    device: Literal["cpu"]
+    workers: Literal[0]
+    amp: Literal[False]
+    plots: Literal[False]
+    cache: Literal[False]
+    deterministic: Literal[True]
+
+
+class TrainingVersions(StrictModel):
+    torch: Literal["2.15.0+cpu"]
+    torchvision: Literal["0.29.2+cpu"]
+    ultralytics: Literal["8.4.202"]
+
+
+class TrainingRuntime(StrictModel):
+    effective: EffectiveTrainingParams
+    versions: TrainingVersions
+    optimizer_steps: int = Field(ge=1)
+    completed_epochs: int = Field(ge=1, le=100)
+    safe_load_count: int = Field(ge=2)
+    threads: Literal[2]
+    device: Literal["cpu"]
+
+
+class TrainingArtifactMetadata(StrictModel):
+    schema_version: Literal[1]
+    task: Literal["detection"]
+    architecture: Literal["yolo11n"]
+    classes: list[str]
+    provenance: TrainingProvenance
+    runtime: TrainingRuntime
+    validation_scope: Literal["weights_only_detection_checkpoint"]
+
+
 class ArtifactPublic(StrictModel):
     id: UUID
     project_id: UUID
@@ -304,7 +371,7 @@ class ArtifactPublic(StrictModel):
     size_bytes: int
     metadata_schema_version: int
     validation_state: ValidationState
-    metadata: ModelMetadata | dict[str, object]
+    metadata: TrainingArtifactMetadata | ModelMetadata | dict[str, object]
     created_at: AwareDatetime
 
 

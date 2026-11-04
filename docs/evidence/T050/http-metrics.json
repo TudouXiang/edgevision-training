@@ -1,0 +1,77 @@
+{
+  "items": [
+    {
+      "seq": 5,
+      "epoch": 1,
+      "name": "metrics/mAP50(B)",
+      "value": 0.36182,
+      "at": "2026-11-04T09:25:21.572852Z"
+    },
+    {
+      "seq": 6,
+      "epoch": 1,
+      "name": "metrics/mAP50-95(B)",
+      "value": 0.18991,
+      "at": "2026-11-04T09:25:21.573037Z"
+    },
+    {
+      "seq": 7,
+      "epoch": 1,
+      "name": "metrics/precision(B)",
+      "value": 0.28272,
+      "at": "2026-11-04T09:25:21.573068Z"
+    },
+    {
+      "seq": 8,
+      "epoch": 1,
+      "name": "metrics/recall(B)",
+      "value": 1.0,
+      "at": "2026-11-04T09:25:21.573092Z"
+    },
+    {
+      "seq": 9,
+      "epoch": 1,
+      "name": "train/box_loss",
+      "value": 1.29962,
+      "at": "2026-11-04T09:25:21.573116Z"
+    },
+    {
+      "seq": 10,
+      "epoch": 1,
+      "name": "train/cls_loss",
+      "value": 3.16239,
+      "at": "2026-11-04T09:25:21.573135Z"
+    },
+    {
+      "seq": 11,
+      "epoch": 1,
+      "name": "train/dfl_loss",
+      "value": 1.12563,
+      "at": "2026-11-04T09:25:21.573155Z"
+    },
+    {
+      "seq": 12,
+      "epoch": 1,
+      "name": "val/box_loss",
+      "value": 1.12882,
+      "at": "2026-11-04T09:25:21.573173Z"
+    },
+    {
+      "seq": 13,
+      "epoch": 1,
+      "name": "val/cls_loss",
+      "value": 5.81171,
+      "at": "2026-11-04T09:25:21.573190Z"
+    },
+    {
+      "seq": 14,
+      "epoch": 1,
+      "name": "val/dfl_loss",
+      "value": 1.22799,
+      "at": "2026-11-04T09:25:21.573208Z"
+    }
+  ],
+  "next_cursor": "v1:860650a5-6380-461b-abf5-4d16790d70b1:metric:16",
+  "eof": true,
+  "job_state": "succeeded"
+}

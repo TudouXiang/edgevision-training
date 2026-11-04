@@ -30,6 +30,7 @@ def capture_output(source, path: Path, result: dict) -> None:
     pending = bytearray()
     retained = count = 0
     truncated = False
+    omitted = False
     try:
         sink = path.open("xb", buffering=0)
     except OSError:
@@ -42,7 +43,7 @@ def capture_output(source, path: Path, result: dict) -> None:
         return
     with sink as target:
         def emit(raw: bytes) -> None:
-            nonlocal retained, count, truncated
+            nonlocal retained, count, truncated, omitted
             text = raw.decode("utf-8", errors="replace")
             # Never forward arbitrary child strings/tracebacks as user-facing logs.
             # Only the fixed adapter's exact compact structured messages are admitted.
@@ -51,9 +52,13 @@ def capture_output(source, path: Path, result: dict) -> None:
                 value = json.loads(text)
             except (ValueError, TypeError):
                 value = None
-            allowed = {"Validation started", "Archive fingerprint verified", "Dataset validation passed", "Dataset validation failed", "Validation report exceeds supported size", "Runner storage is unavailable", "Runner infrastructure failed"}
+            allowed = {"Training input verified", "Training checkpoints verified", "Training safety validation failed", "Validation started", "Archive fingerprint verified", "Dataset validation passed", "Dataset validation failed", "Validation report exceeds supported size", "Runner storage is unavailable", "Runner infrastructure failed"}
             if not isinstance(value, dict) or set(value) != {"level", "text"} or value.get("text") not in allowed or value.get("level") not in {"info", "warning", "error"}:
+                if omitted: return
+                omitted = True
                 value = {"level": "warning", "text": "Runner output omitted (unstructured or sensitive content)"}
+            else:
+                omitted = False
             encoded = (canonical(value) + "\n").encode()
             if retained + len(encoded) > MAX_LOG_BYTES or count >= MAX_LOG_EVENTS:
                 truncated = True

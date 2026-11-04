@@ -129,7 +129,7 @@ class WorkerLockTests(unittest.TestCase):
             with contextlib.closing(sqlite3.connect(db_path)) as db, db:
                 db.execute("CREATE TABLE alembic_version (version_num TEXT)")
                 db.execute("INSERT INTO alembic_version VALUES ('0003_worker')")
-                db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT, launch_phase TEXT DEFAULT 'unverified', kind TEXT DEFAULT 'train', environment_json TEXT, process_identity_json TEXT DEFAULT '{}')")
+                db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT, launch_phase TEXT DEFAULT 'unverified', kind TEXT DEFAULT 'export_onnx', environment_json TEXT, process_identity_json TEXT DEFAULT '{}')")
                 db.execute("CREATE TABLE datasets (status TEXT, validation_job_id TEXT)")
                 db.execute("CREATE TABLE job_events (job_id TEXT, seq INTEGER, kind TEXT, payload_json TEXT, created_at TEXT)")
                 db.execute("INSERT INTO jobs (id,status,created_at) VALUES (?,?,?)", (job_id, "queued", "2026-09-28T00:00:00Z"))
