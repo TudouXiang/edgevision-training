@@ -20,9 +20,6 @@ jobs:
     timeout-minutes: 20
     env:
       CI: 'true'
-      UV_CACHE_DIR: ${{ runner.temp }}/uv-cache
-      npm_config_cache: ${{ runner.temp }}/npm-cache
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
 
     steps:
       - name: Checkout
@@ -40,6 +37,15 @@ jobs:
         with:
           node-version: '24.22.1'
           package-manager-cache: false
+
+      - name: Configure runner paths
+        shell: bash
+        run: |
+          {
+            echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache"
+            echo "npm_config_cache=$RUNNER_TEMP/npm-cache"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright"
+          } >> "$GITHUB_ENV"
 
       - name: Install isolated uv tooling
         shell: bash

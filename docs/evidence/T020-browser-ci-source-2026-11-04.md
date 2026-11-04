@@ -32,3 +32,11 @@
 |真实 Chromium|未执行；遵守既有宿主 socket 限制，不重试/绕过|—|NOT_RUN；等待分支发布后的托管 CI|
 
 托管 CI 的原始 URL、commit SHA、runner 镜像与 Chromium 结果必须在发布后另行追加；源码存在或 `--list` 成功不能把 T020 写为 accepted，也不放行 T030。
+
+## 首次发布的 workflow 校验失败与修正
+
+已发布提交 `f550336d0245d7086cd82356aa1c10ba61bae763` 的 [GitHub Actions run `41779527773`](https://github.com/TudouXiang/edgevision-training/actions/runs/41779527773) 在创建 job 前立即失败，没有 runner、步骤或 Chromium 执行证据。原因由 GitHub 官方 context availability 表确认：`jobs.<job_id>.env` 只允许 `github, needs, strategy, matrix, vars, secrets, inputs`，不允许 `runner`，所以该位置的 `${{ runner.temp }}` 无效。
+
+修正保留 job 级 `CI=true`，删除三个 job-env `runner.temp` 表达式；首个 `run` 步骤改用 runner 已提供的 `$RUNNER_TEMP`，把 `UV_CACHE_DIR`、`npm_config_cache` 和 `PLAYWRIGHT_BROWSERS_PATH` 写入 `$GITHUB_ENV`，供后续步骤使用。GitHub 官方说明 `$GITHUB_ENV` 写入在同一 job 的后续步骤生效；step 的 `run`/`with` 允许 `runner` context，因此失败产物步骤继续使用 `${{ runner.temp }}` 合法。修正尚未发布，真实 Chromium 仍为 **NOT_RUN**。
+
+官方依据：[`Context availability`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability)、[`runner.temp`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#runner-context)、[`GITHUB_ENV`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable)。
