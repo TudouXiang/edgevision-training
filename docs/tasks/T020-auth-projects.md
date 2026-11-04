@@ -1,6 +1,6 @@
 # T020：身份与项目最小闭环
 
-执行者：DeepSeek/GPT5.6。前置：T010 accepted，状态 `review_required`（2026-11-04 实现候选和浏览器 CI 源码已具备，待受信 CI 的真实 Chromium 结果与独立验收）。使用feature-delivery。
+执行者：DeepSeek/GPT5.6。前置：T010 accepted，状态 **accepted**（2026-11-04，独立代码审查与 Linux CI 真实 Chromium 通过；边界见 `docs/evidence/T020-browser-acceptance-2026-11-04.md`）。使用feature-delivery。
 
 目标：真实账号/会话、管理员初始化和普通账号管理、项目所有权、归档、最小相关页面。复用骨架Schema与服务，不引入第三方登录、JWT双轨、邮件验证码或注册流程。
 
@@ -11,3 +11,5 @@
 证据：pytest、相关前端测试与最小浏览器操作；A05先覆盖已有资源，后续任务持续补齐派生资源权限。输出docs/evidence/T020-report.md，标review_required。
 
 浏览器回归必须使用一次性迁移数据库和测试入口生成的账号，连接真实 FastAPI + Vite 同源代理；不得加载开发/生产数据库、写默认生产账号或把密码/Cookie/trace/截图上传为失败产物。源码发现或 `--list` 只能证明测试可加载，不能代替真实 Chromium 执行。浏览器 CI 通过后仍按独立审查结论决定 T020 状态，不自动放行 T030。
+
+当前验收以 T020-browser-acceptance-2026-11-04.md 为准；原 report 和 CI 源码记录保留历史过程。

@@ -1,6 +1,6 @@
 # 核心契约 V0.1
 
-状态：T010 已 accepted。T020 已按本契约形成 `review_required` 实现候选，复用既有 DTO 与 `0002_foundation` 表，不新增迁移；身份配置和依赖决策见 ADR 0007，执行证据见 `docs/evidence/T020-report.md`。此文件不替代生成后的 OpenAPI；内部字段允许补充，外部语义变更需经 ADR 与审查。
+状态：T010 已 accepted。T020 已按本契约通过独立审查与 Linux CI 真实浏览器验收，复用既有 DTO 与 `0002_foundation` 表，不新增迁移；身份配置和依赖决策见 ADR 0007，执行证据见 `docs/evidence/T020-report.md`。此文件不替代生成后的 OpenAPI；内部字段允许补充，外部语义变更需经 ADR 与审查。
 
 ## 1. 全局约定
 

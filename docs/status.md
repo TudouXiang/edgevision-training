@@ -1,6 +1,8 @@
-# 项目状态 · T010 accepted / T020 review_required（更新至 2026-11-04 UTC）
+# 项目状态 · T020 accepted / T030 ready（2026-11-04 UTC）
 
-当前 Git 基线为公开仓库 `main` 的 `dff9ad1fc92e9ce43b135138df18795106d4bf89`。T010 已 accepted；本工作区已实现 T020 的真实身份/会话、显式管理员初始化、管理员用户管理、项目 owner/归档、派生资源权限前置守卫和最小真实页面，状态为 **review_required**，提交与远端发布状态以本报告对应的 Git 引用为准。复用 `0002_foundation`，没有新迁移；公共 DTO 未扩展，OpenAPI 只同步实际错误响应元数据。隔离 pytest 26 项、Vitest 4 项、Vue 构建和契约漂移检查通过；真实 API/Web HTTP 启动探针通过。现已增加锁定 Playwright、一次性迁移数据库/随机测试账号包装器和只读权限 GitHub Actions，测试发现及真实服务编排可在当前宿主运行；但受限宿主不再尝试启动 Chromium，受信 CI 尚未发布执行，因此真实浏览器验收仍为 **NOT_RUN**。完整证据见 [`T020 report`](evidence/T020-report.md) 与 [`browser CI source report`](evidence/T020-browser-ci-source-2026-11-04.md)。T030 仍未放行。
+T020 身份与项目最小闭环已通过独立代码/安全审查，并在提交 `cc2e66043473b9d3f432319fab41130cab3f2270` 的 [GitHub Actions 41779814303](https://github.com/TudouXiang/edgevision-training/actions/runs/41779814303) 完成真实 Chromium 验证：2 个用例实际执行且通过，完整后端/前端/契约检查通过。T020 **accepted（Linux CI 范围）**，T030 **ready、未领取**。验收覆盖、原始日志定位和剩余边界见 [独立验收记录](evidence/T020-browser-acceptance-2026-11-04.md)。
+
+现有能力为身份/会话、显式管理员初始化、账号管理、项目归属/编辑/归档和最小真实页面；复用 0002，无新增迁移。Windows 新功能、实际 TLS、人工视觉/截图、多进程压力及后续数据/训练/模型/部署仍未验收。历史本地 Chromium 不可启动的结论保持有效，但不再阻塞已完成的受信 CI 浏览器验收。main 仍为 `dff9ad1fc92e9ce43b135138df18795106d4bf89`，未合并开发分支。
 
 ## 历史 Windows T010 验收（2026-09-29）
 
@@ -32,4 +34,4 @@ Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无�
 3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。
 
-T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **review_required**。ML、ONNX、RKNN 和真实训练均未因 T020 执行。
+T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **accepted**，T030 **ready**。ML、ONNX、RKNN 和真实训练均未因 T020 执行。

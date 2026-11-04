@@ -1,6 +1,6 @@
 # ADR 0007：T020 服务端会话与浏览器防护
 
-状态：proposed / `review_required`（2026-11-04）
+状态：accepted（2026-11-04；独立审查与 Linux CI 浏览器证据见 T020-browser-acceptance 报告）
 
 ## 问题与既有约束
 

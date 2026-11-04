@@ -1,5 +1,7 @@
 # T020 独立变更审查 · 2026-11-04 UTC
 
+> 后续更新：T020 已完成 Linux CI 真实浏览器与独立验收，见 [最终补证记录](T020-browser-acceptance-2026-11-04.md)。下文保留当时的状态与证据，不改写历史 NOT_RUN。
+
 审查基线：`dff9ad1fc92e9ce43b135138df18795106d4bf89`。范围为完整 T020 未提交差异及新增文件；实现与审查分别执行，写入权按阶段交接。手动读取并执行 `change-review`、`feature-delivery` 与 `experiment-evidence` 的检查要求。
 
 ## 结论

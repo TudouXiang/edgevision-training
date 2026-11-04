@@ -1,5 +1,7 @@
 # T020 任务交付记录
 
+> 后续更新：T020 已完成 Linux CI 真实浏览器与独立验收，见 [最终补证记录](T020-browser-acceptance-2026-11-04.md)。下文保留当时的状态与证据，不改写历史 NOT_RUN。
+
 任务 ID / 状态：T020 / `review_required`
 
 基线：`dff9ad1fc92e9ce43b135138df18795106d4bf89`（`main`）；开始编辑前 `git status --short` 为空。环境：Linux、Python 3.12.14、uv 0.13.5、Node 24.22.1、npm 11.9.0。执行日期：2026-11-04 UTC。
