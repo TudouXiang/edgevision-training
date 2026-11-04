@@ -1,10 +1,10 @@
-# 项目状态 · T040 review_required（2026-11-04 UTC）
+# 项目状态 · T040 accepted（2026-11-04 UTC）
 
-T040 已实现真实单实例 Worker、全局 FIFO 单槽、幂等 dataset_check、Linux guardian/subreaper/pidfd、Windows Job Object 实现、日志/取消/恢复、真实校验与不可变报告/快照发布，以及前端任务面板。当前为 **review_required**，不是 accepted，T050 仍 blocked。
+T040 已完成独立审查及精确源码 `a61321ce3247c6e33c6c5462085da56f1e194b52` 的 Linux/Windows CI。Linux 105 项后端、10 项前端、4 场景真实 Chromium、构建/契约及真实 API 重启通过；Windows 4 项原生解释器探针、40 项进程/API/决策测试及真实 API 重启通过。证据与失败历史见 [跨平台验收](evidence/T040-cross-platform-acceptance-2026-11-04.md)。
 
-本轮 Linux 隔离测试和实际 Uvicorn 重启已执行；最终命令与精确代码指纹见 [T040 报告](evidence/T040-report.md)。Windows 托管进程矩阵和四项 Chromium 场景已配置，尚需对应候选提交的真实 CI 结果；不借用 T030 的浏览器通过结果。没有训练、模型下载、Torch、ONNX 或硬件实验。
+**accepted 仅指已实测的受管进程与数据集异步闭环。** 整机重启/物理掉电、真实磁盘耗尽、用户旧库、实际 TLS、人工视觉、Windows 浏览器及 ML/硬件未实测，不泛称全部 A10 或完整平台已通过。Windows 无 receipt 时安全停领，不自动重跑。T050 仍 blocked 于可信资产、目标 ML 环境及许可核验，未擅自选择 LICENSE。
 
-新库目标为 `0003_worker`。旧库须停 API/Worker、备份，在一致性副本验证后升级。缺乏受管树退出证据时 Worker 退出 4 并停止领取；不会把取消/Worker 中断误报数据无效，Dataset 恢复 pending，内容校验错误才 invalid。完整协议、回退条件和 Windows 无 receipt 时的重启限制见 [ADR 0009](adr/0009-t040-managed-worker.md)。
+新库目标 `0003_worker`。旧库须停 API/Worker、备份并在一致性副本验证后升级。缺整树退出证据时停止领取；取消/Worker 中断恢复 Dataset pending，内容错误才 invalid。完整协议见 [ADR 0009](adr/0009-t040-managed-worker.md)。
 
 ---
 

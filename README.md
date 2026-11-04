@@ -1,6 +1,6 @@
 # EdgeVision — 边缘视觉模型管理与部署平台
 
-EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环境串起数据、训练、模型、ONNX 验证与部署生命周期；ONNX 是部署主线，RKNN 仅保留未验证的扩展边界，不冒充实机能力。本仓库已交付范围/存储/接口基线、API 与 Worker 骨架以及迁移/测试基础。T020 真实身份、管理员账号管理与项目闭环已通过独立审查及 Linux CI 真实浏览器验收；T030 受限数据集上传、版本记录与纯校验核心已通过独立审查和 Linux CI 三项真实浏览器回归；T040 真实异步校验、任务日志/取消/恢复和报告下载已有候选实现，待最终跨平台/浏览器审查；训练、模型和部署仍明确未实现。状态见 `docs/status.md` 与 `docs/evidence/T020-browser-acceptance-2026-11-04.md`。
+EdgeVision 当前以目标检测为首个可验证场景，面向轻量单机环境串起数据、训练、模型、ONNX 验证与部署生命周期；ONNX 是部署主线，RKNN 仅保留未验证的扩展边界，不冒充实机能力。本仓库已交付范围/存储/接口基线、API 与 Worker 骨架以及迁移/测试基础。T020 真实身份、管理员账号管理与项目闭环已通过独立审查及 Linux CI 真实浏览器验收；T030 受限数据集上传、版本记录与纯校验核心已通过独立审查和 Linux CI 三项真实浏览器回归；T040 真实异步校验、任务日志/取消/恢复和报告下载已通过 Linux/Windows 进程及 Linux 浏览器 CI，具体范围与未执行项见 `docs/evidence/T040-cross-platform-acceptance-2026-11-04.md`；训练、模型和部署仍明确未实现。状态见 `docs/status.md` 与 `docs/evidence/T020-browser-acceptance-2026-11-04.md`。
 
 ## 目录
 
@@ -61,7 +61,7 @@ py -3 scripts\dev.py api
 
 身份配置默认只允许 `http://127.0.0.1` / `localhost` 的 5173、8000 开发 Origin。部署时用逗号分隔的 `EDGEVISION_ALLOWED_ORIGINS` 明确列出浏览器 Origin；非本机 Origin 必须是 HTTPS，并同时设置 `EDGEVISION_COOKIE_SECURE=true`，否则身份接口按失败关闭返回 503。`EDGEVISION_SESSION_TTL_SECONDS` 可设为 300–604800 秒，默认 43200。修改请求必须携带同源 Origin 与浏览器从 CSRF Cookie 读取的 `X-CSRF-Token`。
 
-Worker 遇到不明遗留 running/cancelling 任务会停止领取并返回 4，不会静默重训。T040 候选使用独立 guardian、Linux subreaper/pidfd 或 Windows Job Object 回收整树。Windows 缺 receipt 时的主机重启安全阻塞，不能凭旧 PID 手工强制解锁。详见 ADR 0009 与 T040 报告。
+Worker 遇到不明遗留 running/cancelling 任务会停止领取并返回 4，不会静默重训。T040 使用独立 guardian、Linux subreaper/pidfd 或 Windows Job Object 回收整树。Windows 缺 receipt 时的主机重启安全阻塞，不能凭旧 PID 手工强制解锁。详见 ADR 0009 与 T040 报告。
 
 检查/契约生成（把 `python3 scripts/dev.py` 换为 Windows 的 `py -3 scripts\dev.py`）：
 
@@ -87,4 +87,4 @@ python3 scripts/e2e.py
 
 数据集操作：登录并创建项目→选择所属项目→上传受控 YOLO ZIP→点击“开始校验”。Worker 未启动时任务会真实停留 queued；执行时显示日志，无虚构进度。ready 可预览/下载报告，invalid 可下载错误报告；取消或主机执行失败恢复 pending，重新校验创建新 Job。归档项目禁止新任务，但已有任务仍可查看/取消。任务面板支持历史分页和终态最终日志读取。
 
-T040 轻量进程测试：`cd backend && .venv/bin/python -m pytest tests/test_worker_process.py tests/test_worker_api.py`（Windows 用 `.venv/Scripts/python.exe`）；实际 HTTP 服务重启探针为 `tests/http_restart_probe.py`，只使用隔离夹具，不读取已有用户库。Windows CI 使用标准 windows-2022 runner 执行真实 Job Object 场景，尚未取得精确提交的结果前不标 Windows 已验收。所有测试均无模型下载或训练。
+T040 轻量进程测试：`cd backend && .venv/bin/python -m pytest tests/test_worker_process.py tests/test_worker_api.py`（Windows 用 `.venv/Scripts/python.exe`）；实际 HTTP 服务重启探针为 `tests/http_restart_probe.py`，只使用隔离夹具，不读取已有用户库。Windows CI 使用标准 windows-2022 runner 执行真实 Job Object 场景，精确通过版本与结果见 T040 跨平台验收；不覆盖未执行的整机重启和硬件故障。所有测试均无模型下载或训练。
