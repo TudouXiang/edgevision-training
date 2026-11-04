@@ -4,7 +4,7 @@
 
 | 表 | 关键字段和约束 | 作用 |
 | --- | --- | --- |
-| `users` | id PK、username UNIQUE、password_hash、role CHECK(user/admin)、is_active、created_at | 密码 Argon2id 哈希在 T1 落地；无默认用户 |
+| `users` | id PK、username UNIQUE、password_hash、role CHECK(user/admin)、is_active、created_at | T020 使用 Argon2id；无默认用户，首个管理员由显式交互 CLI 创建 |
 | `sessions` | id PK、user_id FK、token_hash UNIQUE、csrf_hash、expires_at、created_at、revoked_at | 只存会话令牌哈希，登出及禁用后失效 |
 | `projects` | id PK、owner_id FK、name、description、task_type CHECK(detection)、status CHECK(active/archived)、archived_at nullable、created_at/updated_at | 所有权边界；owner_id+updated_at 索引 |
 | `datasets` | id PK、project_id FK、parent_id FK nullable、version INTEGER、name、archive_key、snapshot_key、sha256、size_bytes、status CHECK(pending/validating/ready/invalid)、report_key nullable、counts_json、classes_json、manifest_json、created_at；UNIQUE(project_id,name,version) | 每次导入/修订创建新行，ready 快照不就地覆盖；0002 映射旧 uploaded/valid |
@@ -17,5 +17,7 @@
 对象关系：`users 1─* projects`、`projects 1─* datasets/jobs/artifacts`、`jobs 1─* events/metrics/artifacts`。数据集 snapshot ID 保存在训练 job 的 payload 内，模型产物 metadata 内也保留它；删除/归档前检查引用关系，物理文件清理由明确管理任务完成，不用 SQLite 触发器直接删文件。
 
 约束不变量：`succeeded` 只能在产物哈希验证后写入（`dataset_check` 等非模型任务须有真实报告）；终态不变；`started_at`/`finished_at` 跟随转换；单重任务串行依赖 Worker 单实例锁+事务领取，不靠表中假想的 DB 全局锁。作业 owner_id 与 project.owner_id 一致由服务层校验，不接受请求体中传入 owner_id。恢复时不确定进程身份则停止领取，不能仅依赖 PID 判死活。
+
+T020 复用既有表，不新增迁移。禁用用户与改密在同一写事务撤销会话；写操作在同一 `BEGIN IMMEDIATE` 事务中重新核对会话、启用状态和角色，避免鉴权与写入之间的禁用/撤销竞态。
 
 数据库存大文件路径的相对键，不存绝对路径或模型二进制；metadata_json 带 `schema_version`，字段格式见 `model-metadata.md`。

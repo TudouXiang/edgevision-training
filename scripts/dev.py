@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 WEB = ROOT / "web"
-COMMANDS = ("doctor", "migrate", "api", "worker", "web", "contract-generate", "contract-check", "check")
+COMMANDS = ("doctor", "migrate", "init-admin", "api", "worker", "web", "contract-generate", "contract-check", "check")
 
 
 def optional_port(name: str) -> str | None:
@@ -64,6 +64,8 @@ def main(argv: list[str]) -> int:
                 return result
     if action == "migrate":
         return run(BACKEND, python, "-m", "alembic", "upgrade", "head")
+    if action == "init-admin":
+        return run(BACKEND, python, "-m", "app.admin_cli", "--username", os.environ.get("EDGEVISION_ADMIN_USERNAME", "admin"))
     if action == "api":
         try:
             port = optional_port("EDGEVISION_DEV_API_PORT") or "8000"
@@ -78,6 +80,7 @@ def main(argv: list[str]) -> int:
         return run(BACKEND, python, "../scripts/export_contract.py", *args)
     return (
         run(BACKEND, python, "-m", "pytest")
+        or run(WEB, "npm", "test")
         or run(WEB, "npm", "run", "build")
         or main(["contract-check"])
     )

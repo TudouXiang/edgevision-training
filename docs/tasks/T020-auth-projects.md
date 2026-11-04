@@ -1,6 +1,6 @@
 # T020：身份与项目最小闭环
 
-执行者：DeepSeek/GPT5.6。前置：T010 accepted，状态blocked。使用feature-delivery。
+执行者：DeepSeek/GPT5.6。前置：T010 accepted，状态 `review_required`（2026-11-04 实现候选，待独立验收）。使用feature-delivery。
 
 目标：真实账号/会话、管理员初始化和普通账号管理、项目所有权、归档、最小相关页面。复用骨架Schema与服务，不引入第三方登录、JWT双轨、邮件验证码或注册流程。
 

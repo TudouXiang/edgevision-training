@@ -1252,6 +1252,24 @@ export interface operations {
                     "application/json": components["schemas"]["Page_JobPublic_"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1293,6 +1311,24 @@ export interface operations {
                     "application/json": components["schemas"]["Page_ProjectPublic_"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1300,15 +1336,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1334,6 +1361,24 @@ export interface operations {
                     "application/json": components["schemas"]["Page_UserPublic_"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1341,15 +1386,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1376,6 +1412,33 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1383,15 +1446,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1420,6 +1474,42 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1427,15 +1517,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1458,6 +1539,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactPublic"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -1500,6 +1599,24 @@ export interface operations {
                     "application/octet-stream": string;
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1540,6 +1657,33 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1547,15 +1691,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1582,6 +1717,24 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1589,15 +1742,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -1618,8 +1762,17 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not implemented in the production shell */
-            501: {
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1647,8 +1800,17 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
-            /** @description Not implemented in the production shell */
-            501: {
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1698,6 +1860,24 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1738,6 +1918,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -1781,6 +1979,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ArtifactPublic_"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -1863,6 +2079,24 @@ export interface operations {
                     "application/json": components["schemas"]["InferenceResult"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1903,6 +2137,24 @@ export interface operations {
                     "application/json": components["schemas"]["JobPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1941,6 +2193,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobPublic"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -1986,6 +2256,24 @@ export interface operations {
                     "application/json": components["schemas"]["Incremental_JobLog_"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2029,6 +2317,24 @@ export interface operations {
                     "application/json": components["schemas"]["Incremental_Metric_"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2070,6 +2376,24 @@ export interface operations {
                     "application/json": components["schemas"]["Page_ProjectPublic_"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2077,15 +2401,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2112,6 +2427,24 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2119,15 +2452,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2152,6 +2476,24 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2159,15 +2501,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2196,6 +2529,24 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2203,15 +2554,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2236,6 +2578,24 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2243,15 +2603,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Not implemented in the production shell */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
                 };
             };
         };
@@ -2277,6 +2628,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ArtifactPublic_"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -2320,6 +2689,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_DatasetPublic_"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -2369,6 +2756,24 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2416,6 +2821,24 @@ export interface operations {
                     "application/json": components["schemas"]["ArtifactPublic"];
                 };
             };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2457,6 +2880,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_JobPublic_"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */
@@ -2503,6 +2944,24 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Validation Error */

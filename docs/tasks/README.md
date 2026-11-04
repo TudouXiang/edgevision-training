@@ -1,12 +1,12 @@
 # 任务索引
 
-一次只领取一个任务。T000/T010 是 GPT6 本轮范围，其余是后续候选，前置未通过不得自动开工。实现后先标 review_required，经审查通过才 accepted。
+一次只领取一个任务。T010 已通过独立验收，T020 已形成实现候选；前置未通过不得自动开工。实现后先标 review_required，经审查通过才 accepted。
 
 |任务|执行者|前置|状态|
 |---|---|---|---|
 |T000 盘点与规范合并|GPT6|实际目标目录已确认|review_required，ML_CHECK_PENDING|
 |T010 可启动骨架与精确契约|GPT6/Codex|T000相关轻量环境就绪|accepted，Windows A01–A04 PASS，独立审查 accept|
-|T020 身份与项目|实现Agent|T010审查通过|ready，未领取|
+|T020 身份与项目|实现Agent|T010审查通过|review_required，自动检查通过，真实浏览器待补证|
 |T030 数据导入/校验核心|实现Agent|T020通过|blocked|
 |T040 Worker与校验任务接线|实现Agent|T030通过、进程方案明确|blocked|
 |T050 真实训练|实现Agent|T040通过、ML链路已核验|blocked|
