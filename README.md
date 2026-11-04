@@ -73,4 +73,13 @@ python3 scripts/dev.py check
 
 `contract-generate` 从 FastAPI OpenAPI 生成 TS；`contract-check` 不修改跟踪产物。`check` 包括纯契约/脚本测试、后端 pytest、前端构建和契约漂移检查。兼容的 Bash 入口仍可使用 `bash scripts/dev.sh <命令>`。Windows 本机的运行结果见 `docs/evidence/T010-windows-2026-09-28.md`；此前 Linux 容器缺依赖的结论只适用于当时环境。
 
+T020 的真实浏览器回归使用锁定的 Playwright/Chromium，并且只连接测试入口创建的临时迁移数据库。先安装项目依赖和与锁文件匹配的浏览器，再执行包装脚本；包装脚本会生成内存测试凭据、启动真实 Uvicorn 与 Vite 同源代理，并在结束时停止服务和删除临时数据库：
+
+```bash
+cd web && ./node_modules/.bin/playwright install chromium && cd ..
+python3 scripts/e2e.py
+```
+
+只核对测试发现、临时迁移和服务编排而不启动浏览器时，可运行 `python3 scripts/e2e.py --list`。浏览器报告只包含用例名、状态、耗时和源码位置；不保存截图、trace、视频、Cookie、请求正文、服务日志、数据库或凭据。CI 使用相同步骤；测试源码或 `--list` 成功不等于真实浏览器验收通过。
+
 旧基线的执行记录见 `docs/evidence/bootstrap-2026-09-23.md` 与 `docs/evidence/foundation-report.md`；本机结果见 `docs/evidence/T010-windows-2026-09-28.md`。不要把启动说明当成已执行证据。未实现路径明确返回 501，未知路径 404，字段无效 422；正式运行不注入 Fake Runner。

@@ -1,6 +1,6 @@
 # 项目状态 · T010 accepted / T020 review_required（更新至 2026-11-04 UTC）
 
-当前 Git 基线为公开仓库 `main` 的 `dff9ad1fc92e9ce43b135138df18795106d4bf89`。T010 已 accepted；本工作区已实现 T020 的真实身份/会话、显式管理员初始化、管理员用户管理、项目 owner/归档、派生资源权限前置守卫和最小真实页面，状态为 **review_required**，提交与远端发布状态以本报告对应的 Git 引用为准。复用 `0002_foundation`，没有新迁移；公共 DTO 未扩展，OpenAPI 只同步实际错误响应元数据。隔离 pytest 26 项、Vitest 4 项、Vue 构建和契约漂移检查通过；真实 API/Web HTTP 启动探针通过。Chromium 因宿主 socket 权限崩溃，云浏览器对工作区端口拒绝连接，因此真实浏览器操作与截图 **NOT_RUN**。完整证据见 [`T020 report`](evidence/T020-report.md)。T030 仍未放行。
+当前 Git 基线为公开仓库 `main` 的 `dff9ad1fc92e9ce43b135138df18795106d4bf89`。T010 已 accepted；本工作区已实现 T020 的真实身份/会话、显式管理员初始化、管理员用户管理、项目 owner/归档、派生资源权限前置守卫和最小真实页面，状态为 **review_required**，提交与远端发布状态以本报告对应的 Git 引用为准。复用 `0002_foundation`，没有新迁移；公共 DTO 未扩展，OpenAPI 只同步实际错误响应元数据。隔离 pytest 26 项、Vitest 4 项、Vue 构建和契约漂移检查通过；真实 API/Web HTTP 启动探针通过。现已增加锁定 Playwright、一次性迁移数据库/随机测试账号包装器和只读权限 GitHub Actions，测试发现及真实服务编排可在当前宿主运行；但受限宿主不再尝试启动 Chromium，受信 CI 尚未发布执行，因此真实浏览器验收仍为 **NOT_RUN**。完整证据见 [`T020 report`](evidence/T020-report.md) 与 [`browser CI source report`](evidence/T020-browser-ci-source-2026-11-04.md)。T030 仍未放行。
 
 ## 历史 Windows T010 验收（2026-09-29）
 
@@ -27,7 +27,7 @@ Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无�
 
 ## 待审查与领取闸门
 
-1. T020 已形成实现候选并完成[独立代码/安全审查](evidence/T020-change-review-2026-11-04.md)，仍需可访问宿主上的真实浏览器补证；不能把 `review_required` 写成 accepted。T030 不自动进入。
+1. T020 已形成实现候选并完成[独立代码/安全审查](evidence/T020-change-review-2026-11-04.md)，浏览器 CI 源码待发布后在 GitHub 托管 runner 上执行；在取得该提交的真实 Chromium 结果和独立验收前，不能把 `review_required` 写成 accepted。T030 不自动进入。
 2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。项目级后端同步没有重装已存在的 26 个包，已有环境的可运行性与全新环境可重装性分开判断。
 3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。

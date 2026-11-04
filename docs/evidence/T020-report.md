@@ -59,4 +59,10 @@
 
 未执行真实多进程禁用/写入竞态压力；实现以 `BEGIN IMMEDIATE` 同事务重查和集成测试为证，SQLite 高并发仍不是范围。HTTPS 只用 TestClient 验证配置/Cookie 属性，没有实际 TLS 部署。
 
+## 浏览器 CI 源码补充（2026-11-04 UTC）
+
+在既有失败证据之上增补了可重复的真实浏览器回归源码：锁定 `@playwright/test`，由 `scripts/e2e.py` 独占临时目录，执行真实 Alembic 迁移、通过测试入口生成随机管理员、启动真实 Uvicorn 与 Vite 同源代理，然后串行运行 Chromium 测试。覆盖错误/正确登录、刷新/退出、项目双提交守卫、编辑取消/保存、归档/重载、管理员建号/重复名/禁用/启用、改密会话轮换与其他会话撤销、普通用户所有权、375px 键盘和历史导航。失败报告使用白名单字段，不收集截图、trace、视频、请求/服务日志、数据库、Cookie 或凭据。
+
+这没有改变产品 DTO、数据库迁移、正式启动链路或部署拓扑；更小但不足的方案是继续扩大 Vitest/fetch mock，因不能形成真实浏览器与真实服务证据而未采用。GitHub Actions 仅有 `contents: read`，对 feature push/PR 运行锁定依赖、原聚合检查和浏览器套件，失败只上传脱敏摘要。当前受限宿主只运行 `npm run test:e2e:list` 和 `python scripts/e2e.py --report-dir /tmp/edgevision-e2e-report --list`，均退出 0；后者实际完成临时迁移、管理员建立、API/Vite 同源 ready 探针和清理，但 `--list` 不启动 Chromium。因此真实浏览器结果仍为 **NOT_RUN**，原 NOT_RUN 记录不被覆盖。详细文件与复现命令见 [`T020-browser-ci-source-2026-11-04.md`](T020-browser-ci-source-2026-11-04.md)。
+
 回退代码无需数据库 downgrade，但已有真实 Argon2id 用户时，不能回退到不识别该哈希的版本而不先做受审迁移。回退前应停 API、备份数据库；不要删除 sessions/projects 记录。T030 仍未放行。

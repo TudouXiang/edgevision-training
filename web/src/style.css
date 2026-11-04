@@ -54,7 +54,8 @@ label { display: block; color: #485c57; font-size: 13px; font-weight: 650; }
 .row-card > div:first-child { min-width: 0; flex: 1; }
 .row-card p { margin: 7px 0; color: var(--muted); font-size: 13px; }
 .row-card small { color: #758580; font-size: 10px; word-break: break-all; }
-.row-title { display: flex; align-items: center; gap: 10px; }
+.row-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.row-title strong, .row-card p { overflow-wrap: anywhere; }
 .row-title span { padding: 3px 7px; color: #47615a; background: #eff4f2; border-radius: 999px; font-size: 10px; }
 .row-title span.active { color: #14675d; background: #e6f3ef; }
 .row-title span.archived { color: #796947; background: #f4efe4; }
