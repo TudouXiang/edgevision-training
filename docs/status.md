@@ -1,3 +1,11 @@
+# 当前状态 · T050 accepted / T060 前检（2026-11-04 UTC）
+
+精确提交 `c398426b2ba9369d769479ca3fcb7c09600f7bab` 的三项 CI 全部通过：Linux 轻量回归、实际 CPU 训练与真实浏览器、Windows 既有进程回归。T050 在固定 Linux CPU 小规模闭环范围 accepted；完整范围和未执行项见 [T050 CI 验收](evidence/T050-ci-acceptance-2026-11-04.md)。T060 进入依赖/导出前检，尚未实现 ONNX/ORT、推理或独立部署。
+
+以下保留分阶段记录；遇到状态差异以上述最新结论为准。
+
+---
+
 # 当前增量 · T050 review_required（2026-11-04 UTC）
 
 固定 Linux CPU 训练闭环已实现：真实 HTTP/受管 Worker 单轮合成输入、真实轮次指标、净化且安全重载的 best/last、

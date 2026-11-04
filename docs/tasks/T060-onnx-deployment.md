@@ -1,6 +1,6 @@
 # T060：ONNX导出、推理与部署包
 
-执行者：实现Agent。前置：T050 accepted；状态blocked。可在同一契约内拆成三个顺序子任务。
+执行者：实现Agent。前置：T050 已在固定 Linux CPU 范围 accepted；状态 preflight（仅依赖/导出前检和架构设计，生产实现待真实工具链与 ADR 冻结）。可在同一契约内拆成三个顺序子任务。
 
 目标：export_onnx、infer、package接入同一Worker；只处理平台可信模型。固定导出参数，生成完整模型元数据；按实际格式执行PT/ORT；固定模板产生独立Python部署包。
 

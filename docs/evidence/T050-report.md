@@ -1,4 +1,6 @@
-# T050 固定 YOLO11n 训练闭环 · review_required
+最新结论：固定 Linux CPU 范围 **accepted**，精确提交与远端 CI 见 [2026-11-04 验收](T050-ci-acceptance-2026-11-04.md)。以下保留发布前的执行记录与当时未完成项。
+
+# T050 固定 YOLO11n 训练闭环 · 实现与测试历史
 
 日期：2026-11-04 UTC。起点：T040 accepted 3795759；前置许可与设计见 ADR 0010/0011。
 本报告不把本地实现/烟测等同全部平台验收。最终 CI、Windows 训练、CUDA、ONNX、RKNN、精度实验未完成。

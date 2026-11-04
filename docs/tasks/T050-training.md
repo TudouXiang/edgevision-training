@@ -1,8 +1,8 @@
 # T050：真实YOLO训练闭环
 
-执行者：实现Agent。前置：T040 accepted、可信资产和目标ML环境核验；状态 ready（仅放行 ADR 0011 的 Linux CPU、私有本地样本训练实现；非 accepted，平台 A11/A12 与发行仍未验收）。
+执行者：实现Agent。前置：T040 accepted、可信资产和目标ML环境核验；状态 accepted（固定 Linux CPU 小规模真实训练闭环；完整平台与发行尚未验收）。
 
-项目原创代码/文档已选择 AGPL-3.0-only，见 [ADR 0010](../adr/0010-project-licensing.md)；计划采用 Ultralytics AGPL 路线。精确联合 ML 环境、固定官方权重和本地样本已完成[前检](../evidence/T050-preflight-2026-11-04.md)，不能用根 LICENSE 代替资产授权。COCO8 的 GPLv3/CC BY 4.0 差异仅允许当前私有本地技术验证，不再分发。仓库尚未引入生产 ML 依赖，也未接通真实训练。
+项目原创代码/文档已选择 AGPL-3.0-only，见 [ADR 0010](../adr/0010-project-licensing.md)；计划采用 Ultralytics AGPL 路线。精确联合 ML 环境、固定官方权重和本地样本已完成[前检](../evidence/T050-preflight-2026-11-04.md)，不能用根 LICENSE 代替资产授权。COCO8 的 GPLv3/CC BY 4.0 差异仅允许当前私有本地技术验证，不再分发。可选 ML hash lock 与真实训练已接通；最终公开验收使用项目生成的合成图，不分发 COCO8。
 
 先按 [ADR 0011](../adr/0011-t050-fixed-training-adapter.md) 实施：复用现有 guardian/状态机/0003_worker，不新增框架或迁移；冻结完整输入，独立运行副本，固定安全加载，真实有界指标和双 PT 原子发布。独立 1 epoch 烟测单独记录，不能代替平台验收。Windows ML、CUDA 与 ONNX 均未验证。
 
@@ -18,4 +18,4 @@
 
 固定适配器、完整冻结输入、真实指标、双 PT 发布/下载、操作员探针、训练表单及故障测试已实现。
 本地真实 Uvicorn/Worker 单轮 CPU 合成数据烟测通过；尚待最终代码 aggregate、独立复核及远端 Linux/Windows/浏览器 CI。
-当前状态 review_required，不提前标 A11/A12 accepted。详见 `../evidence/T050-report.md`。
+以上为 CI 前的实现记录。最终结论 accepted 的范围见 [CI 验收](../evidence/T050-ci-acceptance-2026-11-04.md)，不能扩展到 Windows ML、CUDA、正式精度或 ONNX。
