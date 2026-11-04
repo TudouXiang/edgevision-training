@@ -133,7 +133,7 @@ jobs:
         working-directory: backend
         shell: pwsh
         run: |
-          & .venv/Scripts/python.exe -m pytest tests/test_worker_process.py tests/test_worker_api.py -q
+          & .venv/Scripts/python.exe -m pytest tests/test_worker_process.py tests/test_worker_api.py -q -s
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .venv/Scripts/python.exe tests/http_restart_probe.py
           exit $LASTEXITCODE

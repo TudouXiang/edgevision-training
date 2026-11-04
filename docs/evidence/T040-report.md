@@ -82,3 +82,14 @@ Windows 真实 Job Object、nested Job/初始 suspended cancellation 与 Windows
 根因依据为 [CPython 3.12.10 Windows launcher](https://github.com/python/cpython/blob/v3.12.10/PC/launcher.c) 通过 CreateProcessW 启动并等待另一个解释器，以及 [stdlib multiprocessing 的明确修正](https://github.com/python/cpython/blob/v3.12.10/Lib/multiprocessing/popen_spawn_win32.py#L55-L62)。当前 Worker 错把 redirector 的 Popen PID 与实际 guardian 自报出生身份比较。采用官方 direct-base + 子环境 venv 标记方式，保持原有出生身份/receipt 校验；完整原生确认仍由下一次 Windows CI 的 fail-fast 探针和未削弱矩阵完成。未伪造 Windows 本地通过。
 
 本次修正的 Linux 有限回归：`cd backend && .venv/bin/python -m pytest tests/test_python_launch.py tests/test_worker_process.py tests/test_worker_api.py -q -s` 为 **33 passed / 0 skipped**（39.98 秒），日志 `T040-python-launch-local-2026-11-04.txt`；安全探针显示 PID/出生身份/venv/依赖全部匹配，windows=false，不冒充 Windows 实验。`tests/http_restart_probe.py` 退出 0、真实 API 重启/独立 Worker/整树退出通过，日志 `T040-python-launch-http-2026-11-04.txt`。脚本单元测试改在 backend 正确目录执行为 11 passed；先从仓库根执行曾因 app 导入路径缺失报 1 error，未当作通过。工作流 YAML 和原生探针先于矩阵的顺序断言、`git diff --check` 通过。此次候选仍待 Windows 原生 CI；此前代码指纹只描述原始候选，不覆盖本次兼容性修正。
+
+
+## Windows direct-interpreter 实测与剩余诊断
+
+[CI 41798554667 / Windows job 126468410873](https://github.com/TudouXiang/edgevision-training/actions/runs/41798554667/job/126468410873) 的原生探针 **4 passed**，`raw_pid_matches=false`，direct PID/出生身份/venv/依赖均为 true，实际证实并修复 redirector 身份根因。完整进程/API 矩阵推进为 **29 passed / 1 failed**：仅输出容量故障预期 `OUTPUT_CAPACITY_LIMIT` 却得到 `RUNNER_FAILED`。树清理、取消、恢复、nested Job 等其他用例通过不抵消此错误分类失败；HTTP 重启后续步骤因矩阵失败未执行。
+
+本次仅为该断言加入 receipt 的五项白名单诊断：reason、exit_code、logs_complete、started、tree_exited。不输出路径、身份、环境或用户数据，不改变生产行为或预期值。Windows Job ActiveProcesses 在退出且所有引用释放后才递减（[Microsoft 官方说明](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information)），但当前失败尚无 receipt 字段，不能把计数滞后假设写成已证实根因。待下一次精确 CI 取证。
+
+诊断调整本地仅执行 `cd backend && .venv/bin/python -m pytest tests/test_worker_process.py -k output_capacity_failure_remains_pending -q`：Linux 1 passed / 22 deselected（1.75 秒）；`git diff --check` 通过，不视为 Windows 故障已修复。
+
+诊断补充：容量场景仅重复五次，Windows 矩阵 `-s` 输出白名单 receipt 字段；无环境/路径/标识或用户内容。保留完整进程矩阵和严格错误码断言，不将偶然通过解释为缺陷已修复。

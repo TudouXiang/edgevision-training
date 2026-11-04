@@ -370,14 +370,19 @@ def test_spawning_unknown_and_malformed_receipt_fail_closed(data_root, monkeypat
     assert record(task)["status"] == "running"
 
 
-def test_output_capacity_failure_remains_pending(data_root):
+@pytest.mark.parametrize("attempt", range(5))
+def test_output_capacity_failure_remains_pending(data_root, attempt):
     client, project = setup_admin(data_root)
     dataset = upload(client, project).json()
     task = submit(client, dataset["id"])
     process = start("output_capacity")
     try:
         assert process.wait(timeout=10) == 0
-        assert record(task)["error_code"] == "OUTPUT_CAPACITY_LIMIT"
+        receipt = read_json(run_path(task) / "drained.json")
+        # Safe CI diagnosis only: no identities, paths, environment or payloads.
+        diagnostic = {key: receipt.get(key) for key in ("reason", "exit_code", "logs_complete", "started", "tree_exited")}
+        print("capacity_receipt=" + json.dumps(diagnostic, sort_keys=True))
+        assert record(task)["error_code"] == "OUTPUT_CAPACITY_LIMIT", json.dumps(diagnostic, sort_keys=True)
         assert client.get(f"/api/v1/datasets/{dataset['id']}").json()["state"] == "pending"
     finally:
         stop_and_reap(process)
