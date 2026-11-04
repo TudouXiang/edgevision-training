@@ -55,3 +55,21 @@ Windows 真实 Job Object、nested Job/初始 suspended cancellation 与 Windows
 ## 父级最终候选独立核验
 
 最终指纹不变，独立全量 91 backend / 10 frontend、构建/契约、真实 HTTP 重启与四场景 discovery 均通过；discovery 完成 0，浏览器仍 NOT_RUN。具体命令、退出码及日志见 [独立审查](T040-change-review-2026-11-04.md)。此处不接受 T040，仍等待候选提交的 Linux/Windows CI。
+
+
+## 首次 CI 与 Windows 运行时修正
+
+公开候选提交 `bf6b84922400e1561cdfc613f5eac941d420cba6` 的 [首次 CI 41796272092](https://github.com/TudouXiang/edgevision-training/actions/runs/41796272092) 中，[Windows job 126461007744](https://github.com/TudouXiang/edgevision-training/actions/runs/41796272092/job/126461007744) 在 setup-python 阶段失败：Windows 2022/x64 没有 Python 3.12.14 构建。进程/API 矩阵未运行，不记为测试失败或测试通过。
+
+根据 [actions/python-versions 官方版本清单](https://github.com/actions/python-versions/blob/main/versions-manifest.json) 中提供的 Windows x64 Python 3.12.10，本次只将 Windows job 固定为 3.12.10，Linux 仍为 3.12.14；没有版本回退逻辑或跳过失败。Windows summary 改为展示矩阵步骤的真实 outcome，配置范围不再冒充已执行证据。
+
+这是工作流及证据文档的后续调整，没有业务源码变化。此前源指纹 `7765a67aa988e39a018133e87b600e43f5459f13c6b75b23ee90f73dd711c8ff` 对应原候选，不宣称覆盖本次改动后的工作流。待父级发布新提交并重新取得 Windows 实际运行证据。
+
+
+## 首次 Linux CI 与归档浏览器夹具修正
+
+同次 CI 41796272092 的 Linux 实际结果为后端 91 / 前端 10、构建/契约及真实 HTTP 重启通过；Chromium 为 **3 passed / 1 failed**，新增 T040 Worker 全链路浏览器场景已通过。失败的是旧 T020 归档测试使用不存在的 Dataset UUID，资源核验先返回 404，未到达期望的 `409 PROJECT_ARCHIVED` 分支。不能将这次部分浏览器通过记成全套通过。
+
+本次仅修正浏览器夹具：在项目归档前用现有已认证页面上传合成 ZIP，确认 Dataset 属于该项目且为 pending；归档后对这个真实 Dataset 使用新幂等键提交，继续严格断言 `409 PROJECT_ARCHIVED`。不改变生产错误优先级或弱化为 404，不输出凭据。重新执行仅做 TypeScript 与四场景发现，真实 Chromium 仍待下一次 CI。
+
+本次有限回归：`npm --prefix web run test:e2e:list` 退出 0，TypeScript 通过、发现 4 / 完成 0、browser NOT_RUN；`cd backend && .venv/bin/python -m pytest tests/test_worker_api.py -k concurrent_submission_single_job_key_conflict_and_actor_authority -q` 为 1 passed / 5 deselected；`git diff --check` 通过。这些不替代待运行的完整 Chromium 验证。

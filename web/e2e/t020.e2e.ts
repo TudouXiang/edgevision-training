@@ -113,6 +113,17 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   await page.goForward()
   await expect(projectRow).toBeVisible()
 
+  // Keep a real owned input so this tests archive rejection, not missing-resource precedence.
+  await page.getByLabel('所属项目').selectOption(createdProject.id)
+  await page.getByLabel('受控 YOLO ZIP').setInputFiles(required('EDGEVISION_E2E_DATASET_ZIP'))
+  const datasetUpload = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${createdProject.id}/datasets`) && response.request().method() === 'POST')
+  await page.getByRole('button', { name: '上传新快照' }).click()
+  const uploadedResponse = await datasetUpload
+  expect(uploadedResponse.status()).toBe(201)
+  const archivedDataset = await uploadedResponse.json() as { id: string; project_id: string; state: string }
+  expect(archivedDataset.project_id).toBe(createdProject.id)
+  expect(archivedDataset.state).toBe('pending')
+
   const archiveResponse = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${createdProject.id}/archive`))
   await projectRow.getByRole('button', { name: '归档' }).click()
   expect((await archiveResponse).status()).toBe(200)
@@ -124,8 +135,8 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   expect(repeatedArchive.status).toBe(200)
   const archivedJob = await sameOrigin(page, `/projects/${createdProject.id}/jobs`, {
     method: 'POST',
-    body: { kind: 'dataset_check', params: { dataset_id: '00000000-0000-4000-8000-000000000001' } },
-    headers: { 'Idempotency-Key': 'archived-project-browser-check' },
+    body: { kind: 'dataset_check', params: { dataset_id: archivedDataset.id } },
+    headers: { 'Idempotency-Key': `archived-project-browser-check-${createdProject.id}` },
   })
   expect(archivedJob.status).toBe(409)
   expect((archivedJob.body as { error: { code: string } }).error.code).toBe('PROJECT_ARCHIVED')

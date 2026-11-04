@@ -114,7 +114,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.12.14'
+          python-version: '3.12.10'
       - name: Install isolated tooling and backend
         shell: pwsh
         run: |
@@ -126,6 +126,7 @@ jobs:
       - name: Install locked backend
         run: python scripts/install_deps.py --backend-only
       - name: Execute real Windows process and API matrix
+        id: windows_matrix
         working-directory: backend
         shell: pwsh
         run: |
@@ -136,7 +137,10 @@ jobs:
       - name: Write Windows evidence boundary
         if: always()
         shell: pwsh
+        env:
+          MATRIX_OUTCOME: ${{ steps.windows_matrix.outcome }}
         run: |
           '## T040 Windows real-process matrix' >> $env:GITHUB_STEP_SUMMARY
-          '- Executes Job Object initial membership, suspended cancellation, nested Job, descendants, Worker/guardian kill and publication faults.' >> $env:GITHUB_STEP_SUMMARY
+          "- Process/API matrix outcome: $env:MATRIX_OUTCOME" >> $env:GITHUB_STEP_SUMMARY
+          '- Configured scope (execution depends on outcome above): Job Object initial membership, suspended cancellation, nested Job, descendants, Worker/guardian kill and publication faults.' >> $env:GITHUB_STEP_SUMMARY
           '- Host reboot and hardware power-loss tests: NOT_RUN. Missing drain evidence blocks new work.' >> $env:GITHUB_STEP_SUMMARY
