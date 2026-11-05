@@ -8,6 +8,7 @@
 | --- | --- |
 | 安装依赖、初始化、启动 API / Worker / Web | [仓库 README](../README.md) |
 | 查看阶段、前置条件与任务单 | [任务索引](tasks/README.md) |
+| 准备修改、运行检查与提交审查 | [贡献指南](../CONTRIBUTING.md) |
 | 理解组件、进程与恢复边界 | [架构](architecture.md) |
 | 理解页面和交互的设计约束 | [界面设计](ui-design.md) |
 | 核对实现规则与项目 Skill | [AGENTS.md](../AGENTS.md) |

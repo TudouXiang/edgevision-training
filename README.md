@@ -2,7 +2,7 @@
 
 EdgeVision 面向单机计算机视觉场景，目标是把项目、数据集、训练、模型产物、ONNX 验证与部署准备连成可追溯的工作流。V1 以 YOLO11n 目标检测为主，RKNN 只保留接口，不声称已完成 NPU 转换或实机验证。
 
-文档入口：[阅读导航](docs/README.md) · [任务索引](docs/tasks/README.md) · [验收证据](docs/evidence/README.md)。安装与启动步骤见下文；各阶段的最新结论见 [项目状态](docs/status.md)。
+文档入口：[阅读导航](docs/README.md) · [任务索引](docs/tasks/README.md) · [验收证据](docs/evidence/README.md) · [贡献指南](CONTRIBUTING.md)。安装与启动步骤见下文；各阶段的最新结论见 [项目状态](docs/status.md)。
 
 ## 当前可用范围与限制
 
