@@ -20,7 +20,7 @@ from xml.etree import ElementTree
 
 ROOT = Path('/opt/edgevision')
 PYTHON = ROOT / 'backend/.venv-delivery/bin/python'
-STAGES = ('isolation', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
 STAGE_BUDGET = 450
 
 
@@ -34,7 +34,7 @@ def interrupt_for_cleanup(_signal, _frame):
 
 
 def summary(statuses: dict[str, str]) -> dict:
-    return {'schema_version': 1, 'stage': 'isolated_ml',
+    return {'schema_version': 2, 'stage': 'isolated_ml',
             'status': 'passed' if all(statuses.get(s) == 'passed' for s in STAGES) else 'failed',
             'stages': [{'stage': s, 'status': statuses.get(s, 'NOT_RUN')} for s in STAGES]}
 
@@ -92,6 +92,7 @@ def stage_commands(root: Path = ROOT) -> list[tuple[str, list[str], Path]]:
     python = str(root / 'backend/.venv-delivery/bin/python')
     backend = root / 'backend'
     return [
+        ('dependency_check', [python, '-I', '-m', 'pip', 'check'], backend),
         ('training_http', [python, 'tests/training_http_probe.py'], backend),
         ('export_http', [python, 'tests/export_http_probe.py'], backend),
         ('onnx_policy', [python, '-m', 'pytest', 'tests/test_onnx_runtime_policy.py', '-q',

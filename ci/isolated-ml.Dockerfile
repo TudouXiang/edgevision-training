@@ -22,7 +22,7 @@ COPY asset/yolo11n.pt /opt/edgevision/asset/yolo11n.pt
 # The installer creates a new venv here and installs only hash-locked wheels.
 RUN groupadd --gid 10001 edgevision \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin edgevision \
-    && /opt/hostedtoolcache/Python/3.12.14/x64/bin/python3 -I -S scripts/install_ml.py --delivery \
+    && /opt/hostedtoolcache/Python/3.12.14/x64/bin/python3 -I -S scripts/install_ml.py --delivery --defer-check \
     && cd web && npm ci --ignore-scripts --no-audit --no-fund \
     && chown -R 10001:10001 /opt/edgevision /home/edgevision
 USER 10001:10001

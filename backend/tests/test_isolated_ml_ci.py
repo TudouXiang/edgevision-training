@@ -28,7 +28,7 @@ CID = 'c' * 64
 
 
 def full_summary():
-    return {'schema_version': 1, 'stage': 'isolated_ml', 'status': 'passed',
+    return {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
             'stages': [{'stage': stage, 'status': 'passed'} for stage in ci.STAGES]}
 
 
@@ -299,13 +299,13 @@ def test_stage_order_shared_deadline_and_private_logs(tmp_path, monkeypatch, cap
     monkeypatch.setattr(entry, 'ROOT', tmp_path)
     monkeypatch.setattr(entry, 'verify_boundary', lambda *a: None)
     monkeypatch.setattr(entry, 'stage_commands', lambda: [(stage, ['never-run'], tmp_path) for stage in ci.STAGES[1:]])
-    times = iter([0, 10, 20, 30, 40, 50])
+    times = iter([0, 10, 20, 30, 40, 50, 60])
     monkeypatch.setattr(entry.time, 'monotonic', lambda: next(times))
     calls = []
     monkeypatch.setattr(entry, 'run_stage', lambda *args: calls.append(args))
     monkeypatch.setattr(entry, 'verify_policy_report', lambda *args: None)
     assert entry.main(['--host-netns', 'net:[123]']) == 0
-    assert [call[-1] for call in calls] == [440, 430, 420, 410, 400]
+    assert [call[-1] for call in calls] == [440, 430, 420, 410, 400, 390]
     assert all(call[3].parent == tmp_path / 'private' for call in calls)
     assert all(call[2]['EDGEVISION_ONNX_POLICY_ROOT'] == str(tmp_path / 'private/http') for call in calls)
     assert ci.validate_summary(capsys.readouterr().out) == full_summary()
@@ -350,7 +350,7 @@ def test_fixed_image_and_tool_prefixes_no_host_venv_or_early_ml():
     dockerfile = (ROOT / 'ci/isolated-ml.Dockerfile').read_text()
     assert 'FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.64.1-noble@sha256:' in dockerfile
     assert 'COPY tool-python/' in dockerfile and 'COPY tool-node/' in dockerfile
-    assert 'install_ml.py --delivery' in dockerfile
+    assert 'python3 -I -S scripts/install_ml.py --delivery --defer-check' in dockerfile
     assert 'npm ci --ignore-scripts --no-audit --no-fund' in dockerfile
     assert 'ORT_DISABLE_TELEMETRY=1' in dockerfile
     for name in ('isolated_ml_ci', 'isolated_ml_entry'):
@@ -737,3 +737,44 @@ def test_unapproved_or_moved_commit_stops_before_any_preparation(tmp_path, monke
     result = json.loads(capsys.readouterr().out)
     assert result['stage'] == 'preparation' and result['status'] == 'failed'
     assert all(row['status'] == 'NOT_RUN' for row in result['stages'])
+
+
+def test_schema_v1_cannot_omit_deferred_dependency_check():
+    payload = full_summary()
+    payload['schema_version'] = 1
+    payload['stages'] = [row for row in payload['stages'] if row['stage'] != 'dependency_check']
+    with pytest.raises(ci.IsolationError): ci.validate_summary(json.dumps(payload))
+
+
+def test_dependency_check_is_first_child_after_boundary():
+    commands = entry.stage_commands()
+    assert [name for name, _, _ in commands] == list(ci.STAGES[1:])
+    assert commands[0][0] == 'dependency_check'
+    assert commands[0][1][1:] == ['-I', '-m', 'pip', 'check']
+
+
+def test_dependency_failure_prevents_every_ml_stage(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(entry, 'ROOT', tmp_path)
+    boundary = []
+    monkeypatch.setattr(entry, 'verify_boundary', lambda *a: boundary.append(True))
+    calls = []
+    def reject(args, *rest):
+        assert boundary == [True]
+        calls.append(args)
+        raise RuntimeError('private dependency conflict')
+    monkeypatch.setattr(entry, 'run_stage', reject)
+    assert entry.main(['--host-netns', 'net:[123]']) == 1
+    assert len(calls) == 1 and calls[0][1:] == ['-I', '-m', 'pip', 'check']
+    output = capsys.readouterr()
+    assert 'private dependency conflict' not in output.out + output.err
+    result = ci.validate_summary(output.out)
+    assert [row['status'] for row in result['stages']] == ['passed', 'failed'] + ['NOT_RUN'] * 5
+
+
+def test_tool_python_path_override_rejected_before_copy(tmp_path):
+    source = tmp_path / 'source'
+    (source / 'lib').mkdir(parents=True)
+    (source / 'lib/libpython3.12._pth').write_text('import site\n')
+    destination = tmp_path / 'destination'
+    with pytest.raises(ci.IsolationError): ci.copy_tool_prefix(source, destination, python=True)
+    assert not destination.exists()

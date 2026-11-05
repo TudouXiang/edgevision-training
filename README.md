@@ -11,6 +11,8 @@ EdgeVision 面向单机计算机视觉场景，目标是把项目、数据集、
 
 本轮文档/合成恢复测试修正前的普通 CI [41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873)对应源码 `b9cbc568`：371 项后端、47 项前端通过，9 项原生 opt-in 跳过；普通浏览器 4 项实际执行通过、1 项 ML 跳过；Windows 既有进程/API 检查通过，ML job 跳过。新增 27 项文档/合成恢复测试后的本地轻量回归为 398 后端通过、9 跳过、47 前端通过，见[限定恢复练习](docs/evidence/synthetic-backup-recovery-2026-11-04.md)。精确阶段状态见 [docs/status.md](docs/status.md)，验收条件与证据边界见 [验收矩阵](docs/acceptance.md)。这不是完整项目交付声明。
 
+2026-11-05 联网准备子进程时序已完成[修正与独立源码复核](docs/evidence/T060-preparation-bootstrap-2026-11-05.md)。最终本地整合回归为429项后端通过、9项原生跳过、47项前端通过，构建/契约及HTTP重启通过。此源码修正不代表容器或真实模型已执行，不改变 E 未 accepted。
+
 ## 许可
 
 有权授权的项目原创源码与文档采用 **[AGPL-3.0-only](LICENSE)**。适用范围及排除项见

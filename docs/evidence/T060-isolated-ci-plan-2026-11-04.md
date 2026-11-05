@@ -1,6 +1,9 @@
 # T060 isolated ML CI reconstruction: static-only plan and evidence
 
-Date: 2026-11-04 UTC. Status: **review_required; actual isolation and ML NOT_RUN**.
+Date: 2026-11-04 UTC; preparation correction added 2026-11-05. Status: **actual isolation and ML NOT_RUN**.
+The original static review missed the online `pip check` child startup. The
+[2026-11-05 correction](T060-preparation-bootstrap-2026-11-05.md) supersedes that
+part of this plan; source review is not authorization or execution evidence.
 This is new reconstruction after the earlier unpublished T060 files were lost.
 It does not reuse their tests or treat their results as evidence for this code.
 ADR 0012 and ADR 0013 remain the privacy and export contracts.
@@ -52,7 +55,15 @@ GitHub-hosted workflow executing the reviewed source revision.
   home directory, Docker socket or credentials.
 - In the image, standard-library-only Python/version and Node-version checks
   precede installation. Create a new `/opt/edgevision/backend/.venv-delivery`
-  using `scripts/install_ml.py --delivery` and the joint hash-locked wheels.
+  using `python3 -I -S scripts/install_ml.py --delivery --defer-check` and the joint hash-locked wheels.
+  Reject any existing target (including a dangling link), Python `._pth` overrides,
+  active bootstrap `.pth` paths and customization modules/packages/archives.
+  The sole fresh-venv install child uses `-I -m pip install`; it deliberately
+  retains site initialization because Python 3.12 requires it for the correct
+  venv prefix. No Python child restarts after the joint wheels are installed
+  while the build still has networking. The same installer process also rejects
+  any newly installed `._pth` override in the venv or base prefix. `pip check`
+  moves to the isolated runtime.
   Use `npm ci --ignore-scripts --no-audit --no-fund`. No build-time model probe,
   ML import or model execution is permitted.
 - `ORT_DISABLE_TELEMETRY=1` is set in the image and all command environments.
@@ -119,24 +130,25 @@ capabilities zero, NoNewPrivs=1 and Seccomp=2. Kernel unreachable IPv6 defaults 
 loopback are allowed only with RTF_REJECT and no gateway. No external connection
 attempt is used to test isolation. Any failure exits; there is no host fallback.
 
-Six canonical stages, in order:
+Seven canonical stages, in order:
 
 1. Structural isolation verification.
-2. `tests/training_http_probe.py`.
-3. `tests/export_http_probe.py`, consuming the completed training HTTP root.
-4. `tests/test_onnx_runtime_policy.py`, with EDGEVISION_ONNX_POLICY_ROOT set.
-5. `tests/test_training_ml_policy.py`, with EDGEVISION_ML_POLICY_ROOT set.
-6. `scripts/e2e.py --delivery --ml-asset ...`, using its own disposable data root.
+2. `python -I -m pip check`; failure prevents every ML stage.
+3. `tests/training_http_probe.py`.
+4. `tests/export_http_probe.py`, consuming the completed training HTTP root.
+5. `tests/test_onnx_runtime_policy.py`, with EDGEVISION_ONNX_POLICY_ROOT set.
+6. `tests/test_training_ml_policy.py`, with EDGEVISION_ML_POLICY_ROOT set.
+7. `scripts/e2e.py --delivery --ml-asset ...`, using its own disposable data root.
 
 Both policy roots point to the same private HTTP root. Policy suites additionally
 require nonzero executed JUnit cases, zero skips, zero failures and zero errors;
 a skipped suite cannot pass. All child output/tracebacks and JUnit/browser reports
-stay private. Only reconstructed schema-version-1 stage/status fields are public.
+stay private. Only reconstructed schema-version-2 stage/status fields are public.
 An uncertain start's stages are `unverified`, not falsely `NOT_RUN`. Missing,
 extra, duplicate, malformed, reordered or incomplete summary fields are rejected.
 
 After execution, inspect the stopped/exited container again. A success exit alone
-is insufficient: all six canonical stages must pass, post-execution inspection
+is insufficient: all seven canonical stages must pass, post-execution inspection
 must pass, and owned container/image/local context cleanup must complete before
 public success. Cleanup failure overturns success while preserving previously sanitized child
 outcomes; a late context/report-writing fault cannot relabel executed stages

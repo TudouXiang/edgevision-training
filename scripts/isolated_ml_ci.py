@@ -29,7 +29,7 @@ OWNER_LABEL = 'org.edgevision.isolated-ml-owner'
 BUILD_TIMEOUT = 600
 EXECUTION_TIMEOUT = 480
 CLEANUP_TIMEOUT = 30
-STAGES = ('isolation', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
 PUBLIC_STAGES = ('preparation', 'build', 'create', 'inspect', 'execution', 'cleanup', 'cleanup_unknown', 'complete')
 IMAGE_ID = re.compile(r'sha256:[a-f0-9]{64}')
 CONTAINER_ID = re.compile(r'[a-f0-9]{64}')
@@ -95,7 +95,7 @@ def validate_summary(value: str) -> dict:
     require(len(value) <= 8192)
     result = decode_json(value)
     require(isinstance(result, dict) and set(result) == {'schema_version', 'stage', 'status', 'stages'})
-    require(type(result['schema_version']) is int and result['schema_version'] == 1)
+    require(type(result['schema_version']) is int and result['schema_version'] == 2)
     require(result['stage'] == 'isolated_ml' and result['status'] in ('passed', 'failed'))
     rows = result['stages']
     require(isinstance(rows, list) and len(rows) == len(STAGES))
@@ -105,7 +105,7 @@ def validate_summary(value: str) -> dict:
     all_passed = all(row['status'] == 'passed' for row in rows)
     require((result['status'] == 'passed') == all_passed)
     # Return freshly built known fields; never relay arbitrary Docker output.
-    return {'schema_version': 1, 'stage': 'isolated_ml', 'status': result['status'],
+    return {'schema_version': 2, 'stage': 'isolated_ml', 'status': result['status'],
             'stages': [{'stage': name, 'status': row['status']} for name, row in zip(STAGES, rows, strict=True)]}
 
 
@@ -115,13 +115,13 @@ def public_summary(stage: str, passed: bool, result: dict | None = None) -> dict
     if result is not None:
         rows = validate_summary(json.dumps(result))['stages']
     require(not passed or (stage == 'complete' and all(row['status'] == 'passed' for row in rows)))
-    return {'schema_version': 1, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows}
+    return {'schema_version': 2, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows}
 
 
 def failed_outer(stage: str, previous: dict) -> dict:
     # Cleanup/reporting faults cannot erase already verified child outcomes.
     rows = previous['stages']
-    evidence = {'schema_version': 1, 'stage': 'isolated_ml',
+    evidence = {'schema_version': 2, 'stage': 'isolated_ml',
                 'status': 'passed' if all(row['status'] == 'passed' for row in rows) else 'failed',
                 'stages': rows}
     return public_summary(stage, False, evidence)
@@ -260,9 +260,13 @@ def freeze_source(root: Path, context: Path, commands: PrivateCommands, expected
     require(git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--', *paths) == '')
 
 
-def copy_tool_prefix(source: Path, destination: Path) -> None:
+def copy_tool_prefix(source: Path, destination: Path, *, python: bool = False) -> None:
     require(source.is_dir() and not source.is_symlink())
     for path in source.rglob('*'):
+        if python:
+            name = path.name.lower()
+            # -I -S skips site hooks, but ._pth may override interpreter flags.
+            require(not name.endswith('._pth'))
         if path.is_symlink():
             require(path.resolve(strict=True).is_relative_to(source.resolve()))
         else:
@@ -278,7 +282,7 @@ def prepare_context(root: Path, private: Path, commands: PrivateCommands, expect
     context = private / 'build-context'
     context.mkdir(mode=0o700)
     freeze_source(root, context, commands, expected_commit)
-    copy_tool_prefix(PYTHON_PREFIX, context / 'tool-python')
+    copy_tool_prefix(PYTHON_PREFIX, context / 'tool-python', python=True)
     copy_tool_prefix(NODE_PREFIX, context / 'tool-node')
     asset = context / 'asset/yolo11n.pt'
     commands.command([str(PYTHON_PREFIX / 'bin/python3'), '-I', '-S', str(context / 'source/scripts/fetch_training_asset.py'),
@@ -415,7 +419,7 @@ class IsolatedRun:
         self.stage = 'execution'
         # If the client disappears or output is malformed, actual child outcomes
         # are unknown, not falsely reported as never run.
-        self.result = {'schema_version': 1, 'stage': 'isolated_ml', 'status': 'failed',
+        self.result = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'failed',
                        'stages': [{'stage': name, 'status': 'unverified'} for name in STAGES]}
         try:
             output = self.commands.docker(['start', '--attach', container['Id']], timeout=remaining())
