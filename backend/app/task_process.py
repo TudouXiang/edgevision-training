@@ -1,13 +1,29 @@
-"""Isolated task entrypoint. Real adapters must replace this with verified work."""
-import json
+"""Fixed bootstrap: gate before importing any adapter or decoding its inputs."""
 import sys
 
 
 def main() -> int:
-    # Never claim a task succeeded while adapters are absent.
-    print(json.dumps({"code": "UNSUPPORTED_JOB", "message": "No production task adapter is installed"}), flush=True)
-    return 65
+    if len(sys.argv) != 3 or sys.stdin.buffer.readline(16) != b"GO\n":
+        return 125
+    return execute(sys.argv[1], sys.argv[2])
+
+
+def execute(job_id: str, run_id: str) -> int:
+    # No user-controlled module, command or model is imported.
+    from .dataset_runner import log, run
+    from .run_files import OutputLimitError
+    try:
+        return run(job_id, run_id)
+    except OutputLimitError:
+        log("Validation report exceeds supported size", "error")
+        return 71
+    except OSError:
+        log("Runner storage is unavailable", "error")
+        return 70
+    except Exception:
+        log("Runner infrastructure failed", "error")
+        return 72
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

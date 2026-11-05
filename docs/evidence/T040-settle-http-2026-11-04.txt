@@ -1,0 +1,3 @@
+/workspace/scratch/fd4aaee6f782/edgevision-training/backend/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+http_api_restart=passed independent_worker=passed tree_exit=passed

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import JobPanel from './components/JobPanel.vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Activity, Archive, FolderPlus, LogOut, Pencil, RefreshCw, ShieldCheck, UserPlus } from '@lucide/vue'
-import { adminApi, ApiClientError, authApi, checkSystem, projectApi } from './api'
-import type { Capabilities, Project, User } from './api'
+import { Activity, Archive, Database, FolderPlus, Images, LogOut, Pencil, RefreshCw, ShieldCheck, UploadCloud, UserPlus } from '@lucide/vue'
+import { adminApi, ApiClientError, authApi, checkSystem, datasetApi, projectApi } from './api'
+import type { Capabilities, Dataset, DatasetSample, Project, User } from './api'
 
 const PAGE_SIZE = 20
 const booting = ref(true)
@@ -37,11 +38,26 @@ const currentPassword = ref('')
 const replacementPassword = ref('')
 const changingPassword = ref(false)
 const accountMessage = ref('')
+const selectedProjectId = ref('')
+const datasets = ref<Dataset[]>([])
+const jobPanel = ref<InstanceType<typeof JobPanel> | null>(null)
+function updateDataset(value: Dataset) { datasets.value = datasets.value.map(item => item.id === value.id ? value : item) }
+const datasetTotal = ref(0)
+const datasetPage = ref(1)
+const datasetFile = ref<File | null>(null)
+const datasetInput = ref<HTMLInputElement | null>(null)
+const loadingDatasets = ref(false)
+const loadingMoreDatasets = ref(false)
+const uploadingDataset = ref(false)
+const previewingDataset = ref<string | null>(null)
+const previewSamples = ref<DatasetSample[]>([])
+const previewLoading = ref(false)
 const checkingSystem = ref(true)
 const apiLive = ref(false)
 const apiReady = ref(false)
 const capabilities = ref<Capabilities | null>(null)
 const isAdmin = computed(() => user.value?.role === 'admin')
+const selectedProject = computed(() => projects.value.find(project => project.id === selectedProjectId.value) ?? null)
 const stages = computed(() => [
   ['身份', capabilities.value?.features.auth?.available],
   ['项目', capabilities.value?.features.projects?.available],
@@ -55,8 +71,11 @@ const stages = computed(() => [
 let generation = 0
 let projectRevision = 0
 let userRevision = 0
+let datasetRevision = 0
+let datasetReadRevision = 0
 let sessionController: AbortController | null = null
 let systemController: AbortController | null = null
+let datasetController: AbortController | null = null
 
 function message(error: unknown): string {
   if (error instanceof ApiClientError) return error.message
@@ -80,6 +99,18 @@ function resetSessionDrafts() {
   currentPassword.value = ''
   replacementPassword.value = ''
   accountMessage.value = ''
+  selectedProjectId.value = ''
+  datasets.value = []
+  datasetTotal.value = 0
+  datasetPage.value = 1
+  datasetFile.value = null
+  if (datasetInput.value) datasetInput.value.value = ''
+  loadingDatasets.value = false
+  loadingMoreDatasets.value = false
+  uploadingDataset.value = false
+  previewingDataset.value = null
+  previewSamples.value = []
+  previewLoading.value = false
   projectBusy.value = null
   userBusy.value = null
   creatingProject.value = false
@@ -94,7 +125,11 @@ function invalidateSession() {
   generation += 1
   projectRevision += 1
   userRevision += 1
+  datasetRevision += 1
+  datasetReadRevision += 1
   sessionController?.abort()
+  datasetController?.abort()
+  datasetController = null
   sessionController = null
   user.value = null
   projects.value = []
@@ -203,7 +238,10 @@ async function refreshProjects() {
   refreshingProjects.value = true
   try {
     const result = await projectApi.list(1, PAGE_SIZE, sessionController.signal)
-    if (isCurrent(expected) && expectedRevision === projectRevision) { projects.value = result.items; projectTotal.value = result.total; projectPage.value = 1 }
+    if (isCurrent(expected) && expectedRevision === projectRevision) {
+      projects.value = result.items; projectTotal.value = result.total; projectPage.value = 1
+      if (selectedProjectId.value && !projects.value.some(project => project.id === selectedProjectId.value)) clearDatasetSelection()
+    }
   } catch (error) { if (expectedRevision === projectRevision) handleError(error, expected) }
   finally { if (expected === generation) refreshingProjects.value = false }
 }
@@ -279,6 +317,109 @@ async function archiveProject(project: Project) {
   finally { if (expected === generation) projectBusy.value = null }
 }
 
+function clearDatasetSelection() {
+  datasetRevision += 1
+  datasetReadRevision += 1
+  datasetController?.abort()
+  datasetController = null
+  selectedProjectId.value = ''
+  datasets.value = []
+  datasetTotal.value = 0
+  datasetPage.value = 1
+  datasetFile.value = null
+  previewingDataset.value = null
+  previewSamples.value = []
+  loadingDatasets.value = false
+  loadingMoreDatasets.value = false
+  uploadingDataset.value = false
+  previewLoading.value = false
+  if (datasetInput.value) datasetInput.value.value = ''
+}
+
+async function selectDatasetProject() {
+  datasetRevision += 1
+  const readRevision = ++datasetReadRevision
+  datasetController?.abort()
+  datasetController = null
+  datasets.value = []
+  datasetTotal.value = 0
+  datasetPage.value = 1
+  previewingDataset.value = null
+  previewSamples.value = []
+  loadingDatasets.value = false
+  loadingMoreDatasets.value = false
+  uploadingDataset.value = false
+  previewLoading.value = false
+  datasetFile.value = null
+  if (datasetInput.value) datasetInput.value.value = ''
+  if (!selectedProjectId.value || !sessionController) return
+  datasetController = new AbortController()
+  const expected = generation
+  const revision = datasetRevision
+  loadingDatasets.value = true
+  try {
+    const result = await datasetApi.list(selectedProjectId.value, 1, PAGE_SIZE, datasetController.signal)
+    if (isCurrent(expected) && revision === datasetRevision && readRevision === datasetReadRevision) { datasets.value = result.items; datasetTotal.value = result.total; datasetPage.value = 1 }
+  } catch (error) { if (revision === datasetRevision && readRevision === datasetReadRevision) handleError(error, expected) }
+  finally { if (revision === datasetRevision) loadingDatasets.value = false }
+}
+
+async function loadMoreDatasets() {
+  if (loadingMoreDatasets.value || datasets.value.length >= datasetTotal.value || !selectedProjectId.value || !datasetController) return
+  const expected = generation
+  const revision = datasetRevision
+  const readRevision = datasetReadRevision
+  const projectId = selectedProjectId.value
+  const next = datasetPage.value + 1
+  loadingMoreDatasets.value = true
+  try {
+    const result = await datasetApi.list(projectId, next, PAGE_SIZE, datasetController.signal)
+    if (isCurrent(expected) && revision === datasetRevision && readRevision === datasetReadRevision && selectedProjectId.value === projectId) {
+      datasets.value.push(...result.items); datasetTotal.value = result.total; datasetPage.value = next
+    }
+  } catch (error) { if (revision === datasetRevision && readRevision === datasetReadRevision) handleError(error, expected) }
+  finally { if (revision === datasetRevision) loadingMoreDatasets.value = false }
+}
+
+function chooseDataset(event: Event) {
+  datasetFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function uploadDataset() {
+  if (uploadingDataset.value || !datasetFile.value || !selectedProjectId.value || !datasetController) return
+  const expected = generation
+  const revision = datasetRevision
+  datasetReadRevision += 1 // Invalidate an older list/load-more response before starting the write.
+  loadingDatasets.value = false
+  loadingMoreDatasets.value = false
+  uploadingDataset.value = true
+  globalError.value = ''
+  try {
+    await datasetApi.upload(selectedProjectId.value, datasetFile.value, datasetController.signal)
+    if (!isCurrent(expected) || revision !== datasetRevision) return
+    datasetFile.value = null
+    if (datasetInput.value) datasetInput.value.value = ''
+    const readRevision = ++datasetReadRevision
+    const result = await datasetApi.list(selectedProjectId.value, 1, PAGE_SIZE, datasetController.signal)
+    if (isCurrent(expected) && revision === datasetRevision && readRevision === datasetReadRevision) { datasets.value = result.items; datasetTotal.value = result.total; datasetPage.value = 1 }
+  } catch (error) { if (revision === datasetRevision) handleError(error, expected) }
+  finally { if (revision === datasetRevision) uploadingDataset.value = false }
+}
+
+async function previewDataset(dataset: Dataset) {
+  if (dataset.state !== 'ready' || !datasetController) return
+  const expected = generation
+  const revision = datasetRevision
+  previewingDataset.value = dataset.id
+  previewSamples.value = []
+  previewLoading.value = true
+  try {
+    const result = await datasetApi.samples(dataset.id, 1, 12, datasetController.signal)
+    if (isCurrent(expected) && revision === datasetRevision && previewingDataset.value === dataset.id) previewSamples.value = result.items
+  } catch (error) { if (revision === datasetRevision && previewingDataset.value === dataset.id) handleError(error, expected) }
+  finally { if (revision === datasetRevision && previewingDataset.value === dataset.id) previewLoading.value = false }
+}
+
 async function createUser() {
   if (creatingUser.value || !sessionController) return
   const expected = generation
@@ -345,6 +486,7 @@ onUnmounted(() => { sessionController?.abort(); systemController?.abort() })
       <section class="panel status-panel"><div class="section-title"><h2><Activity :size="20" />系统与阶段</h2><button :disabled="checkingSystem" @click="refreshSystem">重新检查</button></div><div class="status-summary"><strong :class="apiLive ? 'ok' : 'bad'">{{ apiLive ? 'API 已响应' : 'API 未连接' }}</strong><strong :class="apiReady ? 'ok' : 'bad'">{{ apiReady ? '数据库已就绪' : '数据库未就绪' }}</strong></div><div class="stage-list"><span v-for="stage in stages" :key="stage[0]" :class="stage[1] ? 'available' : 'unavailable'">{{ stage[0] }} · {{ stage[1] ? '可用' : '未实现' }}</span></div></section>
       <section class="panel"><h2><FolderPlus :size="20" />新建项目</h2><form class="grid-form" @submit.prevent="createProject"><label>项目名称<input v-model="projectName" required maxlength="160" /></label><label>描述<input v-model="projectDescription" maxlength="2000" /></label><button class="primary" :disabled="creatingProject" type="submit">{{ creatingProject ? '创建中…' : '创建项目' }}</button></form></section>
       <section class="panel"><div class="section-title"><h2>项目列表</h2><span>已显示 {{ projects.length }} / {{ projectTotal }}</span></div><p v-if="projects.length === 0" class="empty">还没有项目。创建第一个检测工作区吧。</p><article v-for="project in projects" :key="project.id" class="row-card"><template v-if="editingProject === project.id"><div class="edit-grid"><input v-model="editName" required maxlength="160" aria-label="编辑项目名称" /><input v-model="editDescription" maxlength="2000" aria-label="编辑项目描述" /></div><div class="actions"><button @click="editingProject = null">取消</button><button class="primary" :disabled="projectBusy === project.id" @click="saveProject(project)">保存</button></div></template><template v-else><div><div class="row-title"><strong>{{ project.name }}</strong><span :class="project.archived_at ? 'archived' : 'active'">{{ project.archived_at ? '已归档' : '使用中' }}</span></div><p>{{ project.description || '暂无描述' }}</p><small>所有者 {{ project.owner_id }}</small></div><div class="actions"><button @click="startEdit(project)"><Pencil :size="15" />编辑</button><button :disabled="Boolean(project.archived_at) || projectBusy === project.id" @click="archiveProject(project)"><Archive :size="15" />归档</button></div></template></article><button v-if="projects.length < projectTotal" class="load-more" :disabled="loadingMoreProjects" @click="loadMoreProjects">{{ loadingMoreProjects ? '加载中…' : '加载更多项目' }}</button></section>
+      <section class="panel dataset-panel"><div class="section-title"><h2><Database :size="20" />数据集快照</h2><span>上传后提交校验，状态和日志来自独立 Worker</span></div><label class="project-picker">所属项目<select v-model="selectedProjectId" @change="selectDatasetProject"><option value="">请选择项目</option><option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}{{ project.archived_at ? '（已归档）' : '' }}</option></select></label><form v-if="selectedProject" class="dataset-upload" @submit.prevent="uploadDataset"><label>受控 YOLO ZIP<input ref="datasetInput" type="file" accept=".zip,application/zip" :disabled="Boolean(selectedProject.archived_at) || uploadingDataset" @change="chooseDataset" /></label><button class="primary" type="submit" :disabled="!datasetFile || Boolean(selectedProject.archived_at) || uploadingDataset"><UploadCloud :size="16" />{{ uploadingDataset ? '上传中…' : '上传新快照' }}</button></form><p v-if="selectedProject?.archived_at" class="note">归档项目只读，不能继续上传。</p><p v-if="loadingDatasets" class="empty">正在读取真实数据集记录…</p><p v-else-if="selectedProject && datasets.length === 0" class="empty">这个项目还没有数据集。</p><article v-for="dataset in datasets" :key="dataset.id" class="row-card dataset-row"><div><div class="row-title"><strong>{{ dataset.name }} · v{{ dataset.version }}</strong><span :class="dataset.state">{{ dataset.state }}</span></div><p>ZIP {{ dataset.size_bytes.toLocaleString() }} bytes · SHA-256 {{ dataset.sha256.slice(0, 16) }}…</p><small>{{ dataset.state === 'pending' ? '已安全暂存，尚未校验，不能训练或预览' : dataset.state === 'ready' ? `${dataset.counts?.images ?? 0} 张图片 · ${dataset.classes.length} 类` : '校验状态来自真实记录' }}</small></div><div class="actions dataset-actions"><button :disabled="Boolean(selectedProject?.archived_at) || dataset.state === 'ready' || dataset.state === 'validating' || Boolean(jobPanel?.submitting)" @click="jobPanel?.checkDataset(dataset)">{{ jobPanel?.submitting === dataset.id ? '提交中…' : '开始校验' }}</button><a v-if="dataset.report_artifact_id" :href="`/api/v1/artifacts/${dataset.report_artifact_id}/download`">下载报告</a><button :disabled="dataset.state !== 'ready'" @click="previewDataset(dataset)"><Images :size="15" />有限预览</button></div></article><button v-if="datasets.length < datasetTotal" class="load-more" :disabled="loadingMoreDatasets" @click="loadMoreDatasets">{{ loadingMoreDatasets ? '加载中…' : '加载更多数据集' }}</button><p v-if="selectedProject && datasets.length" class="note">已显示 {{ datasets.length }} / {{ datasetTotal }}。同名 ZIP 再次上传会创建新版本，不覆盖既有快照。</p><JobPanel v-if="selectedProjectId" :key="`${generation}-${selectedProjectId}`" ref="jobPanel" :project-id="selectedProjectId" :datasets="datasets" @dataset="updateDataset" @error="handleError" /><div v-if="previewingDataset" class="preview-grid"><p v-if="previewLoading" class="empty">正在读取已验证预览…</p><article v-for="sample in previewSamples" :key="sample.id" class="preview-card"><svg :viewBox="`0 0 ${sample.width} ${sample.height}`" role="img" :aria-label="sample.image_path"><image :href="sample.image_url" x="0" y="0" :width="sample.width" :height="sample.height" preserveAspectRatio="xMidYMid meet" /><rect v-for="(annotation, index) in sample.annotations" :key="index" :x="(annotation.xywh[0] - annotation.xywh[2] / 2) * sample.width" :y="(annotation.xywh[1] - annotation.xywh[3] / 2) * sample.height" :width="annotation.xywh[2] * sample.width" :height="annotation.xywh[3] * sample.height"><title>{{ annotation.class_name }} · class {{ annotation.class_id }}</title></rect></svg><strong>{{ sample.split }} · {{ sample.image_path }}</strong><small>{{ sample.width }}×{{ sample.height }} · {{ sample.annotations.map(item => item.class_name).join('、') || '显式背景' }}{{ sample.annotations_truncated ? '（框已截断）' : '' }}</small></article><p v-if="!previewLoading && previewSamples.length === 0" class="empty">该 ready 数据集没有可用的有限预览摘要。</p></div></section>
       <section class="panel"><h2><ShieldCheck :size="20" />账号安全</h2><form class="grid-form" @submit.prevent="changePassword"><label>当前密码<input v-model="currentPassword" required type="password" autocomplete="current-password" /></label><label>新密码<input v-model="replacementPassword" required minlength="12" maxlength="256" type="password" autocomplete="new-password" /></label><button :disabled="changingPassword" type="submit">{{ changingPassword ? '更新中…' : '修改密码' }}</button></form><p v-if="accountMessage" class="note" aria-live="polite">{{ accountMessage }}</p></section>
       <section v-if="isAdmin" class="panel"><div class="section-title"><h2><UserPlus :size="20" />用户管理</h2><span>已显示 {{ users.length }} / {{ userTotal }}</span></div><form class="grid-form admin-create" @submit.prevent="createUser"><label>用户名<input v-model="newUsername" required maxlength="128" /></label><label>初始密码<input v-model="newPassword" required minlength="12" maxlength="256" type="password" autocomplete="new-password" /></label><label>角色<select v-model="newRole"><option value="user">普通用户</option><option value="admin">管理员</option></select></label><button class="primary" :disabled="creatingUser" type="submit">{{ creatingUser ? '创建中…' : '创建用户' }}</button></form><article v-for="entry in users" :key="entry.id" class="row-card user-row"><div><div class="row-title"><strong>{{ entry.username }}</strong><span>{{ entry.role }}</span></div><small>{{ entry.is_active ? '账号已启用' : '账号已禁用' }}</small></div><button :disabled="userBusy === entry.id" @click="setUserActive(entry, !entry.is_active)">{{ entry.is_active ? '禁用' : '启用' }}</button></article><button v-if="users.length < userTotal" class="load-more" :disabled="loadingMoreUsers" @click="loadMoreUsers">{{ loadingMoreUsers ? '加载中…' : '加载更多用户' }}</button></section>
     </div>

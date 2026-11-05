@@ -105,12 +105,32 @@ class DatasetPublic(StrictModel):
     project_id: UUID
     name: str
     state: DatasetState
-    version: int
-    sha256: str
-    size_bytes: int
+    version: int = Field(ge=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes: int = Field(ge=0)
     classes: list[str]
     counts: dict[str, int] | None
+    validation_job_id: UUID | None = None
+    report_artifact_id: UUID | None = None
     created_at: AwareDatetime
+
+
+class DatasetAnnotationPublic(StrictModel):
+    class_id: int = Field(ge=0)
+    class_name: str = Field(min_length=1, max_length=128)
+    xywh: tuple[FiniteFloat, FiniteFloat, FiniteFloat, FiniteFloat]
+
+
+class DatasetSamplePublic(StrictModel):
+    id: str = Field(min_length=24, max_length=24, pattern=r"^[0-9a-f]{24}$")
+    split: Literal["train", "val", "test"]
+    image_path: str = Field(min_length=1, max_length=1024)
+    label_path: str = Field(min_length=1, max_length=1024)
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    annotations: list[DatasetAnnotationPublic]
+    annotations_truncated: bool
+    image_url: str = Field(min_length=1, max_length=2048)
 
 
 class DatasetCheckRequest(StrictModel):
@@ -181,7 +201,7 @@ JobCreate = Annotated[
 
 class JobAccepted(StrictModel):
     job_id: UUID
-    state: Literal[JobState.QUEUED]
+    state: JobState
 
 
 class JobPublic(StrictModel):

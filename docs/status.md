@@ -1,8 +1,20 @@
-# 项目状态 · T020 accepted / T030 ready（2026-11-04 UTC）
+# 项目状态 · T040 accepted（2026-11-04 UTC）
 
-T020 身份与项目最小闭环已通过独立代码/安全审查，并在提交 `cc2e66043473b9d3f432319fab41130cab3f2270` 的 [GitHub Actions 41779814303](https://github.com/TudouXiang/edgevision-training/actions/runs/41779814303) 完成真实 Chromium 验证：2 个用例实际执行且通过，完整后端/前端/契约检查通过。T020 **accepted（Linux CI 范围）**，T030 **ready、未领取**。验收覆盖、原始日志定位和剩余边界见 [独立验收记录](evidence/T020-browser-acceptance-2026-11-04.md)。
+T040 已完成独立审查及精确源码 `a61321ce3247c6e33c6c5462085da56f1e194b52` 的 Linux/Windows CI。Linux 105 项后端、10 项前端、4 场景真实 Chromium、构建/契约及真实 API 重启通过；Windows 4 项原生解释器探针、40 项进程/API/决策测试及真实 API 重启通过。证据与失败历史见 [跨平台验收](evidence/T040-cross-platform-acceptance-2026-11-04.md)。
 
-现有能力为身份/会话、显式管理员初始化、账号管理、项目归属/编辑/归档和最小真实页面；复用 0002，无新增迁移。Windows 新功能、实际 TLS、人工视觉/截图、多进程压力及后续数据/训练/模型/部署仍未验收。历史本地 Chromium 不可启动的结论保持有效，但不再阻塞已完成的受信 CI 浏览器验收。main 仍为 `dff9ad1fc92e9ce43b135138df18795106d4bf89`，未合并开发分支。
+**accepted 仅指已实测的受管进程与数据集异步闭环。** 整机重启/物理掉电、真实磁盘耗尽、用户旧库、实际 TLS、人工视觉、Windows 浏览器及 ML/硬件未实测，不泛称全部 A10 或完整平台已通过。Windows 无 receipt 时安全停领，不自动重跑。T050 仍 blocked 于可信资产、目标 ML 环境及许可核验，未擅自选择 LICENSE。
+
+新库目标 `0003_worker`。旧库须停 API/Worker、备份并在一致性副本验证后升级。缺整树退出证据时停止领取；取消/Worker 中断恢复 Dataset pending，内容错误才 invalid。完整协议见 [ADR 0009](adr/0009-t040-managed-worker.md)。
+
+---
+
+以下是 T040 开始前的已接受基线，保留历史日期与证据：
+
+# 项目状态 · T030 accepted / T040 ready（2026-11-04 UTC）
+
+T030 受限数据导入、不可变版本、纯校验核心、授权预览和前端已通过独立审查，以及提交 `a9309e7d9be279ca1143c1a49dd31d2fdfe085f5` 的 [GitHub Actions 41786393552](https://github.com/TudouXiang/edgevision-training/actions/runs/41786393552)：60 项后端、6 项前端、构建/契约和三项真实 Chromium 回归通过。**T030 accepted（Linux 核心范围）**，T040 **ready**。精确版本、失败修复与限制见 [T030 验收](evidence/T030-browser-acceptance-2026-11-04.md)。
+
+生产上传仍固定为 pending，不能训练/预览；`/check` 仍 501。T040 将实现真实 Worker、日志、取消/恢复及 ready/invalid 发布。Windows 新功能、实际 TLS、人工视觉检查、真实 ML/ONNX/边缘硬件均未验收。远端 main 的外部 T020 合并为 `f6db48a68534a93a50110e09750243e39417df7f`，T030 发布在独立功能分支，未由本次操作合并 main。
 
 ## 历史 Windows T010 验收（2026-09-29）
 
@@ -29,9 +41,9 @@ Windows 本机已对项目级后端依赖同步/核对（26 个已安装包无�
 
 ## 待审查与领取闸门
 
-1. T020 已形成实现候选并完成[独立代码/安全审查](evidence/T020-change-review-2026-11-04.md)，浏览器 CI 源码待发布后在 GitHub 托管 runner 上执行；在取得该提交的真实 Chromium 结果和独立验收前，不能把 `review_required` 写成 accepted。T030 不自动进入。
+1. T030 核心已验收。T040 先完成进程/发布协议 ADR，再实施真实子进程与 Linux/Windows 故障测试，不能沿用占位 Worker 冒充完成。
 2. 真实旧用户 `0001` 库若将来提供，先停 API/Worker、备份并在一致性副本验证；本轮仅有代表性隔离样本。项目级后端同步没有重装已存在的 26 个包，已有环境的可运行性与全新环境可重装性分开判断。
 3. T040 前分别在 Linux/Windows 验证真实任务进程树取消、重启和恢复；不得以占位 Worker 的路径替代。
 4. 核查学校是否把 NPU/边缘实机作为正式硬性要求、目标机器容量与可信数据/权重许可。无授权不下载模型或开始训练。
 
-T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **accepted**，T030 **ready**。ML、ONNX、RKNN 和真实训练均未因 T020 执行。
+T000 的历史盘点仍标 `review_required/ML_CHECK_PENDING`，不阻塞轻量 M1；T010 **accepted**，T020 **accepted**，T030 **accepted（Linux 核心）**。T040 **ready**；ML、ONNX、RKNN 和真实训练均未因 T030 执行。

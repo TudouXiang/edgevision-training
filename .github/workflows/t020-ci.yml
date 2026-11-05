@@ -1,4 +1,4 @@
-name: T020 checks
+name: EdgeVision feature checks
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: t020-${{ github.workflow }}-${{ github.ref }}
+  group: edgevision-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,6 +62,10 @@ jobs:
         id: aggregate
         run: python scripts/dev.py check
 
+      - name: Verify real API process restart
+        working-directory: backend
+        run: .venv/bin/python tests/http_restart_probe.py
+
       - name: Install pinned Chromium
         working-directory: web
         run: ./node_modules/.bin/playwright install chromium
@@ -78,21 +82,68 @@ jobs:
           BROWSER_OUTCOME: ${{ steps.browser.outcome }}
         run: |
           {
-            echo '## T020 validation'
+            echo '## T020/T030/T040 validation'
             printf '%s\n' "- Aggregate checks: $AGGREGATE_OUTCOME"
             printf '%s\n' "- Browser checks: $BROWSER_OUTCOME"
-            echo '- Browser scope: T020 identity and projects only.'
-            echo '- This workflow does not accept T020 or release T030.'
+            echo '- Browser scope: T020 identity/projects and T030 bounded upload plus T040 real validation queue, logs, preview and reports.'
+            echo '- This workflow records evidence only; independent T040 acceptance is required.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload safe failure report
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: t020-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          name: edgevision-feature-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/edgevision-report/summary.json
             ${{ runner.temp }}/edgevision-report/summary.md
           if-no-files-found: warn
           include-hidden-files: false
           retention-days: 7
+
+  windows-process:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.10'
+      - name: Install isolated tooling and backend
+        shell: pwsh
+        run: |
+          python -m venv "$env:RUNNER_TEMP/edgevision-tools"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/edgevision-tools/Scripts/python.exe" -m pip install --disable-pip-version-check --no-deps 'uv==0.13.5'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$env:RUNNER_TEMP/edgevision-tools/Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Install locked backend
+        run: python scripts/install_deps.py --backend-only
+      - name: Verify native Python PID and virtual environment
+        working-directory: backend
+        run: .venv/Scripts/python.exe -m pytest tests/test_python_launch.py -q -s
+      - name: Execute real Windows process and API matrix
+        id: windows_matrix
+        working-directory: backend
+        shell: pwsh
+        run: |
+          & .venv/Scripts/python.exe -m pytest tests/test_guardian_settle.py tests/test_worker_process.py tests/test_worker_api.py -q -s
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .venv/Scripts/python.exe tests/http_restart_probe.py
+          exit $LASTEXITCODE
+      - name: Write Windows evidence boundary
+        if: always()
+        shell: pwsh
+        env:
+          MATRIX_OUTCOME: ${{ steps.windows_matrix.outcome }}
+        run: |
+          '## T040 Windows real-process matrix' >> $env:GITHUB_STEP_SUMMARY
+          "- Process/API matrix outcome: $env:MATRIX_OUTCOME" >> $env:GITHUB_STEP_SUMMARY
+          '- Configured scope (execution depends on outcome above): Job Object initial membership, suspended cancellation, nested Job, descendants, Worker/guardian kill and publication faults.' >> $env:GITHUB_STEP_SUMMARY
+          '- Host reboot and hardware power-loss tests: NOT_RUN. Missing drain evidence blocks new work.' >> $env:GITHUB_STEP_SUMMARY

@@ -7,7 +7,7 @@
 | Web | Vue 3 + TypeScript + Vite + Element Plus（沿用现有 npm/Vite） | 表单、显示真实状态、下载、增量轮询；无训练/转换/推理算法 |
 | API | FastAPI + Pydantic | 会话/归属校验、JSON 契约、上传/下载、持久化与排队；不在请求进程跑重任务 |
 | 持久化 | SQLite + SQLAlchemy + Alembic | 单库元数据、事务状态；大文件单独落盘 |
-| Worker | 独立 Python 进程 | 轮询 SQLite，持有单实例锁，事务领取一个 job，每任务启动新子进程 |
+| Worker | 独立 Python 进程 | 轮询 SQLite，持有单实例锁，事务领取一个 job，每任务启动短命 guardian 和一个固定 runner 子进程 |
 | 算法适配 | Ultralytics，ONNX Runtime（按任务安装） | 受控 YOLO11n 起点、CPU 上验证/推理 ONNX；RKNN adapter 暂不可用 |
 
 浏览器与 API 同源代理；默认仅监听 127.0.0.1。浏览器会话由服务端生成，HttpOnly、SameSite=Lax cookie + 修改请求 CSRF 保护；管理员授权始终在 API 检查。生产启动不自动生成演示用户或样本。初始化管理员使用显式 CLI（T020 实现），不写死密码。PyTorch/Ultralytics/RKNN 不进入轻量 API 的顶层导入。
@@ -35,8 +35,10 @@
 
 ## 进程与恢复边界
 
-Worker 在 Linux 使用 `flock`，在 Windows 使用本机一字节非阻塞文件锁；`BEGIN IMMEDIATE` 原子领取。启动时如果 DB 记录 running/cancelling 而无法确认对应任务子进程及进程组已退出，拒绝再领任务并报告人工核验；绝不因旧 PID 单独杀进程。记录 `run_id`、`worker_instance`、主机 boot ID 与实际子进程身份；Windows T010 无可信 boot ID 时明确存 `windows-unverified`，绝不将其用于恢复判定。T010 只提供占位进程的受限协议和失败路径；T040 负责 Linux/Windows 真正任务的进程树终止、取消/重启故障注入。见 ADR 0006。
+Worker 在 Linux 使用 `flock`，在 Windows 使用本机一字节非阻塞文件锁；`BEGIN IMMEDIATE` 原子领取。真实受管执行见 ADR 0009：Linux 独立 session + child subreaper + 直接子进程 pidfd；Windows 原子 Job Object membership + suspended start。身份先提交，随后在与取消串行的事务内发送 GO。控制管道 EOF 使 guardian 回收整树，只有 drain receipt 加 guardian 退出才能终态/发布。
+
+恢复区分 claimed 未启动、spawning 歧义、prepared（GO 可能已发）、go_authorized、已确认 drain。Linux 可信 boot UUID 变化可证明旧进程消失；Windows 无 receipt 的重启保持阻塞，不使用历史 `windows-unverified`。恢复不对未知 PID 发信号、不自动重试、不从孤儿发布目录重建成功。文件与数据库之间的崩溃保证是进程级一致性，不是硬件掉电认证。API 进程不拥有 Worker 生命周期。
 
 ## 不可混用的运行模式
 
-正式 API 与 Worker 不注入测试替身；pytest 使用隔离临时 DB/data root 和替身 runner，并以明确测试配置启动。`reference/` 中 Next.js 演示源保持只读：假概览、计时训练、转换和管理员监控不能作为运行状态。逐页复用设计时须替换为真实 API，未完成入口禁用并标记。
+正式 API 与 Worker 不注入测试替身；pytest 使用隔离临时 DB/data root，真实流程调用固定 validator；故障夹具仅由 tests/process_fixture.py 显式调用并替换测试进程内的函数，生产无测试环境变量开关。`reference/` 中 Next.js 演示源保持只读：假概览、计时训练、转换和管理员监控不能作为运行状态。逐页复用设计时须替换为真实 API，未完成入口禁用并标记。

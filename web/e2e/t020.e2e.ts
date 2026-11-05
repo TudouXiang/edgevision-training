@@ -95,7 +95,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   await projectRow.getByRole('button', { name: '编辑' }).click()
   await page.getByLabel('编辑项目名称').fill(`${projectName}-cancelled`)
   await page.getByRole('button', { name: '取消' }).click()
-  await expect(page.getByText(projectName, { exact: true })).toBeVisible()
+  await expect(projectRow.getByText(projectName, { exact: true })).toBeVisible()
   await projectRow.getByRole('button', { name: '编辑' }).click()
   const renamedProject = `${projectName}-renamed`
   await page.getByLabel('编辑项目名称').fill(renamedProject)
@@ -113,6 +113,17 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   await page.goForward()
   await expect(projectRow).toBeVisible()
 
+  // Keep a real owned input so this tests archive rejection, not missing-resource precedence.
+  await page.getByLabel('所属项目').selectOption(createdProject.id)
+  await page.getByLabel('受控 YOLO ZIP').setInputFiles(required('EDGEVISION_E2E_DATASET_ZIP'))
+  const datasetUpload = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${createdProject.id}/datasets`) && response.request().method() === 'POST')
+  await page.getByRole('button', { name: '上传新快照' }).click()
+  const uploadedResponse = await datasetUpload
+  expect(uploadedResponse.status()).toBe(201)
+  const archivedDataset = await uploadedResponse.json() as { id: string; project_id: string; state: string }
+  expect(archivedDataset.project_id).toBe(createdProject.id)
+  expect(archivedDataset.state).toBe('pending')
+
   const archiveResponse = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${createdProject.id}/archive`))
   await projectRow.getByRole('button', { name: '归档' }).click()
   expect((await archiveResponse).status()).toBe(200)
@@ -124,8 +135,8 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   expect(repeatedArchive.status).toBe(200)
   const archivedJob = await sameOrigin(page, `/projects/${createdProject.id}/jobs`, {
     method: 'POST',
-    body: { kind: 'dataset_check', params: { dataset_id: '00000000-0000-4000-8000-000000000001' } },
-    headers: { 'Idempotency-Key': 'archived-project-browser-check' },
+    body: { kind: 'dataset_check', params: { dataset_id: archivedDataset.id } },
+    headers: { 'Idempotency-Key': `archived-project-browser-check-${createdProject.id}` },
   })
   expect(archivedJob.status).toBe(409)
   expect((archivedJob.body as { error: { code: string } }).error.code).toBe('PROJECT_ARCHIVED')
@@ -184,7 +195,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   await currentSession.page.getByLabel('描述', { exact: true }).fill('owned by ordinary user')
   await currentSession.page.getByRole('button', { name: '创建项目' }).click()
   expect((await ordinaryCreate).status()).toBe(201)
-  await expect(currentSession.page.getByText(ordinaryProjectName, { exact: true })).toBeVisible()
+  await expect(currentSession.page.locator('article.row-card').filter({ hasText: ordinaryProjectName }).getByText(ordinaryProjectName, { exact: true })).toBeVisible()
   const logoutResponse = currentSession.page.waitForResponse(response => response.url().endsWith('/api/v1/auth/logout'))
   await currentSession.page.getByRole('button', { name: '退出' }).click()
   expect((await logoutResponse).status()).toBe(204)
@@ -197,7 +208,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   await currentSession.page.getByLabel('用户名', { exact: true }).fill(user.username)
   await currentSession.page.getByLabel('密码', { exact: true }).fill(rotatedPassword)
   await currentSession.page.getByRole('button', { name: '登录', exact: true }).click()
-  await expect(currentSession.page.getByText(ordinaryProjectName, { exact: true })).toBeVisible()
+  await expect(currentSession.page.locator('article.row-card').filter({ hasText: ordinaryProjectName }).getByText(ordinaryProjectName, { exact: true })).toBeVisible()
   await currentSession.context.close()
 })
 
@@ -225,7 +236,8 @@ test('375px keyboard flow remains usable without horizontal overflow', async ({ 
   await page.getByLabel('项目名称').fill(longName)
   await page.getByLabel('描述', { exact: true }).fill('keyboard-created project')
   await page.getByLabel('描述', { exact: true }).press('Enter')
-  await expect(page.getByText(longName, { exact: true })).toBeVisible()
+  const mobileProjectRow = page.locator('article.row-card').filter({ hasText: longName })
+  await expect(mobileProjectRow.getByText(longName, { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 
   await page.goto('/projects')

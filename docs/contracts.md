@@ -1,6 +1,6 @@
 # 核心契约 V0.1
 
-状态：T010 已 accepted。T020 已按本契约通过独立审查与 Linux CI 真实浏览器验收，复用既有 DTO 与 `0002_foundation` 表，不新增迁移；身份配置和依赖决策见 ADR 0007，执行证据见 `docs/evidence/T020-report.md`。此文件不替代生成后的 OpenAPI；内部字段允许补充，外部语义变更需经 ADR 与审查。
+状态：T010/T020 已 accepted。T030 核心复用 `0002_foundation`、不新增迁移，受控数据规则与兼容性见 ADR 0008，已通过 Linux 核心独立验收。此文件不替代生成后的 OpenAPI；内部字段允许补充，外部语义变更需经 ADR 与审查。
 
 ## 1. 全局约定
 
@@ -21,7 +21,7 @@
 
 Session、Job、Artifact 等实际表名由骨架统一，不额外复制“训练任务表/转换任务表/推理任务表”三套状态机。各 Job.kind 的参数使用独立的严格 Schema，不透传任意字典。
 
-Job.kind：dataset_check、train、export_onnx、infer、package。Dataset.state：pending、validating、ready、invalid。Dataset 校验中断时记 invalid 并保存可解释错误，可创建新的校验任务；已 ready 快照不可被失败重试改坏。
+Job.kind：dataset_check、train、export_onnx、infer、package。Dataset.state：pending、validating、ready、invalid。Dataset 仅在真实内容校验失败时记 invalid；取消、Worker 中断或基础设施失败恢复 pending 并在 Job 保存可解释错误，可创建新的校验任务。新任务清空当前报告指针，旧 Artifact/Job 历史保留；已 ready 快照不可被失败重试改坏。
 
 Artifact.validation_state：unverified、passed、failed。完成写入但未验证的导出产物不能当作可用 ONNX 模型供后续任务选择。验证失败产生错误报告，可保留受限诊断文件，但不能展示“导出成功”。
 
@@ -71,7 +71,7 @@ Worker 通过受控参数/配置文件启动固定入口，禁止 shell=True 与
 |运行|GET /health/live，GET /health/ready，GET /capabilities|
 |管理|管理员用户管理、跨项目资源/任务查询；具体 DTO 在 T010 固化|
 
-上传数据集采用 multipart，流式受限落盘；重型解压与校验使用 Job。完整 DTO 在 T010 中明确；未实现接口应返回稳定的 NOT_IMPLEMENTED/501，不能提供虚构成功数据。上传/任务接口返回资源或 Job ID，并明确当前状态，而不是等待训练完成。
+上传数据集采用只有一个 `file` part 的 multipart，读取原始请求流时限制 body/文件大小并计算 SHA-256；成功只登记不可变 pending Dataset。重型解压与校验使用 Job。未实现接口返回稳定的 NOT_IMPLEMENTED/501，不能提供虚构成功数据。
 
 日志响应至少包含 items、next_cursor、eof、job_state。游标按任务单调递增，不截断 UTF-8，不无限返回整个日志；失败/取消后也支持最终读取。指标来自结构化真实事件，不靠 UI 正则猜训练进度。
 
@@ -81,11 +81,11 @@ capabilities 按功能返回 available、reason_code、reason、相关已检测�
 
 ## 6. 数据集和文件边界
 
-首版 ZIP 内固定 data.yaml、images/train、images/val、labels/train、labels/val，可选 test。允许规范化的单一包裹目录，但不支持任意层级自动猜测。
+首版 ZIP 内固定 `data.yaml`、`images/train`、`images/val`、`labels/train`、`labels/val`，可选成对的 test。允许规范化的单一包裹目录，但不支持任意层级自动猜测；只接受小写 JPG/JPEG/PNG 和 TXT。
 
-YAML 只读取允许的类别与受限 split 配置，安全解析；不执行 download 字段、不读服务器绝对路径、不访问外部 URL。明确接受的 names/nc 表达、标签空文件/缺失策略与警告等级，写测试后冻结；不能悄悄丢弃坏样本。
+YAML 限 UTF-8、64 KiB、32 层/10000 节点，只接受 path/train/val/test/names/nc，拒绝 alias/anchor/tag/重复键/URL/download。names 是非空字符串列表或从 0 连续的整数 mapping；nc 可省略，存在时必须匹配。缺 label 是错误；空 label 是显式背景并产生 `LABEL_EMPTY` warning；孤立 label 是错误。
 
-解压前检查路径逃逸、链接、条目数、压缩/解压大小和允许类型。解压到专用 staging，验证成功后再发布；拒绝越界路径、符号链接、设备文件和重复冲突路径。图片解码设置像素/尺寸上限，标注校验类别 ID、行列数、有限数值和归一化坐标范围。上传、解码、训练和任务时间/磁盘均有配置上限。
+解压前检查 EOCD/中央目录边界并拒绝 ZIP64/multidisk/SFX，再检查路径逃逸、链接/特殊文件、条目、成员/总解压、成员/总压缩比、标志和允许类型。图片真实 verify+decode、内容/扩展名一致、单帧且不超过 3000 万像素。标签 class ID、字段数、有限数值、归一化中心/正宽高及完整框边界均严格校验。精确限制见 ADR 0008。
 
 服务端 storage_key 相对固定存储根；所有资源路径经同一安全解析。下载通过鉴权后的 ID，响应不泄露真实绝对路径。每任务独立 staging；产物先写完再原子发布，随后事务登记；崩溃遗留文件只隔离核对，不自动认成功。
 
