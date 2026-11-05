@@ -1,8 +1,52 @@
+# 当前增量 · T060 隔离准备修正（2026-11-05 UTC）
+
+复核识别并修正联网构建中 `pip check` 子解释器会执行安装后启动钩子的缺口。将依赖检查移到内核边界核验后的首个子阶段，保持 fresh venv、hash 锁与固定预算；见[修正验证](evidence/T060-preparation-bootstrap-2026-11-05.md)。当前源码检查点已持久备份，独立复核 accept（174 项聚焦测试通过）；最终本地整合回归为429后端通过/9原生跳过、47前端通过，构建/契约及HTTP重启通过；精确远端 CI 单独绑定发布 SHA 留档。真实 Docker/模型/ORT/ML 浏览器仍 NOT_RUN，E 未 accepted，I/P 仍 501。
+
+以下保留各精确源码的历史验证结果，不能把旧静态方案或 CI 计数当作本次新候选的执行证据。
+
+---
+
+# 当前状态 · T060 E 重建候选（2026-11-04 UTC）
+
+T050 的既有验收保持原范围。未发布的旧 T060 工作区已丢失，本轮从公开 T050 `3b5b8ec785be595dd82a15fe94adcb7d102396f2` 重新实现，**不沿用旧候选测试结果**。
+
+E（可信模型 ONNX 导出）的后端、严格契约、前端和验证脚本已形成源码检查点，独立静态审查已收口，新一轮轻量整合回归为后端 356 passed/9 skipped、前端 38 passed，构建/契约通过；详见 [重建记录](evidence/T060-rebuild-recovery-2026-11-04.md) 与 [后端范围](evidence/T060-export-rebuild-core.md)。隔离 CI 的静态方案审查已收口，但实际执行仍未发生。最终源码与命令范围见 [检查点记录](evidence/T060-rebuild-checkpoints.md)。源码已按阶段提交并另存持久备份，不等同于完整项目交付或业务验收。
+
+**真实 ONNX/ORT、ML HTTP/浏览器、容器隔离、Windows 新增 E 行为均未执行，E 未 accepted。** 默认自动工作流暂不运行真实 ML；隔离方案须完成审查并获准后才能实际验证。I（真实图片推理）与 P（独立部署包）继续保持规范化 501，不越过 E 验收闸门。没有发布图片、模型权重或原始运行证据。
+
+公开源码 `0455566` 已通过 [Linux/Windows 普通 CI](evidence/T060-source-ci-2026-11-04.md)，ML job 明确跳过。此结果不解除 E 原生验收闸门。
+
+浏览器证据计数另有独立修正（静态复审与轻量整合回归已通过：371 后端/9 跳过、47 前端，增量远端 CI 已通过，详见下方精确版本）：匿名 schema v2 区分执行、跳过、未运行与重试，不再把所有回调写成 completed；[验证记录](evidence/T060-browser-evidence-counts-2026-11-04.md)。公开提交 `b9cbc568774d8ddfdfb4a312009ebf39bebe4437` 的 [CI 41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873) 已完成 success：普通浏览器实际执行 4 项通过、1 项 ML 跳过；Linux 371 后端/9 跳过、47 前端，Windows 既有进程/API 通过；ML job skipped。不推进 E/I/P 验收。
+
+以下保留历史阶段记录；遇到差异以本节为准。
+
+README/验收文档的当前与历史范围已校正，并新增[纯合成 SQLite WAL 恢复练习](evidence/synthetic-backup-recovery-2026-11-04.md)。本轮端点差异独立复核 accept，27 项新增文档/合成恢复测试通过；整合轻量回归为 **398 后端通过、9 原生跳过、47 前端通过**，构建/契约及真实 API 重启探针通过。恢复练习只覆盖固定临时样本，不是生产备份工具或全平台恢复验收；真实 E/I/P 的边界不变。各远端结果仍以对应精确发布 SHA 为准。
+
+---
+
+# 当前状态 · T050 accepted / T060 前检（2026-11-04 UTC）
+
+精确提交 `c398426b2ba9369d769479ca3fcb7c09600f7bab` 的三项 CI 全部通过：Linux 轻量回归、实际 CPU 训练与真实浏览器、Windows 既有进程回归。T050 在固定 Linux CPU 小规模闭环范围 accepted；完整范围和未执行项见 [T050 CI 验收](evidence/T050-ci-acceptance-2026-11-04.md)。T060 进入依赖/导出前检，尚未实现 ONNX/ORT、推理或独立部署。
+
+以下保留分阶段记录；遇到状态差异以上述最新结论为准。
+
+---
+
+# 当前增量 · T050 review_required（2026-11-04 UTC）
+
+固定 Linux CPU 训练闭环已实现：真实 HTTP/受管 Worker 单轮合成输入、真实轮次指标、净化且安全重载的 best/last、
+完整束发布和鉴权下载均本地通过。未发布资产；CUDA、Windows ML、ONNX/RKNN 和正式精度实验不在此次实测范围。
+具体 Job/Artifact/hash、失败历史、轻量及实际 ML 策略测试见 [T050 实现报告](evidence/T050-report.md)。
+远端精确提交的 Linux/Windows 既有矩阵与新增训练浏览器 CI 仍待执行，不提前称 A11/A12 accepted。
+现有 T040 accepted 基线保持；以下历史状态按原日期保留。
+
+---
+
 # 项目状态 · T040 accepted（2026-11-04 UTC）
 
 T040 已完成独立审查及精确源码 `a61321ce3247c6e33c6c5462085da56f1e194b52` 的 Linux/Windows CI。Linux 105 项后端、10 项前端、4 场景真实 Chromium、构建/契约及真实 API 重启通过；Windows 4 项原生解释器探针、40 项进程/API/决策测试及真实 API 重启通过。证据与失败历史见 [跨平台验收](evidence/T040-cross-platform-acceptance-2026-11-04.md)。
 
-**accepted 仅指已实测的受管进程与数据集异步闭环。** 整机重启/物理掉电、真实磁盘耗尽、用户旧库、实际 TLS、人工视觉、Windows 浏览器及 ML/硬件未实测，不泛称全部 A10 或完整平台已通过。Windows 无 receipt 时安全停领，不自动重跑。T050 仍 blocked 于可信资产、目标 ML 环境及许可核验，未擅自选择 LICENSE。
+**accepted 仅指已实测的受管进程与数据集异步闭环。** 整机重启/物理掉电、真实磁盘耗尽、用户旧库、实际 TLS、人工视觉、Windows 浏览器及 ML/硬件未实测，不泛称全部 A10 或完整平台已通过。Windows 无 receipt 时安全停领，不自动重跑。项目所有者已委托选择原创代码与文档的 AGPL-3.0-only 许可，边界见 [ADR 0010](adr/0010-project-licensing.md)。T050 已完成限定 Linux CPU 联合环境/官方权重/本地样本[前检](evidence/T050-preflight-2026-11-04.md)，按 [ADR 0011](adr/0011-t050-fixed-training-adapter.md) **ready for implementation（非 accepted）**。仓库训练仍未实现，A11/A12、Windows ML/CUDA 与发行未验收；COCO8 许可差异未解决，仅作私有本地技术烟测，不再分发。
 
 新库目标 `0003_worker`。旧库须停 API/Worker、备份并在一致性副本验证后升级。缺整树退出证据时停止领取；取消/Worker 中断恢复 Dataset pending，内容错误才 invalid。完整协议见 [ADR 0009](adr/0009-t040-managed-worker.md)。
 

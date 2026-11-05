@@ -54,95 +54,31 @@
         "type": "object"
       },
       "ArtifactPublic": {
-        "additionalProperties": false,
-        "properties": {
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
+        "description": "Kind-discriminated public schema: malformed ONNX never falls back to dict.",
+        "discriminator": {
+          "mapping": {
+            "dataset_report": "#/components/schemas/OtherArtifactPublic",
+            "deployment_zip": "#/components/schemas/OtherArtifactPublic",
+            "inference_input": "#/components/schemas/OtherArtifactPublic",
+            "inference_result": "#/components/schemas/OtherArtifactPublic",
+            "onnx": "#/components/schemas/OnnxArtifactPublic",
+            "pt_best": "#/components/schemas/TrainingArtifactPublic",
+            "pt_last": "#/components/schemas/TrainingArtifactPublic"
           },
-          "format": {
-            "title": "Format",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "job_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Job Id"
-          },
-          "kind": {
-            "enum": [
-              "dataset_report",
-              "pt_best",
-              "pt_last",
-              "onnx",
-              "inference_input",
-              "inference_result",
-              "deployment_zip"
-            ],
-            "title": "Kind",
-            "type": "string"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelMetadata"
-              },
-              {
-                "additionalProperties": true,
-                "type": "object"
-              }
-            ],
-            "title": "Metadata"
-          },
-          "metadata_schema_version": {
-            "title": "Metadata Schema Version",
-            "type": "integer"
-          },
-          "project_id": {
-            "format": "uuid",
-            "title": "Project Id",
-            "type": "string"
-          },
-          "sha256": {
-            "title": "Sha256",
-            "type": "string"
-          },
-          "size_bytes": {
-            "title": "Size Bytes",
-            "type": "integer"
-          },
-          "validation_state": {
-            "$ref": "#/components/schemas/ValidationState"
-          }
+          "propertyName": "kind"
         },
-        "required": [
-          "id",
-          "project_id",
-          "job_id",
-          "kind",
-          "format",
-          "sha256",
-          "size_bytes",
-          "metadata_schema_version",
-          "validation_state",
-          "metadata",
-          "created_at"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TrainingArtifactPublic"
+          },
+          {
+            "$ref": "#/components/schemas/OnnxArtifactPublic"
+          },
+          {
+            "$ref": "#/components/schemas/OtherArtifactPublic"
+          }
         ],
-        "title": "ArtifactPublic",
-        "type": "object"
+        "title": "ArtifactPublic"
       },
       "CapabilitiesResponse": {
         "additionalProperties": false,
@@ -494,6 +430,117 @@
         "title": "Detection",
         "type": "object"
       },
+      "EffectiveTrainingParams": {
+        "additionalProperties": false,
+        "properties": {
+          "amp": {
+            "const": false,
+            "title": "Amp",
+            "type": "boolean"
+          },
+          "batch": {
+            "title": "Batch",
+            "type": "integer"
+          },
+          "cache": {
+            "const": false,
+            "title": "Cache",
+            "type": "boolean"
+          },
+          "deterministic": {
+            "const": true,
+            "title": "Deterministic",
+            "type": "boolean"
+          },
+          "device": {
+            "const": "cpu",
+            "title": "Device",
+            "type": "string"
+          },
+          "epochs": {
+            "title": "Epochs",
+            "type": "integer"
+          },
+          "imgsz": {
+            "title": "Imgsz",
+            "type": "integer"
+          },
+          "lr0": {
+            "title": "Lr0",
+            "type": "number"
+          },
+          "lrf": {
+            "title": "Lrf",
+            "type": "number"
+          },
+          "momentum": {
+            "title": "Momentum",
+            "type": "number"
+          },
+          "nbs": {
+            "title": "Nbs",
+            "type": "integer"
+          },
+          "optimizer": {
+            "const": "SGD",
+            "title": "Optimizer",
+            "type": "string"
+          },
+          "plots": {
+            "const": false,
+            "title": "Plots",
+            "type": "boolean"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "warmup_bias_lr": {
+            "title": "Warmup Bias Lr",
+            "type": "number"
+          },
+          "warmup_epochs": {
+            "title": "Warmup Epochs",
+            "type": "number"
+          },
+          "warmup_momentum": {
+            "title": "Warmup Momentum",
+            "type": "number"
+          },
+          "weight_decay": {
+            "title": "Weight Decay",
+            "type": "number"
+          },
+          "workers": {
+            "const": 0,
+            "title": "Workers",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "optimizer",
+          "lr0",
+          "lrf",
+          "warmup_epochs",
+          "warmup_bias_lr",
+          "warmup_momentum",
+          "momentum",
+          "weight_decay",
+          "nbs",
+          "seed",
+          "batch",
+          "epochs",
+          "imgsz",
+          "device",
+          "workers",
+          "amp",
+          "plots",
+          "cache",
+          "deterministic"
+        ],
+        "title": "EffectiveTrainingParams",
+        "type": "object"
+      },
       "ExportJobCreate": {
         "additionalProperties": false,
         "properties": {
@@ -511,6 +558,49 @@
           "params"
         ],
         "title": "ExportJobCreate",
+        "type": "object"
+      },
+      "ExportJobSource": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/ExportOnnxParams"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          },
+          "source_artifact_id": {
+            "format": "uuid",
+            "title": "Source Artifact Id",
+            "type": "string"
+          },
+          "source_job_id": {
+            "format": "uuid",
+            "title": "Source Job Id",
+            "type": "string"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_artifact_id",
+          "source_job_id",
+          "source_sha256",
+          "params",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "ExportJobSource",
         "type": "object"
       },
       "ExportOnnxParams": {
@@ -544,6 +634,367 @@
           "model_artifact_id"
         ],
         "title": "ExportOnnxParams",
+        "type": "object"
+      },
+      "ExportProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Input Sha256",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "parent_artifact_id": {
+            "format": "uuid",
+            "title": "Parent Artifact Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "source_job_id": {
+            "format": "uuid",
+            "title": "Source Job Id",
+            "type": "string"
+          },
+          "source_metadata_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Metadata Sha256",
+            "type": "string"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "source_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 134217728.0,
+            "title": "Source Size Bytes",
+            "type": "integer"
+          },
+          "source_training_input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Training Input Sha256",
+            "type": "string"
+          },
+          "training": {
+            "$ref": "#/components/schemas/TrainingProvenance"
+          }
+        },
+        "required": [
+          "schema_version",
+          "job_id",
+          "run_id",
+          "input_sha256",
+          "parent_artifact_id",
+          "source_job_id",
+          "source_sha256",
+          "source_size_bytes",
+          "source_metadata_sha256",
+          "source_training_input_sha256",
+          "training",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "ExportProvenance",
+        "type": "object"
+      },
+      "ExportRuntime": {
+        "additionalProperties": false,
+        "properties": {
+          "device": {
+            "const": "cpu",
+            "title": "Device",
+            "type": "string"
+          },
+          "dynamic": {
+            "const": false,
+            "title": "Dynamic",
+            "type": "boolean"
+          },
+          "ir_version": {
+            "const": 8,
+            "title": "Ir Version",
+            "type": "integer"
+          },
+          "nms": {
+            "const": false,
+            "title": "Nms",
+            "type": "boolean"
+          },
+          "opset": {
+            "const": 18,
+            "title": "Opset",
+            "type": "integer"
+          },
+          "precision": {
+            "const": "fp32",
+            "title": "Precision",
+            "type": "string"
+          },
+          "provider": {
+            "const": "CPUExecutionProvider",
+            "title": "Provider",
+            "type": "string"
+          },
+          "simplify": {
+            "const": false,
+            "title": "Simplify",
+            "type": "boolean"
+          },
+          "threads": {
+            "const": 2,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/ExportVersions"
+          }
+        },
+        "required": [
+          "versions",
+          "provider",
+          "device",
+          "threads",
+          "opset",
+          "ir_version",
+          "precision",
+          "dynamic",
+          "simplify",
+          "nms"
+        ],
+        "title": "ExportRuntime",
+        "type": "object"
+      },
+      "ExportValidation": {
+        "additionalProperties": false,
+        "properties": {
+          "atol": {
+            "const": 0.0001,
+            "title": "Atol",
+            "type": "number"
+          },
+          "checker_passed": {
+            "const": true,
+            "title": "Checker Passed",
+            "type": "boolean"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Classes",
+            "type": "array"
+          },
+          "dtype": {
+            "const": "float32",
+            "title": "Dtype",
+            "type": "string"
+          },
+          "input_name": {
+            "const": "images",
+            "title": "Input Name",
+            "type": "string"
+          },
+          "input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Input Sha256",
+            "type": "string"
+          },
+          "input_shape": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "const": 1,
+                "type": "integer"
+              },
+              {
+                "const": 3,
+                "type": "integer"
+              },
+              {
+                "const": 640,
+                "type": "integer"
+              },
+              {
+                "const": 640,
+                "type": "integer"
+              }
+            ],
+            "title": "Input Shape",
+            "type": "array"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "model_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Sha256",
+            "type": "string"
+          },
+          "model_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 134217728.0,
+            "title": "Model Size Bytes",
+            "type": "integer"
+          },
+          "original_graph_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Original Graph Sha256",
+            "type": "string"
+          },
+          "output_name": {
+            "const": "output0",
+            "title": "Output Name",
+            "type": "string"
+          },
+          "output_shape": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "const": 1,
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "const": 8400,
+                "type": "integer"
+              }
+            ],
+            "title": "Output Shape",
+            "type": "array"
+          },
+          "rtol": {
+            "const": 0.0001,
+            "title": "Rtol",
+            "type": "number"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/ExportRuntime"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/TensorComparison"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "title": "Samples",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "tensor_protocol": {
+            "const": "rgb-fixed-v1",
+            "title": "Tensor Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "job_id",
+          "run_id",
+          "input_sha256",
+          "source_sha256",
+          "original_graph_sha256",
+          "model_sha256",
+          "model_size_bytes",
+          "classes",
+          "input_name",
+          "input_shape",
+          "output_name",
+          "output_shape",
+          "dtype",
+          "tensor_protocol",
+          "atol",
+          "rtol",
+          "checker_passed",
+          "runtime",
+          "samples"
+        ],
+        "title": "ExportValidation",
+        "type": "object"
+      },
+      "ExportVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "onnx": {
+            "const": "1.23.2",
+            "title": "Onnx",
+            "type": "string"
+          },
+          "onnxruntime": {
+            "const": "1.31.1",
+            "title": "Onnxruntime",
+            "type": "string"
+          },
+          "torch": {
+            "const": "2.15.0+cpu",
+            "title": "Torch",
+            "type": "string"
+          },
+          "torchvision": {
+            "const": "0.29.2+cpu",
+            "title": "Torchvision",
+            "type": "string"
+          },
+          "ultralytics": {
+            "const": "8.4.202",
+            "title": "Ultralytics",
+            "type": "string"
+          }
+        },
+        "required": [
+          "torch",
+          "torchvision",
+          "ultralytics",
+          "onnx",
+          "onnxruntime"
+        ],
+        "title": "ExportVersions",
         "type": "object"
       },
       "FeatureCapability": {
@@ -888,6 +1339,16 @@
             ],
             "title": "Error Code"
           },
+          "export": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportJobSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "finished_at": {
             "anyOf": [
               {
@@ -943,6 +1404,16 @@
           },
           "state": {
             "$ref": "#/components/schemas/JobState"
+          },
+          "training": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainingProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1057,63 +1528,7 @@
         "title": "Metric",
         "type": "object"
       },
-      "ModelInput": {
-        "additionalProperties": false,
-        "properties": {
-          "color": {
-            "enum": [
-              "RGB",
-              "BGR"
-            ],
-            "title": "Color",
-            "type": "string"
-          },
-          "layout": {
-            "const": "NCHW",
-            "title": "Layout",
-            "type": "string"
-          },
-          "letterbox": {
-            "title": "Letterbox",
-            "type": "boolean"
-          },
-          "normalization": {
-            "const": "0..1",
-            "title": "Normalization",
-            "type": "string"
-          },
-          "shape": {
-            "maxItems": 4,
-            "minItems": 4,
-            "prefixItems": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              }
-            ],
-            "title": "Shape",
-            "type": "array"
-          }
-        },
-        "required": [
-          "shape",
-          "color",
-          "layout",
-          "normalization",
-          "letterbox"
-        ],
-        "title": "ModelInput",
-        "type": "object"
-      },
-      "ModelMetadata": {
+      "OnnxArtifactMetadata": {
         "additionalProperties": false,
         "properties": {
           "architecture": {
@@ -1125,34 +1540,70 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 1000,
+            "minItems": 1,
             "title": "Classes",
             "type": "array"
           },
-          "dataset_id": {
+          "provenance": {
+            "$ref": "#/components/schemas/ExportProvenance"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "task": {
+            "const": "detection",
+            "title": "Task",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/ExportValidation"
+          },
+          "validation_scope": {
+            "const": "checker_ort_raw_tensor_equivalence",
+            "title": "Validation Scope",
+            "type": "string"
+          },
+          "validation_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Validation Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "task",
+          "architecture",
+          "classes",
+          "provenance",
+          "validation",
+          "validation_sha256",
+          "validation_scope"
+        ],
+        "title": "OnnxArtifactMetadata",
+        "type": "object"
+      },
+      "OnnxArtifactPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "const": "onnx",
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
             "format": "uuid",
-            "title": "Dataset Id",
+            "title": "Id",
             "type": "string"
           },
-          "family": {
-            "const": "YOLO",
-            "title": "Family",
-            "type": "string"
-          },
-          "framework": {
-            "title": "Framework",
-            "type": "string"
-          },
-          "framework_version": {
-            "title": "Framework Version",
-            "type": "string"
-          },
-          "input": {
-            "$ref": "#/components/schemas/ModelInput"
-          },
-          "output": {
-            "$ref": "#/components/schemas/ModelOutput"
-          },
-          "parent_artifact_id": {
+          "job_id": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -1162,176 +1613,139 @@
                 "type": "null"
               }
             ],
-            "title": "Parent Artifact Id"
+            "title": "Job Id"
           },
-          "schema_version": {
+          "kind": {
+            "const": "onnx",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/OnnxArtifactMetadata"
+          },
+          "metadata_schema_version": {
             "const": 1,
-            "title": "Schema Version",
+            "title": "Metadata Schema Version",
             "type": "integer"
           },
-          "source": {
-            "enum": [
-              "trained_best",
-              "trained_last",
-              "exported_onnx"
-            ],
-            "title": "Source",
-            "type": "string"
-          },
-          "source_job_id": {
+          "project_id": {
             "format": "uuid",
-            "title": "Source Job Id",
+            "title": "Project Id",
             "type": "string"
           },
-          "target": {
-            "$ref": "#/components/schemas/ModelTarget"
-          },
-          "task": {
-            "const": "detection",
-            "title": "Task",
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
             "type": "string"
           },
-          "training": {
-            "additionalProperties": true,
-            "title": "Training",
-            "type": "object"
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
           },
-          "validation": {
-            "$ref": "#/components/schemas/ModelValidation"
+          "validation_state": {
+            "const": "passed",
+            "title": "Validation State",
+            "type": "string"
           }
         },
         "required": [
-          "schema_version",
-          "family",
-          "task",
-          "source",
-          "dataset_id",
-          "source_job_id",
-          "parent_artifact_id",
-          "framework",
-          "framework_version",
-          "architecture",
-          "input",
-          "classes",
-          "output",
-          "training",
-          "validation",
-          "target"
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
         ],
-        "title": "ModelMetadata",
+        "title": "OnnxArtifactPublic",
         "type": "object"
       },
-      "ModelOutput": {
+      "OtherArtifactPublic": {
         "additionalProperties": false,
         "properties": {
-          "nms_in_graph": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nms In Graph"
-          },
-          "schema": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Schema"
-          }
-        },
-        "required": [
-          "schema",
-          "nms_in_graph"
-        ],
-        "title": "ModelOutput",
-        "type": "object"
-      },
-      "ModelTarget": {
-        "additionalProperties": false,
-        "properties": {
-          "chip": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Chip"
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
           },
           "format": {
-            "enum": [
-              "pt",
-              "onnx",
-              "rknn"
-            ],
             "title": "Format",
             "type": "string"
           },
-          "quantization": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Quantization"
-          }
-        },
-        "required": [
-          "format",
-          "chip",
-          "quantization"
-        ],
-        "title": "ModelTarget",
-        "type": "object"
-      },
-      "ModelValidation": {
-        "additionalProperties": false,
-        "properties": {
-          "evidence_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Evidence Key"
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
           },
-          "result": {
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "kind": {
+            "enum": [
+              "dataset_report",
+              "inference_input",
+              "inference_result",
+              "deployment_zip"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "metadata_schema_version": {
+            "title": "Metadata Schema Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "validation_state": {
             "$ref": "#/components/schemas/ValidationState"
-          },
-          "runtime": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runtime"
           }
         },
         "required": [
-          "runtime",
-          "result",
-          "evidence_key"
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
         ],
-        "title": "ModelValidation",
+        "title": "OtherArtifactPublic",
         "type": "object"
       },
       "PackageJobCreate": {
@@ -1721,6 +2135,68 @@
         "title": "ReadyResponse",
         "type": "object"
       },
+      "TensorComparison": {
+        "additionalProperties": false,
+        "properties": {
+          "elements": {
+            "exclusiveMinimum": 0.0,
+            "title": "Elements",
+            "type": "integer"
+          },
+          "input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Input Sha256",
+            "type": "string"
+          },
+          "max_absolute_error": {
+            "minimum": 0.0,
+            "title": "Max Absolute Error",
+            "type": "number"
+          },
+          "max_tolerance_ratio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Max Tolerance Ratio",
+            "type": "number"
+          },
+          "name": {
+            "enum": [
+              "zeros",
+              "gradient",
+              "pattern"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "ort_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Ort Sha256",
+            "type": "string"
+          },
+          "passed": {
+            "const": true,
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "pt_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Pt Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "input_sha256",
+          "pt_sha256",
+          "ort_sha256",
+          "max_absolute_error",
+          "max_tolerance_ratio",
+          "elements",
+          "passed"
+        ],
+        "title": "TensorComparison",
+        "type": "object"
+      },
       "TrainJobCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1731,6 +2207,18 @@
           },
           "params": {
             "$ref": "#/components/schemas/TrainParams"
+          },
+          "source_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Job Id"
           }
         },
         "required": [
@@ -1818,6 +2306,298 @@
           "seed"
         ],
         "title": "TrainParams",
+        "type": "object"
+      },
+      "TrainingArtifactMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "architecture": {
+            "const": "yolo11n",
+            "title": "Architecture",
+            "type": "string"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/TrainingProvenance"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/TrainingRuntime"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "task": {
+            "const": "detection",
+            "title": "Task",
+            "type": "string"
+          },
+          "validation_scope": {
+            "const": "weights_only_detection_checkpoint",
+            "title": "Validation Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "task",
+          "architecture",
+          "classes",
+          "provenance",
+          "runtime",
+          "validation_scope"
+        ],
+        "title": "TrainingArtifactMetadata",
+        "type": "object"
+      },
+      "TrainingArtifactPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "const": "pt",
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "kind": {
+            "enum": [
+              "pt_best",
+              "pt_last"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/TrainingArtifactMetadata"
+          },
+          "metadata_schema_version": {
+            "title": "Metadata Schema Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "validation_state": {
+            "$ref": "#/components/schemas/ValidationState"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
+        ],
+        "title": "TrainingArtifactPublic",
+        "type": "object"
+      },
+      "TrainingProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "archive_sha256": {
+            "title": "Archive Sha256",
+            "type": "string"
+          },
+          "base_manifest_sha256": {
+            "title": "Base Manifest Sha256",
+            "type": "string"
+          },
+          "base_model_sha256": {
+            "title": "Base Model Sha256",
+            "type": "string"
+          },
+          "classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "code_version": {
+            "title": "Code Version",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "dataset_id": {
+            "format": "uuid",
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "dataset_version": {
+            "minimum": 1.0,
+            "title": "Dataset Version",
+            "type": "integer"
+          },
+          "params": {
+            "$ref": "#/components/schemas/TrainParams"
+          },
+          "report_artifact_id": {
+            "format": "uuid",
+            "title": "Report Artifact Id",
+            "type": "string"
+          },
+          "report_sha256": {
+            "title": "Report Sha256",
+            "type": "string"
+          },
+          "runtime_binding": {
+            "title": "Runtime Binding",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "snapshot_sha256": {
+            "title": "Snapshot Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "dataset_id",
+          "dataset_version",
+          "archive_sha256",
+          "snapshot_sha256",
+          "report_artifact_id",
+          "report_sha256",
+          "classes",
+          "counts",
+          "params",
+          "base_manifest_sha256",
+          "base_model_sha256",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "TrainingProvenance",
+        "type": "object"
+      },
+      "TrainingRuntime": {
+        "additionalProperties": false,
+        "properties": {
+          "completed_epochs": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Completed Epochs",
+            "type": "integer"
+          },
+          "device": {
+            "const": "cpu",
+            "title": "Device",
+            "type": "string"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/EffectiveTrainingParams"
+          },
+          "optimizer_steps": {
+            "minimum": 1.0,
+            "title": "Optimizer Steps",
+            "type": "integer"
+          },
+          "safe_load_count": {
+            "minimum": 2.0,
+            "title": "Safe Load Count",
+            "type": "integer"
+          },
+          "threads": {
+            "const": 2,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/TrainingVersions"
+          }
+        },
+        "required": [
+          "effective",
+          "versions",
+          "optimizer_steps",
+          "completed_epochs",
+          "safe_load_count",
+          "threads",
+          "device"
+        ],
+        "title": "TrainingRuntime",
+        "type": "object"
+      },
+      "TrainingVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "torch": {
+            "const": "2.15.0+cpu",
+            "title": "Torch",
+            "type": "string"
+          },
+          "torchvision": {
+            "const": "0.29.2+cpu",
+            "title": "Torchvision",
+            "type": "string"
+          },
+          "ultralytics": {
+            "const": "8.4.202",
+            "title": "Ultralytics",
+            "type": "string"
+          }
+        },
+        "required": [
+          "torch",
+          "torchvision",
+          "ultralytics"
+        ],
+        "title": "TrainingVersions",
         "type": "object"
       },
       "UserCreate": {

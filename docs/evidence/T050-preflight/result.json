@@ -1,0 +1,250 @@
+{
+  "status": "prerequisite_cpu_environment_and_local_trusted_assets_verified",
+  "checked_at_utc": "2026-11-04T08:59:49.817553+00:00",
+  "python": "3.12.14",
+  "joint_wheel_count": 62,
+  "joint_wheel_bytes": 405471983,
+  "backend_lock_exact_version_and_wheel_hash_matches": 33,
+  "joint_lock_sha256": "5e4232fe85b96d94cfc1570e61a5a39679f78b054f95e2790fab4e7e4b887341",
+  "cpu_probe": {
+    "stage": "joint-model-load",
+    "network_attempts": [],
+    "subprocess_attempts": [],
+    "versions": {
+      "torch": "2.15.0+cpu",
+      "torchvision": "0.29.2+cpu",
+      "numpy": "2.5.4",
+      "cv2": "5.0.0",
+      "PIL": "12.3.0",
+      "ultralytics": "8.4.202"
+    },
+    "cuda_built": null,
+    "hip_built": null,
+    "cuda_available": false,
+    "cpu_matmul": 11,
+    "nms_keep": [
+      0
+    ],
+    "settings_sync": false,
+    "offline": true,
+    "autoinstall": false,
+    "safe_load": true,
+    "backend_locked_imports": {
+      "fastapi": "0.141.1",
+      "pydantic": "2.13.5",
+      "sqlalchemy": "2.1.1",
+      "alembic": "1.20.0",
+      "uvicorn": "0.54.0",
+      "pyyaml": "6.0.3"
+    },
+    "backend_packages_exact_version_matches": [
+      {
+        "name": "alembic",
+        "version": "1.20.0"
+      },
+      {
+        "name": "annotated-doc",
+        "version": "0.0.5"
+      },
+      {
+        "name": "annotated-types",
+        "version": "0.8.0"
+      },
+      {
+        "name": "anyio",
+        "version": "4.15.1"
+      },
+      {
+        "name": "argon2-cffi",
+        "version": "25.1.0"
+      },
+      {
+        "name": "argon2-cffi-bindings",
+        "version": "26.1.0"
+      },
+      {
+        "name": "certifi",
+        "version": "2026.7.22"
+      },
+      {
+        "name": "cffi",
+        "version": "2.1.1"
+      },
+      {
+        "name": "click",
+        "version": "8.5.0"
+      },
+      {
+        "name": "colorama",
+        "version": "0.4.6"
+      },
+      {
+        "name": "fastapi",
+        "version": "0.141.1"
+      },
+      {
+        "name": "h11",
+        "version": "0.16.0"
+      },
+      {
+        "name": "httpcore",
+        "version": "1.0.9"
+      },
+      {
+        "name": "httpx",
+        "version": "0.28.1"
+      },
+      {
+        "name": "idna",
+        "version": "3.20"
+      },
+      {
+        "name": "iniconfig",
+        "version": "2.3.0"
+      },
+      {
+        "name": "mako",
+        "version": "1.4.3"
+      },
+      {
+        "name": "markupsafe",
+        "version": "3.0.3"
+      },
+      {
+        "name": "packaging",
+        "version": "26.3"
+      },
+      {
+        "name": "pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "pluggy",
+        "version": "1.6.0"
+      },
+      {
+        "name": "pycparser",
+        "version": "3.12"
+      },
+      {
+        "name": "pydantic",
+        "version": "2.13.5"
+      },
+      {
+        "name": "pydantic-core",
+        "version": "2.46.5"
+      },
+      {
+        "name": "pygments",
+        "version": "2.21.0"
+      },
+      {
+        "name": "pytest",
+        "version": "9.1.1"
+      },
+      {
+        "name": "python-multipart",
+        "version": "0.0.33"
+      },
+      {
+        "name": "pyyaml",
+        "version": "6.0.3"
+      },
+      {
+        "name": "sqlalchemy",
+        "version": "2.1.1"
+      },
+      {
+        "name": "starlette",
+        "version": "1.7.0"
+      },
+      {
+        "name": "typing-extensions",
+        "version": "4.16.0"
+      },
+      {
+        "name": "typing-inspection",
+        "version": "0.4.4"
+      },
+      {
+        "name": "uvicorn",
+        "version": "0.54.0"
+      }
+    ],
+    "checkpoint_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+    "torch_load_weights_only": [
+      true
+    ],
+    "model": {
+      "task": "detect",
+      "classes": 80,
+      "parameters": 2624080,
+      "device": "cpu",
+      "yaml_file": "yolo11n.yaml"
+    },
+    "status": "passed",
+    "elapsed_seconds": 3.1402332199995726
+  },
+  "weights": {
+    "name": "yolo11n.pt",
+    "source_url": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt",
+    "asset_id": 196201276,
+    "expected_bytes": 5613764,
+    "publisher_digest": null,
+    "license": "AGPL-3.0 / Enterprise options stated by publisher",
+    "license_source": "https://docs.ultralytics.com/models/yolo11/",
+    "method": "GET",
+    "started_utc": "2026-11-04T08:54:58.837233+00:00",
+    "http_status": 200,
+    "final_origin": "https://release-assets.githubusercontent.com",
+    "status": "downloaded_verified_size",
+    "bytes": 5613764,
+    "sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
+  },
+  "dataset": {
+    "name": "coco8.zip",
+    "source_url": "https://github.com/ultralytics/assets/releases/download/v0.0.0/coco8.zip",
+    "asset_id": 178785421,
+    "expected_bytes": 443158,
+    "publisher_digest": null,
+    "license": "Official documentation labels CC BY 4.0; inspect archive notices before distribution",
+    "license_source": "https://docs.ultralytics.com/datasets/detect/coco8/",
+    "method": "GET",
+    "started_utc": "2026-11-04T08:54:58.838037+00:00",
+    "http_status": 200,
+    "final_origin": "https://release-assets.githubusercontent.com",
+    "status": "downloaded_verified_size",
+    "bytes": 443158,
+    "sha256": "54c67fe9ef88313e021ec0e92b73c200167bb0a86633e8df8658d832cca828c9"
+  },
+  "sample_counts": {
+    "train": {
+      "images": 4,
+      "labels": 4,
+      "boxes": 13
+    },
+    "val": {
+      "images": 4,
+      "labels": 4,
+      "boxes": 17
+    }
+  },
+  "sample_class_count": 80,
+  "scope_limits": [
+    "No training",
+    "No forward/inference",
+    "No API/Worker/app integration",
+    "No ONNX export/runtime",
+    "No GPU or Windows ML validation",
+    "No repository or API environment edits",
+    "No publication or third-party redistribution",
+    "Process-local Python audit guards only; not OS network isolation"
+  ],
+  "remaining_gates": [
+    "Bounded training proof is recorded separately from this prerequisite check",
+    "Application adapter/worker integration and failure-path verification",
+    "Strict no-network behavior during training, font/cache/AMP/integration handling",
+    "Reconcile original-image rights and conflicting COCO8 notices before any redistribution"
+  ],
+  "evidence_note": "Technical projection of original preflight result; local paths and internal coordination omitted. Not platform acceptance."
+}

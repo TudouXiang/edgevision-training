@@ -13,14 +13,15 @@ def python_child(command: list[str], environment: dict[str, str] | None = None) 
     if not command or os.path.normcase(command[0]) != os.path.normcase(sys.executable):
         raise ValueError("Owned Python children must use the current interpreter")
     args = list(command)
+    child_environment = dict(os.environ if environment is None else environment)
+    child_environment["ORT_DISABLE_TELEMETRY"] = "1"
     if os.name != "nt":
-        return args, environment
+        return args, child_environment
     base = getattr(sys, "_base_executable", None)
     if not base or not os.path.isabs(base):
         raise RuntimeError("Direct Windows Python interpreter is unavailable")
     if os.path.normcase(base) == os.path.normcase(sys.executable):
-        return args, environment
-    child_environment = dict(os.environ if environment is None else environment)
+        return args, child_environment
     child_environment["__PYVENV_LAUNCHER__"] = sys.executable
     args[0] = base
     return args, child_environment

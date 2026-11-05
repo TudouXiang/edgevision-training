@@ -1,0 +1,17 @@
+[
+  {
+    "path": "joint-packages-audit.json",
+    "bytes": 132243,
+    "sha256": "693f2bb089e928aa6589c9ad35218bf0d279728a81866308a27ac71a3df1f5a2"
+  },
+  {
+    "path": "joint-resolved-requirements.lock",
+    "bytes": 6009,
+    "sha256": "5e4232fe85b96d94cfc1570e61a5a39679f78b054f95e2790fab4e7e4b887341"
+  },
+  {
+    "path": "result.json",
+    "bytes": 6405,
+    "sha256": "6943a0898a2af35f687f28b5134f158fb265c6e6760cc3e8553060844343ddcb"
+  }
+]

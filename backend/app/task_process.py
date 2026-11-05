@@ -11,6 +11,18 @@ def main() -> int:
 def execute(job_id: str, run_id: str) -> int:
     # No user-controlled module, command or model is imported.
     from .dataset_runner import log, run
+    from .run_files import read_json, run_directory
+    kind = read_json(run_directory(job_id, run_id) / "input.json").get("kind")
+    if kind == "train":
+        from .training_runner import run
+    elif kind == "export_onnx":
+        from .export_runner import run
+    elif kind == "export_probe":
+        from .export_probe import probe_child as run
+    elif kind == "ml_probe":
+        from .training_probe import probe_child as run
+    elif kind != "dataset_check":
+        return 65
     from .run_files import OutputLimitError
     try:
         return run(job_id, run_id)

@@ -1,0 +1,48 @@
+{
+  "id": "fe86f46a-aaa0-42e1-a198-03c0bf952f0f",
+  "project_id": "c7f3af6a-befa-4042-9b77-4fd362ed1351",
+  "created_by": "cc2c7422-13d9-4c35-af47-1910c558c95a",
+  "kind": "train",
+  "state": "succeeded",
+  "params_schema_version": 1,
+  "created_at": "2026-11-04T09:35:24.064538Z",
+  "started_at": "2026-11-04T09:35:24.330503Z",
+  "finished_at": "2026-11-04T09:35:32.890559Z",
+  "error_code": null,
+  "source_job_id": null,
+  "training": {
+    "schema_version": 1,
+    "dataset_id": "3bf64a2b-45a3-4ac1-8fb1-0781c367c747",
+    "dataset_version": 1,
+    "archive_sha256": "3e87a71037db6c1f3d9fc8ead6dccb1ae3971d77f48720d4dd597127ddc27d9c",
+    "snapshot_sha256": "9dd06f2317fea51740fe8ca585bdf0cb2ef7be8fa63d719bf405c839a01b2588",
+    "report_artifact_id": "37bab474-49e5-4a82-90c4-3dacfcb6bfa6",
+    "report_sha256": "a81c76349bb047d6745dfe3d5310fe328bac5a4dc43e83164be70f588a128a94",
+    "classes": [
+      "object"
+    ],
+    "counts": {
+      "annotations": 8,
+      "background_images": 0,
+      "images": 8,
+      "test_images": 0,
+      "train_images": 4,
+      "val_images": 4
+    },
+    "params": {
+      "dataset_id": "3bf64a2b-45a3-4ac1-8fb1-0781c367c747",
+      "experiment_name": "bounded synthetic smoke",
+      "base_model": "yolo11n.pt",
+      "epochs": 1,
+      "batch": 1,
+      "imgsz": 320,
+      "device": "cpu",
+      "seed": 0,
+      "learning_rate": 0.01
+    },
+    "base_manifest_sha256": "f974d5c24a4607ea68d458be26141aa07ebbf4b678abab1e24ddd6feeba5298d",
+    "base_model_sha256": "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1",
+    "runtime_binding": "382f9c3f53ea6d122ea4c7ac5ee05c27abc6f549849b7bdfa30ac3b6960ab94c",
+    "code_version": "7a2b5f7f3078fc33a2b015b8fc120213bdf550fd37eedea891fcc41f8477696d"
+  }
+}

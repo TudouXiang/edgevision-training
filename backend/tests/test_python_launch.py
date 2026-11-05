@@ -24,10 +24,10 @@ def test_child_environment_is_private_and_current_interpreter_only(monkeypatch, 
         args, env = python_launch.python_child(command, explicit)
         assert args[0] == (base if direct else executable)
         assert command[0] == executable
-        assert env == ({**explicit, "__PYVENV_LAUNCHER__": executable} if direct else explicit)
+        assert env == ({**explicit, "ORT_DISABLE_TELEMETRY": "1", "__PYVENV_LAUNCHER__": executable} if direct else {**explicit, "ORT_DISABLE_TELEMETRY": "1"})
         inherited_args, inherited_env = python_launch.python_child(command)
         assert inherited_args == args
-        assert inherited_env == ({**parent, "__PYVENV_LAUNCHER__": executable} if direct else None)
+        assert inherited_env == ({**parent, "ORT_DISABLE_TELEMETRY": "1", "__PYVENV_LAUNCHER__": executable} if direct else {**parent, "ORT_DISABLE_TELEMETRY": "1"})
         with pytest.raises(ValueError):
             python_launch.python_child([r"C:\unrelated\python.exe"])
     assert parent == {"UNCHANGED": "yes"} and explicit == {"CHILD_ONLY": "yes"}

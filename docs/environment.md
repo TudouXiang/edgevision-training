@@ -45,3 +45,56 @@
 ## 2026-09-28 跨平台开发入口补充
 
 目标仓库基线 `d5eade0`、编辑前工作区干净。当前 Linux 容器 Python 3.12.14、uv 0.12.18、Node 24.19.0、npm 11.9.0；新增标准库安装脚本预检通过，但未实际安装依赖。当前 `backend/.venv` 缺 FastAPI 与 pytest，后端 HTTP/迁移/生成未验证。Windows 原生系统/PowerShell 不可用，路径与 Worker 兼容代码只完成静态及 Linux 上的占位进程测试，不能宣称 Windows 运行通过。详细命令、失败和补证方式在 `evidence/portable-bootstrap-2026-09-28.md`。
+
+## Browser evidence schema v2
+
+`web/e2e/safe-reporter.ts` writes anonymous `summary.json`/`summary.md` and a
+closed-field console summary. Case numbers are discovery-order ordinals for that
+run only. Test titles/IDs, filenames, stack traces, stdout/stderr, annotations,
+attachments and credentials are never serialized. `completed` is removed:
+
+- `discovered` counts unique Playwright cases, not attempts.
+- `counts.executed` counts cases with at least one non-skipped result. This is an
+  observed test-result count, not proof that a browser fixture launched or that a
+  business acceptance gate passed.
+- `counts.passed/failed/timedOut/interrupted/skipped/NOT_RUN` partition discovered
+  cases by their final observed result. A discovered case with no result is
+  `NOT_RUN`. Skips are not passes. `expected_skipped` and `unexpected_skipped`
+  split final skips using the expected status recorded at that attempt; runtime
+  `test.skip` is expected when Playwright marks its expected status skipped.
+- `outcomes` records Playwright's `expected/unexpected/flaky/skipped` classification
+  separately from actual status (plus `NOT_RUN` for cases with no result). Thus an
+  expected failure is still an actual failure and an unexpected pass is visible.
+- `attempts` counts all callbacks, including retries and skipped attempts. Each
+  anonymous case retains only closed status enums and numeric attempt metadata.
+  A fail-then-pass retry is one executed/passed case, two executed attempts and a
+  flaky outcome. A fail-then-skip case is both executed and finally skipped;
+  `executed` therefore must not be added to the final-status partition.
+- Listing uses `stage=discovery`, `status=listed` only on successful discovery,
+  `browser_status=NOT_RUN`, all discovered cases `NOT_RUN`, zero executed cases
+  and zero attempts. Empty/all-skipped runs also have `browser_status=NOT_RUN`.
+- `status` remains the runner outcome, independent of case counts. A passed run
+  with skipped tests does not establish execution of those skipped scenarios.
+  Reporter-level errors are counted without serializing error contents.
+- Harness fallback summaries set `evidence_available=false`, unknown counts to
+  `null`, and browser status to `UNKNOWN` after a browser run may have started
+  (`NOT_RUN` before launch/discovery). A successful subprocess without a terminal
+  reporter receipt fails the harness with exit 2 (an original nonzero exit is preserved).
+  `--ml` and `--delivery` additionally require positive execution with
+  `passed == executed == discovered`, zero reporter errors, and no unexpected or
+  flaky outcomes, so an opted-in ML skip or flaky pass cannot succeed.
+  Ordinary mode permits the gated ML skip. Cleanup preserves an existing
+  receipt, including historical schema-v1 receipts, rather than recasting it.
+
+Example default suite: four passes and an optional ML skip yield `discovered=5
+executed=4 passed=4 skipped=1 NOT_RUN=0`, not five executed cases. Historical
+schema-v1 evidence stays unchanged and must be interpreted with its original
+per-case statuses. Reporter unit tests are mocked and cannot advance E/I/P gates.
+
+Receipt consumers enforce the complete closed schema, including anonymous cases
+and numeric attempts, and recompute all aggregates rather than trusting totals.
+Outcome reconstruction follows the pinned Playwright 1.64 semantics (the final
+expected status applies across retries; interrupted attempts do not count as an
+expected/unexpected result). A missing/extra/contradictory field is rejected.
+The harness reads at most 1 MiB plus one overflow-detection byte before parsing;
+oversized, invalid-UTF-8 or excessively nested JSON fails anonymously.

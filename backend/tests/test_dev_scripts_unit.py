@@ -1,6 +1,7 @@
 """Offline checks for project-local install/startup commands."""
 
 import contextlib
+import copy
 import importlib.util
 import io
 import json
@@ -91,6 +92,204 @@ class InstallCommandTests(unittest.TestCase):
 
 
 class BrowserCleanupTests(unittest.TestCase):
+    @staticmethod
+    def receipt(status="passed", skipped=0):
+        return {"schema_version": 2, "stage": "browser", "status": status,
+                "browser_status": status if skipped < 5 else "NOT_RUN", "evidence_available": True, "discovered": 5,
+                "reporter_errors": 0,
+                "counts": {"passed": 5 - skipped, "failed": 0, "timedOut": 0, "interrupted": 0,
+                           "skipped": skipped, "NOT_RUN": 0, "executed": 5 - skipped,
+                           "expected_skipped": skipped, "unexpected_skipped": 0},
+                "outcomes": {"expected": 5 - skipped, "unexpected": 0, "flaky": 0, "skipped": skipped, "NOT_RUN": 0},
+                "attempts": {"passed": 5 - skipped, "failed": 0, "timedOut": 0, "interrupted": 0,
+                             "skipped": skipped, "total": 5, "executed": 5 - skipped},
+                "cases": [{"case_number": i + 1, "status": "skipped" if i < skipped else "passed",
+                           "outcome": "skipped" if i < skipped else "expected", "executed": i >= skipped,
+                           "attempts": [{"status": "skipped" if i < skipped else "passed",
+                                         "expected_status": "skipped" if i < skipped else "passed",
+                                         "retry": 0, "duration_ms": 12}]} for i in range(5)]}
+
+    def test_closed_receipt_rejects_missing_unknown_and_contradictory_fields(self):
+        script = load_script("e2e")
+        mutations = [
+            (("cases",), [None] * 5), (("cases", 0), {"case_number": 1}),
+            (("cases", 0, "case_number"), 2), (("cases", 0, "case_number"), True),
+            (("cases", 0, "status"), "skipped"), (("cases", 0, "outcome"), "flaky"),
+            (("cases", 0, "executed"), False), (("cases", 0, "executed"), 1),
+            (("cases", 0, "attempts"), []), (("cases", 0, "attempts"), [None]),
+            (("cases", 0, "attempts", 0, "status"), "UNKNOWN"),
+            (("cases", 0, "attempts", 0, "expected_status"), "failed"),
+            (("cases", 0, "attempts", 0, "retry"), 1),
+            (("cases", 0, "attempts", 0, "duration_ms"), -1),
+            (("cases", 0, "attempts", 0, "duration_ms"), True),
+            (("cases", 0, "attempts", 0, "duration_ms"), float("nan")),
+            (("attempts", "passed"), 4), (("attempts", "executed"), 4),
+            (("outcomes", "expected"), 4), (("reporter_errors",), 1),
+            (("reporter_errors",), True), (("counts", "passed"), True),
+            (("cases", 0, "title"), "PRIVATE-SENTINEL"),
+            (("cases", 0, "attempts", 0, "stack"), "PRIVATE-SENTINEL"),
+            (("raw_error",), "PRIVATE-SENTINEL"),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for path, value in mutations:
+                with self.subTest(path=path):
+                    payload = self.receipt()
+                    target = payload
+                    for key in path[:-1]:
+                        target = target[key]
+                    target[path[-1]] = value
+                    (root / "summary.json").write_text(json.dumps(payload))
+                    self.assertEqual(script.browser_exit_code(root, 0, require_all_passed=True), 2)
+                    self.assertEqual(json.loads((root / "summary.json").read_text())["browser_status"], "UNKNOWN")
+                    self.assertNotIn("PRIVATE-SENTINEL", (root / "summary.json").read_text() + (root / "summary.md").read_text())
+            for path in (("outcomes",), ("attempts",), ("reporter_errors",), ("cases", 0, "status"),
+                         ("cases", 0, "attempts", 0, "expected_status")):
+                payload = self.receipt()
+                target = payload
+                for key in path[:-1]:
+                    target = target[key]
+                del target[path[-1]]
+                self.assertFalse(script.valid_browser_receipt(payload))
+
+    def test_oversized_invalid_encoding_and_deep_json_fail_anonymously(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for raw in (b" " * (1024 * 1024 + 1), b"\xff", b"[" * 2000 + b"]" * 2000):
+                (root / "summary.json").write_bytes(raw)
+                self.assertEqual(script.browser_exit_code(root, 17, require_all_passed=True), 17)
+                self.assertEqual(json.loads((root / "summary.json").read_text())["browser_status"], "UNKNOWN")
+
+    def test_recomputed_retry_skip_failure_and_not_run_outcomes(self):
+        script = load_script("e2e")
+        base = self.receipt()
+        # Keep four ordinary passed cases, vary the fifth with explicit expected aggregates.
+        scenarios = [
+            ([], "NOT_RUN", "NOT_RUN", False),
+            ([("failed", "passed")], "failed", "unexpected", True),
+            ([("timedOut", "passed")], "timedOut", "unexpected", True),
+            ([("interrupted", "passed")], "interrupted", "skipped", True),
+            ([("failed", "failed")], "failed", "expected", True),
+            ([("skipped", "passed")], "skipped", "skipped", False),
+            ([("failed", "passed"), ("passed", "passed")], "passed", "flaky", True),
+            ([("failed", "passed"), ("skipped", "skipped")], "skipped", "flaky", True),
+            ([("failed", "passed"), ("skipped", "passed")], "skipped", "unexpected", True),
+        ]
+        for results, status, outcome, executed in scenarios:
+            with self.subTest(status=status, outcome=outcome, results=results):
+                payload = copy.deepcopy(base)
+                payload["status"] = payload["browser_status"] = "failed"
+                case = payload["cases"][-1]
+                case.update(status=status, outcome=outcome, executed=executed,
+                            attempts=[{"status": actual, "expected_status": expected, "retry": i, "duration_ms": 1}
+                                      for i, (actual, expected) in enumerate(results)])
+                payload["counts"]["passed"] -= 1
+                payload["counts"][status] += 1
+                payload["counts"]["executed"] += int(executed) - 1
+                if status == "skipped":
+                    payload["counts"]["expected_skipped" if results[-1][1] == "skipped" else "unexpected_skipped"] += 1
+                payload["outcomes"]["expected"] -= 1
+                payload["outcomes"][outcome] += 1
+                payload["attempts"]["passed"] -= 1
+                payload["attempts"]["total"] += len(results) - 1
+                payload["attempts"]["executed"] += sum(actual != "skipped" for actual, _ in results) - 1
+                for actual, _ in results:
+                    payload["attempts"][actual] += 1
+                self.assertTrue(script.valid_browser_receipt(payload))
+                payload["cases"][-1]["outcome"] = "expected" if outcome != "expected" else "unexpected"
+                self.assertFalse(script.valid_browser_receipt(payload))
+
+    def test_opted_in_ml_rejects_valid_flaky_pass_receipt(self):
+        script = load_script("e2e")
+        payload = self.receipt()
+        case = payload["cases"][0]
+        case["attempts"][0]["retry"] = 1
+        case["attempts"].insert(0, {"status": "failed", "expected_status": "passed", "retry": 0, "duration_ms": 1})
+        case["outcome"] = "flaky"
+        payload["outcomes"].update(expected=4, flaky=1)
+        payload["attempts"].update(failed=1, total=6, executed=6)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "summary.json").write_text(json.dumps(payload))
+            self.assertEqual(script.browser_exit_code(root, 0), 0)
+            self.assertEqual(script.browser_exit_code(root, 0, require_all_passed=True), 2)
+            self.assertEqual(json.loads((root / "summary.json").read_text()), payload)
+
+    def test_opted_in_ml_rejects_skips_but_default_allows_them(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for skipped in (0, 1):
+                original = self.receipt(skipped=skipped)
+                (root / "summary.json").write_text(json.dumps(original))
+                self.assertEqual(script.browser_exit_code(root, 0), 0)
+                self.assertEqual(script.browser_exit_code(root, 0, require_all_passed=True), 2 if skipped else 0)
+                self.assertEqual(script.browser_exit_code(root, 7, require_all_passed=True), 7)
+                self.assertEqual(json.loads((root / "summary.json").read_text()), original)
+
+    def test_invalid_count_receipts_are_unknown(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for field, value in (("counts", None), ("discovered", True), ("cases", []), ("status", [])):
+                original = self.receipt()
+                original[field] = value
+                (root / "summary.json").write_text(json.dumps(original))
+                self.assertEqual(script.browser_exit_code(root, 0, require_all_passed=True), 2)
+                self.assertEqual(json.loads((root / "summary.json").read_text())["browser_status"], "UNKNOWN")
+            original = self.receipt()
+            original["counts"]["executed"] = 6
+            (root / "summary.json").write_text(json.dumps(original))
+            self.assertEqual(script.browser_exit_code(root, 9, require_all_passed=True), 9)
+
+    def test_harness_fallback_does_not_invent_browser_execution(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for stage, browser_status in (("bootstrap", "NOT_RUN"), ("discovery", "NOT_RUN"), ("browser", "UNKNOWN")):
+                script.safe_summary(root, stage, "failed")
+                result = json.loads((root / "summary.json").read_text())
+                self.assertEqual(result["schema_version"], 2)
+                self.assertEqual(result["browser_status"], browser_status)
+                self.assertFalse(result["evidence_available"])
+                self.assertIsNone(result["discovered"])
+                self.assertIsNone(result["counts"])
+                self.assertIsNone(result["attempts"])
+
+    def test_missing_receipt_during_cleanup_is_unknown_not_not_run(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script.record_cleanup(root, "failed")
+            result = json.loads((root / "summary.json").read_text())
+            self.assertEqual(result["browser_status"], "UNKNOWN")
+            self.assertFalse(result["evidence_available"])
+
+    def test_process_success_without_terminal_receipt_is_not_success(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for content in (None, "{", "[]", '{"status": "passed"}',
+                            '{"schema_version": 2, "stage": "browser", "status": "running"}'):
+                receipt = root / "summary.json"
+                if content is None:
+                    receipt.unlink(missing_ok=True)
+                else:
+                    receipt.write_text(content)
+                self.assertEqual(script.browser_exit_code(root, 0), 2)
+                self.assertEqual(json.loads(receipt.read_text())["browser_status"], "UNKNOWN")
+
+    def test_reporter_outcome_and_process_exit_both_must_pass(self):
+        script = load_script("e2e")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for status, process_code, expected in (("passed", 0, 0), ("failed", 0, 2), ("passed", 7, 7)):
+                original = self.receipt(status=status)
+                (root / "summary.json").write_text(json.dumps(original))
+                self.assertEqual(script.browser_exit_code(root, process_code), expected)
+                self.assertEqual(json.loads((root / "summary.json").read_text()), original)
+
     def test_every_owned_service_is_stopped_after_one_failure(self):
         script = load_script("e2e")
         processes = (object(), object(), object())
@@ -129,7 +328,7 @@ class WorkerLockTests(unittest.TestCase):
             with contextlib.closing(sqlite3.connect(db_path)) as db, db:
                 db.execute("CREATE TABLE alembic_version (version_num TEXT)")
                 db.execute("INSERT INTO alembic_version VALUES ('0003_worker')")
-                db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT, launch_phase TEXT DEFAULT 'unverified', kind TEXT DEFAULT 'train', environment_json TEXT, process_identity_json TEXT DEFAULT '{}')")
+                db.execute("CREATE TABLE jobs (id TEXT, status TEXT, created_at TEXT, started_at TEXT, heartbeat_at TEXT, worker_pid INTEGER, run_id TEXT, worker_instance TEXT, host_boot_id TEXT, child_pid INTEGER, child_pgid INTEGER, finished_at TEXT, error_code TEXT, error_message TEXT, launch_phase TEXT DEFAULT 'unverified', kind TEXT DEFAULT 'package', environment_json TEXT, process_identity_json TEXT DEFAULT '{}')")
                 db.execute("CREATE TABLE datasets (status TEXT, validation_job_id TEXT)")
                 db.execute("CREATE TABLE job_events (job_id TEXT, seq INTEGER, kind TEXT, payload_json TEXT, created_at TEXT)")
                 db.execute("INSERT INTO jobs (id,status,created_at) VALUES (?,?,?)", (job_id, "queued", "2026-09-28T00:00:00Z"))

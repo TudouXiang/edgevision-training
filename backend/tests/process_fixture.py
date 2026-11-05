@@ -47,6 +47,8 @@ def runner(behavior: str, job_id: str, run_id: str) -> int:
     directory = run_directory(job_id, run_id)
     marker(directory, "started.json")
     print('{"level":"info","text":"Validation started"}', flush=True)
+    if behavior == "bad_metrics":
+        (directory / "metrics.jsonl").write_text('{"not":"a valid metric"}\n')
     if behavior in {"tree", "root_exits_first"}:
         subprocess.Popen([sys.executable, HERE, "descendant", str(directory), "child"], close_fds=True)
         wait_file(directory / "grandchild.json")
@@ -54,7 +56,7 @@ def runner(behavior: str, job_id: str, run_id: str) -> int:
             return 0
     if behavior in {"flood", "flood_wait"}:
         for _ in range(4096):
-            os.write(1, b"x" * 4096)
+            os.write(1, b'{"level":"info","text":"Validation started"}\n' + b"x" * 4096 + b"\n")
         if behavior == "flood_wait":
             marker(directory, "flood-ready.json")
             wait_file(directory / "release-runner")
@@ -95,8 +97,19 @@ def guardian(behavior: str, job_id: str, run_id: str) -> int:
 
 def worker(behavior: str) -> int:
     from app import worker as module
+    is_export = behavior.startswith("export_")
+    if is_export:
+        from app import export_inputs
+        export_inputs.verify_input = lambda value: value
+        behavior = behavior[len("export_"):]
+    if behavior.startswith("training_"):
+        # Explicit test-only fixed-process fixture, never a production runner.
+        from app import training_inputs
+        training_inputs.verify_input = lambda value: value
+        behavior = behavior[len("training_"):]
+
     if behavior.startswith("kill_") or behavior in {"pre_go", "go_commit_failure"}:
-        runner_behavior = "valid_then_wait"
+        runner_behavior = "wait" if is_export else "valid_then_wait"
     else:
         runner_behavior = behavior
     module.guardian_command = lambda job, run: [sys.executable, HERE, "guardian", runner_behavior, job, run]
