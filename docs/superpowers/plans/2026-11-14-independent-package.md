@@ -77,3 +77,12 @@ Fixed Linux x86_64 CPU/detection-image-v1, ADR's exact 11-member ZIP and byte li
 ## Handoff
 
 Coordinator reviews before implementation. No user-choice blocker. Engineering checks: exact minimal wheel closure, independent runtime, historical successful package compatibility and source notices. Fixed base AGPL record is known, user data rights remain unproven. Protect untracked backend/.venv and web/node_modules; never stage them.
+
+## Implementation checkpoint: standalone proof and isolated entry
+
+- Implemented the three distinct managed runs: fresh platform ONNX reference, independent nine-package raw execution, independent CLI execution. Strict private record binds runtime, template, dependencies, input, output and drained receipts; complete raw comparison retains the fixed tolerance.
+- Reference PNG uses Pillow encoding and portable example PNG uses standard-library encoding. Original encoded bytes are separately bound; equality is required for decoded RGB, preprocessing tensor, preview and subsequent numerical outputs. This is not a claim of identical encoded PNG bytes.
+- Added strict current-runtime capability validation, fixed ZIP expansion, explicit isolated HTTP/Worker/download acceptance and a fourth fresh CLI execution of the downloaded package. This implementation has not yet run native models.
+- Added the separate hash-locked nine-package installation to the existing isolated Docker build and exactly two root license files to committed-source freezing. No broader root-directory copying or execution security relaxation.
+- New schema 4 requires `package_http` in addition to all ten I stages. Historical schemas 2 and 3 retain E/I-only meanings and cannot pass a current run. P browser integration remains pending; schema 4 is not full UI/project acceptance.
+- Ordinary evidence so far: 129 package tests and 168 isolated-entry/HTTP opt-in tests pass. Full ordinary backend regression is pending for this checkpoint. No package dependency installation, ABI check, native P inference or P browser execution has been performed.

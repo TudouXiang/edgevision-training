@@ -781,8 +781,8 @@ def test_tool_python_path_override_rejected_before_copy(tmp_path):
 
 
 def test_image_stages_have_new_schema_without_relabelling_historical_e():
-    assert ci.SCHEMA_VERSION == entry.SCHEMA_VERSION == 3
-    assert ci.STAGES == entry.STAGES == (*ci.LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+    assert ci.SCHEMA_VERSION == entry.SCHEMA_VERSION == 4
+    assert ci.STAGES == entry.STAGES == (*ci.INFERENCE_STAGES, 'package_http')
     historic = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
                 'stages': [{'stage': name, 'status': 'passed'} for name in ci.LEGACY_STAGES]}
     assert ci.validate_summary(json.dumps(historic)) == historic
@@ -810,7 +810,7 @@ def test_image_stages_keep_budget_and_original_boundary(tmp_path, monkeypatch, c
         assert environment['EDGEVISION_INFERENCE_HTTP_ROOT'] == environment['PLATFORM_DATA_ROOT']
         assert environment['EDGEVISION_INFERENCE_POLICY_ROOT'] == environment['PLATFORM_DATA_ROOT']
         assert environment['ORT_DISABLE_TELEMETRY'] == '1' and 0 < remaining <= 450
-    assert ci.validate_summary(capsys.readouterr().out)['schema_version'] == 3
+    assert ci.validate_summary(capsys.readouterr().out)['schema_version'] == 4
 
 
 def test_old_receipt_cannot_pass_new_container_execution(tmp_path):
@@ -822,7 +822,7 @@ def test_old_receipt_cannot_pass_new_container_execution(tmp_path):
             return super().docker(args, **kwargs)
     docker = OldReceiptDocker(tmp_path)
     result = ci.IsolatedRun(docker, tmp_path, token=TOKEN).run(tmp_path)
-    assert result['status'] == 'failed' and result['schema_version'] == 3
+    assert result['status'] == 'failed' and result['schema_version'] == 4
     assert all(row['status'] == 'unverified' for row in result['stages'])
     assert docker.current is None
 
@@ -836,7 +836,7 @@ def test_image_inputs_must_be_present_in_frozen_source(tmp_path, missing):
 
 
 @pytest.mark.parametrize('fault', ['missing', 'duplicate', 'order', 'old_version'])
-def test_current_image_summary_requires_exact_ten_stage_schema(fault):
+def test_current_summary_requires_exact_current_stage_schema(fault):
     payload = full_summary()
     if fault == 'missing':
         payload['stages'].pop()
@@ -847,20 +847,20 @@ def test_current_image_summary_requires_exact_ten_stage_schema(fault):
     else:
         payload['schema_version'] = 2
     with pytest.raises(ci.IsolationError):
-        ci.validate_summary(json.dumps(payload), expected_version=3)
+        ci.validate_summary(json.dumps(payload), expected_version=ci.SCHEMA_VERSION)
 
 
 def test_current_stage_order_requires_real_image_browser_source():
-    assert len(ci.STAGES) == 10
+    assert len(ci.STAGES) == 11
     assert ci.STAGES[:7] == ci.LEGACY_STAGES
-    assert entry.stage_commands()[-1][1][-1] == '/opt/edgevision/scripts/inference_e2e.py'
+    assert entry.stage_commands()[-2][1][-1] == '/opt/edgevision/scripts/inference_e2e.py'
     assert {'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts'}.issubset(ci.REQUIRED_SOURCE)
 
 
 def test_closed_image_diagnostic_preserved_without_private_details():
     value = full_summary()
     value['status'] = 'failed'
-    value['stages'][-1]['status'] = 'failed'
+    value['stages'][ci.STAGES.index('inference_browser')]['status'] = 'failed'
     value['inference_browser_failure'] = 'inputs'
     assert ci.validate_summary(json.dumps(value)) == value
     assert ci.public_summary('execution', False, value)['inference_browser_failure'] == 'inputs'
@@ -871,7 +871,7 @@ def test_closed_image_diagnostic_preserved_without_private_details():
 def test_image_diagnostic_rejects_non_closed_values(code):
     value = full_summary()
     value['status'] = 'failed'
-    value['stages'][-1]['status'] = 'failed'
+    value['stages'][ci.STAGES.index('inference_browser')]['status'] = 'failed'
     value['inference_browser_failure'] = code
     with pytest.raises((ci.IsolationError, TypeError)):
         ci.validate_summary(json.dumps(value))
@@ -908,13 +908,32 @@ def test_private_image_diagnostic_is_sanitized_at_container_boundary(tmp_path, m
     assert 'SECRET' not in output.out + output.err
     receipt = ci.validate_summary(output.out)
     assert receipt['inference_browser_failure'] == expected
-    assert receipt['stages'][-1]['status'] == 'failed'
+    assert receipt['stages'][ci.STAGES.index('inference_browser')]['status'] == 'failed'
 
 
 @pytest.mark.parametrize('phase', ['ui_setup', 'ui_upload', 'ui_pt_result', 'ui_onnx_download', 'ui_responsive'])
 def test_closed_ui_phases_survive_public_boundary(phase):
     value = full_summary()
     value['status'] = 'failed'
-    value['stages'][-1]['status'] = 'failed'
+    value['stages'][ci.STAGES.index('inference_browser')]['status'] = 'failed'
     value['inference_browser_failure'] = phase
     assert ci.public_summary('execution', False, value)['inference_browser_failure'] == phase
+
+
+def test_package_runtime_build_has_separate_fixed_environment_and_exact_licenses():
+    assert ci.source_allowed('LICENSE') and ci.source_allowed('LICENSE_SCOPE.md')
+    assert not ci.source_allowed('private.md') and not ci.source_allowed('docs/LICENSE_SCOPE.md')
+    assert {'LICENSE','LICENSE_SCOPE.md','scripts/install_package.py','scripts/package_standalone.py',
+        'backend/requirements-package-linux-cpu.lock'}.issubset(ci.REQUIRED_SOURCE)
+    recipe=(ROOT/'ci/isolated-ml.Dockerfile').read_text()
+    assert 'python3 -I -S scripts/install_package.py' in recipe
+
+
+def test_package_stage_requires_new_schema_and_cannot_relabel_i_receipt():
+    assert ci.SCHEMA_VERSION==entry.SCHEMA_VERSION==4
+    assert ci.STAGES[-1]=='package_http'
+    assert entry.stage_commands()[-1][1][-1]=='tests/package_http_probe.py'
+    historic={'schema_version':3,'stage':'isolated_ml','status':'passed',
+        'stages':[{'stage':name,'status':'passed'} for name in ci.INFERENCE_STAGES]}
+    assert ci.validate_summary(json.dumps(historic))==historic
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(historic),expected_version=4)

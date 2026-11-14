@@ -8,7 +8,7 @@ def task():
     return {'schema_version':1,'kind':'package_standalone_probe','job_id':str(uuid4()),'run_id':str(uuid4()),
         'mode':'raw','cli_sha256':'a'*64,'bootstrap_sha256':'b'*64,'package_sha256':'c'*64,
         'package_size_bytes':100,'runtime_binding':'d'*64,'code_version':'e'*64,'model_sha256':'f'*64,
-        'template_sha256':'a'*64}
+        'template_sha256':'a'*64,'image_sha256':'b'*64,'image_size_bytes':100}
 
 
 def test_standalone_input_does_not_accept_commands_or_paths():

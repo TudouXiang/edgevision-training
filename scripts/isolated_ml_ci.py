@@ -31,8 +31,9 @@ EXECUTION_TIMEOUT = 480
 CLEANUP_TIMEOUT = 30
 # Historical E receipts retain the exact seven-stage v2 meaning.
 LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
-STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
-SCHEMA_VERSION = 3
+INFERENCE_STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+STAGES = (*INFERENCE_STAGES, 'package_http')
+SCHEMA_VERSION = 4
 PUBLIC_STAGES = ('preparation', 'build', 'create', 'inspect', 'execution', 'cleanup', 'cleanup_unknown', 'complete')
 IMAGE_ID = re.compile(r'sha256:[a-f0-9]{64}')
 CONTAINER_ID = re.compile(r'[a-f0-9]{64}')
@@ -99,9 +100,9 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
     result = decode_json(value)
     require(isinstance(result, dict) and set(result) in ({'schema_version', 'stage', 'status', 'stages'}, {'schema_version', 'stage', 'status', 'stages', 'inference_browser_failure'}))
     version = result['schema_version']
-    require(type(version) is int and version in (2, SCHEMA_VERSION))
+    require(type(version) is int and version in (2, 3, SCHEMA_VERSION))
     require(expected_version is None or version == expected_version)
-    stages = LEGACY_STAGES if version == 2 else STAGES
+    stages = LEGACY_STAGES if version == 2 else INFERENCE_STAGES if version == 3 else STAGES
     require(result['stage'] == 'isolated_ml' and result['status'] in ('passed', 'failed'))
     rows = result['stages']
     require(isinstance(rows, list) and len(rows) == len(stages))
@@ -113,7 +114,7 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
     diagnostic = {}
     if 'inference_browser_failure' in result:
         code = result['inference_browser_failure']
-        require(version == SCHEMA_VERSION and rows[-1]['status'] == 'failed')
+        require(version in (3, SCHEMA_VERSION) and rows[stages.index('inference_browser')]['status'] == 'failed')
         require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_submit_inventory', 'ui_pt_submit_model', 'ui_pt_submit_thresholds', 'ui_pt_submit_ready', 'ui_pt_submit_request', 'ui_pt_submit_response', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_submit_inventory', 'ui_onnx_submit_model', 'ui_onnx_submit_thresholds', 'ui_onnx_submit_ready', 'ui_onnx_submit_request', 'ui_onnx_submit_response', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete'))
         diagnostic = {'inference_browser_failure': code}
     # Return freshly built known fields; never relay arbitrary Docker output.
@@ -216,6 +217,8 @@ BLOCKED_PARTS = {'data', 'private', 'logs', 'artifacts', 'evidence', 'reports', 
 
 
 def source_allowed(relative: str) -> bool:
+    if relative in {'LICENSE','LICENSE_SCOPE.md'}:
+        return True
     path = PurePosixPath(relative)
     if path.is_absolute() or not path.parts or path.parts[0] not in {'backend', 'web', 'scripts', 'contracts'}:
         return False
@@ -231,6 +234,8 @@ def source_allowed(relative: str) -> bool:
 
 
 REQUIRED_SOURCE = (
+    'LICENSE', 'LICENSE_SCOPE.md', 'scripts/install_package.py', 'scripts/package_standalone.py',
+    'backend/requirements-package-linux-cpu.lock', 'backend/tests/package_http_probe.py',
     'scripts/isolated_ml_entry.py', 'scripts/install_ml.py', 'scripts/e2e.py',
     'scripts/fetch_training_asset.py', 'backend/requirements-delivery-linux-cpu.lock',
     'web/package-lock.json', 'backend/tests/export_http_probe.py',
@@ -271,7 +276,7 @@ def freeze_source(root: Path, context: Path, commands: PrivateCommands, expected
     def git(*args):
         return commands.command(['git', '-c', 'core.fsmonitor=false', *args], cwd=root, timeout=15)
     require(git('rev-parse', '--verify', 'HEAD').strip() == expected_commit)
-    paths = ('backend', 'web', 'scripts', 'contracts', 'ci')
+    paths = ('backend', 'web', 'scripts', 'contracts', 'ci', 'LICENSE', 'LICENSE_SCOPE.md')
     require(git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--', *paths) == '')
     tree = git('ls-tree', '-r', '-z', expected_commit, '--', *paths)
     copy_source(context, tree, lambda object_id: git('cat-file', 'blob', object_id).encode('utf-8'))

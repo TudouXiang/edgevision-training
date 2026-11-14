@@ -94,12 +94,13 @@ def execute(job_id,run_id):
     if not directory.is_absolute() or directory.name!=run_id or directory.parent.name!='runs' or directory.parent.parent.name!=job_id:raise ValueError('directory')
     if any(path.is_symlink() for path in (directory,*directory.parents)):raise ValueError('directory link')
     task=json.loads(read_regular(directory/'input.json',1024**2))
-    names={'schema_version','kind','job_id','run_id','mode','cli_sha256','bootstrap_sha256','package_sha256','package_size_bytes','runtime_binding','code_version','model_sha256','template_sha256'}
+    names={'schema_version','kind','job_id','run_id','mode','cli_sha256','bootstrap_sha256','package_sha256','package_size_bytes','runtime_binding','code_version','model_sha256','template_sha256','image_sha256','image_size_bytes'}
     if type(task) is not dict or set(task)!=names or type(task['schema_version']) is not int or task['schema_version']!=1 or task['kind']!='package_standalone_probe':raise ValueError('task')
     if (task['job_id'],task['run_id'])!=(job_id,run_id) or task['mode'] not in {'raw','cli'}:raise ValueError('task identity')
-    for name in names-{'schema_version','kind','job_id','run_id','mode','package_size_bytes'}:
+    for name in names-{'schema_version','kind','job_id','run_id','mode','package_size_bytes','image_size_bytes'}:
         if type(task[name]) is not str or re.fullmatch('[0-9a-f]{64}',task[name]) is None:raise ValueError('hash')
     if type(task['package_size_bytes']) is not int or not 0<task['package_size_bytes']<=144*1024**2:raise ValueError('size')
+    if type(task['image_size_bytes']) is not int or not 0<task['image_size_bytes']<=50*1024**2:raise ValueError('image size')
     task_hash=sha256(canonical(task)).hexdigest()
     if task_hash!=os.environ['EDGEVISION_PACKAGE_INPUT_SHA256']:raise ValueError('task changed')
     if sha256(read_regular(Path(__file__),1024**2)).hexdigest()!=task['bootstrap_sha256']:raise ValueError('bootstrap changed')
@@ -112,6 +113,8 @@ def execute(job_id,run_id):
     manifest=module.verify_package(package)
     if manifest['source']['sha256']!=task['model_sha256'] or manifest['template']['template_sha256']!=task['template_sha256']:raise ValueError('candidate binding')
     verify_archive(directory,task,module,manifest)
+    example=next(v for v in manifest['members'] if v['path']=='example.png')
+    if (example['sha256'],example['size_bytes'])!=(task['image_sha256'],task['image_size_bytes']):raise ValueError('image binding')
     environment=environment_identity(read_regular(package/'requirements.lock',1024**2))
     if task['mode']=='raw':
         output,preview,raw_tensor=module.execute(package,package/'example.png','png')
