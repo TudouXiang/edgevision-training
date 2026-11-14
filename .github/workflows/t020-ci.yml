@@ -37,6 +37,8 @@ jobs:
       EDGEVISION_INFERENCE_HTTP_ROOT: ''
       EDGEVISION_INFERENCE_POLICY_ROOT: ''
       EDGEVISION_E2E_INFERENCE: ''
+      EDGEVISION_PACKAGE_HTTP_ROOT: ''
+      EDGEVISION_E2E_PACKAGE: ''
 
     steps:
       - name: Checkout
@@ -128,6 +130,8 @@ jobs:
       EDGEVISION_INFERENCE_HTTP_ROOT: ''
       EDGEVISION_INFERENCE_POLICY_ROOT: ''
       EDGEVISION_E2E_INFERENCE: ''
+      EDGEVISION_PACKAGE_HTTP_ROOT: ''
+      EDGEVISION_E2E_PACKAGE: ''
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

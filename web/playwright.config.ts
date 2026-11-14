@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: './e2e',
   // Dedicated I runs discover only their own case. Ordinary/delivery runs do
   // not discover an I skip, preserving their require_all_passed receipt contract.
-  testMatch: process.env.EDGEVISION_E2E_INFERENCE === '1' ? '**/t060-inference.browser.ts' : '**/*.e2e.ts',
+  testMatch: process.env.EDGEVISION_E2E_PACKAGE === '1' ? '**/t060-package.browser.ts' : process.env.EDGEVISION_E2E_INFERENCE === '1' ? '**/t060-inference.browser.ts' : '**/*.e2e.ts',
   fullyParallel: false,
   workers: 1,
   retries: 0,

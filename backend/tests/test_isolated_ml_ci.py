@@ -781,8 +781,8 @@ def test_tool_python_path_override_rejected_before_copy(tmp_path):
 
 
 def test_image_stages_have_new_schema_without_relabelling_historical_e():
-    assert ci.SCHEMA_VERSION == entry.SCHEMA_VERSION == 4
-    assert ci.STAGES == entry.STAGES == (*ci.INFERENCE_STAGES, 'package_http')
+    assert ci.SCHEMA_VERSION == entry.SCHEMA_VERSION == 5
+    assert ci.STAGES == entry.STAGES == (*ci.INFERENCE_STAGES, 'package_http', 'package_browser')
     historic = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
                 'stages': [{'stage': name, 'status': 'passed'} for name in ci.LEGACY_STAGES]}
     assert ci.validate_summary(json.dumps(historic)) == historic
@@ -810,7 +810,7 @@ def test_image_stages_keep_budget_and_original_boundary(tmp_path, monkeypatch, c
         assert environment['EDGEVISION_INFERENCE_HTTP_ROOT'] == environment['PLATFORM_DATA_ROOT']
         assert environment['EDGEVISION_INFERENCE_POLICY_ROOT'] == environment['PLATFORM_DATA_ROOT']
         assert environment['ORT_DISABLE_TELEMETRY'] == '1' and 0 < remaining <= 450
-    assert ci.validate_summary(capsys.readouterr().out)['schema_version'] == 4
+    assert ci.validate_summary(capsys.readouterr().out)['schema_version'] == 5
 
 
 def test_old_receipt_cannot_pass_new_container_execution(tmp_path):
@@ -822,7 +822,7 @@ def test_old_receipt_cannot_pass_new_container_execution(tmp_path):
             return super().docker(args, **kwargs)
     docker = OldReceiptDocker(tmp_path)
     result = ci.IsolatedRun(docker, tmp_path, token=TOKEN).run(tmp_path)
-    assert result['status'] == 'failed' and result['schema_version'] == 4
+    assert result['status'] == 'failed' and result['schema_version'] == 5
     assert all(row['status'] == 'unverified' for row in result['stages'])
     assert docker.current is None
 
@@ -851,9 +851,9 @@ def test_current_summary_requires_exact_current_stage_schema(fault):
 
 
 def test_current_stage_order_requires_real_image_browser_source():
-    assert len(ci.STAGES) == 11
+    assert len(ci.STAGES) == 12
     assert ci.STAGES[:7] == ci.LEGACY_STAGES
-    assert entry.stage_commands()[-2][1][-1] == '/opt/edgevision/scripts/inference_e2e.py'
+    assert dict((name,command) for name,command,_ in entry.stage_commands())['inference_browser'][-1] == '/opt/edgevision/scripts/inference_e2e.py'
     assert {'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts'}.issubset(ci.REQUIRED_SOURCE)
 
 
@@ -930,9 +930,9 @@ def test_package_runtime_build_has_separate_fixed_environment_and_exact_licenses
 
 
 def test_package_stage_requires_new_schema_and_cannot_relabel_i_receipt():
-    assert ci.SCHEMA_VERSION==entry.SCHEMA_VERSION==4
-    assert ci.STAGES[-1]=='package_http'
-    assert entry.stage_commands()[-1][1][-1]=='tests/package_http_probe.py'
+    assert ci.SCHEMA_VERSION==entry.SCHEMA_VERSION==5
+    assert ci.PACKAGE_HTTP_STAGES[-1]=='package_http'
+    assert dict((name,command) for name,command,_ in entry.stage_commands())['package_http'][-1]=='tests/package_http_probe.py'
     historic={'schema_version':3,'stage':'isolated_ml','status':'passed',
         'stages':[{'stage':name,'status':'passed'} for name in ci.INFERENCE_STAGES]}
     assert ci.validate_summary(json.dumps(historic))==historic
@@ -940,7 +940,7 @@ def test_package_stage_requires_new_schema_and_cannot_relabel_i_receipt():
 
 
 def test_package_diagnostic_is_closed_and_not_attached_to_success():
-    value=full_summary();value['status']='failed';value['stages'][-1]['status']='failed'
+    value=full_summary();value['status']='failed';value['stages'][ci.STAGES.index('package_http')]['status']='failed'
     value['package_http_failure']='probe_identity'
     assert ci.validate_summary(json.dumps(value))==value
     assert ci.public_summary('execution',False,value)['package_http_failure']=='probe_identity'
@@ -978,3 +978,32 @@ def test_delivery_diagnostic_rejects_untrusted_phase(tmp_path,raw):
     report=tmp_path/'private/browser-report';report.mkdir(parents=True)
     (report/'harness-phase.json').write_text(raw)
     assert entry.delivery_failure(tmp_path)=='unknown'
+
+
+def test_package_browser_requires_new_schema_and_fixed_source():
+    assert ci.SCHEMA_VERSION==entry.SCHEMA_VERSION==5
+    assert ci.STAGES[-1]=='package_browser'
+    assert entry.stage_commands()[-1][1][-1]=='/opt/edgevision/scripts/package_e2e.py'
+    assert {'scripts/package_e2e.py','web/e2e/t060-package.browser.ts'}.issubset(ci.REQUIRED_SOURCE)
+    old={'schema_version':4,'stage':'isolated_ml','status':'passed','stages':[{'stage':name,'status':'passed'} for name in ci.STAGES[:-1]]}
+    assert ci.validate_summary(json.dumps(old))==old
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(old),expected_version=5)
+    with pytest.raises(ci.IsolationError):ci.public_summary('complete',True,old)
+
+
+def test_package_browser_diagnostic_cannot_leak_or_report_success():
+    value=full_summary();value['status']='failed';value['stages'][-1]['status']='failed'
+    value['package_browser_failure']='ui_download'
+    assert ci.validate_summary(json.dumps(value))==value
+    assert ci.failed_outer('cleanup',ci.public_summary('execution',False,value))['package_browser_failure']=='ui_download'
+    value['package_browser_failure']='SECRET private/path'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+    value=full_summary();value['package_browser_failure']='ui_download'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize('raw,expected',[("{\"phase\":\"ui_submit\"}",'ui_submit'),("{\"phase\":\"SECRET/path\"}",'unknown'),('x'*257,'unknown'),('{"phase":"inputs","extra":"secret"}','unknown')])
+def test_package_browser_private_diagnostic_is_bounded(tmp_path,raw,expected):
+    directory=tmp_path/'private/package-browser';directory.mkdir(parents=True)
+    (directory/'failure.json').write_text(raw)
+    assert entry.package_browser_failure(tmp_path)==expected

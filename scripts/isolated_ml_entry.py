@@ -23,8 +23,10 @@ PYTHON = ROOT / 'backend/.venv-delivery/bin/python'
 # Historical E receipts retain the exact seven-stage v2 meaning.
 LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
 INFERENCE_STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
-STAGES = (*INFERENCE_STAGES, 'package_http')
-SCHEMA_VERSION = 4
+PACKAGE_HTTP_STAGES = (*INFERENCE_STAGES, 'package_http')
+STAGES = (*PACKAGE_HTTP_STAGES, 'package_browser')
+SCHEMA_VERSION = 5
+PACKAGE_BROWSER_PHASES = ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_submit', 'ui_result', 'ui_download', 'ui_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete')
 DELIVERY_PHASES = ('bootstrap', 'training_probe', 'export_probe', 'api', 'web', 'browser', 'receipt', 'cleanup', 'unknown', 'ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_responsive', 'ui_complete')
 STAGE_BUDGET = 450
 
@@ -112,11 +114,24 @@ def stage_commands(root: Path = ROOT) -> list[tuple[str, list[str], Path]]:
                               '--junitxml=' + str(root / 'private/inference_policy.xml')], backend),
         ('inference_browser', [python, str(root / 'scripts/inference_e2e.py')], root),
         ('package_http', [python, 'tests/package_http_probe.py'], backend),
+        ('package_browser', [python, str(root/'scripts/package_e2e.py')], root),
     ]
 
 
 PACKAGE_HTTP_PHASES = ('inputs','probe','api','submit','worker','download','standalone','receipt','complete')
 PACKAGE_PROBE_PHASES = ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')
+
+
+def package_browser_failure(root):
+    try:
+        path=root/'private/package-browser/failure.json'
+        if path.is_symlink() or not path.is_file():raise ValueError('phase file')
+        with path.open('rb') as source:raw=source.read(257)
+        if len(raw)>256:raise ValueError('phase size')
+        value=json.loads(raw)
+        if not isinstance(value,dict) or set(value)!={'phase'} or not isinstance(value['phase'],str) or value['phase'] not in PACKAGE_BROWSER_PHASES:raise ValueError('phase value')
+        return value['phase']
+    except Exception:return 'unknown'
 
 
 def delivery_failure(root):
@@ -241,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         result['inference_browser_failure'] = code
     if current == 'browser_delivery' and statuses[current] == 'failed':
         result['browser_delivery_failure'] = delivery_failure(ROOT)
+    if current == 'package_browser' and statuses[current] == 'failed':
+        result['package_browser_failure'] = package_browser_failure(ROOT)
     if current == 'package_http' and statuses[current] == 'failed':
         result['package_http_failure'] = package_failure(ROOT)
     os.umask(previous_mask)
