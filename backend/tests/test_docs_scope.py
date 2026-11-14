@@ -18,7 +18,7 @@ def test_current_acceptance_matrix_keeps_all_sixteen_conditions_once():
     current = (ROOT / 'docs/acceptance.md').read_text().split('## 旧版 A0–A9')[0]
     assert re.findall(r'^\|(A\d{2})\|', current, re.M) == [f'A{number:02}' for number in range(1, 17)]
     assert '当前轮次到此停止' not in current
-    assert 'T060 E' in current and 'E 限定 accepted' in current and 'T070 前置仍为 T060 accepted' in current
+    assert 'T060 E' in current and 'E 限定 accepted' in current and 'T070 已进入管理员任务切片' in current and '整体仍未验收' in current
 
 
 def test_readme_does_not_restore_obsolete_training_or_report_claims():
@@ -44,15 +44,21 @@ def test_export_acceptance_keeps_incremental_native_evidence_separate():
     assert 'T060 整体尚未 accepted' in text
 
 
-def test_current_image_acceptance_stays_scoped_and_keeps_package_pending():
+def test_current_image_and_package_acceptance_remain_scoped_and_version_bound():
     readme = (ROOT / 'README.md').read_text()
-    assert '真实图片推理与独立部署包尚未实现' not in readme
     assert '单图工程限定 accepted' in readme and 'bd8d554' in readme
-    assert '生产能力仍关闭（PACKAGE_SETUP_REQUIRED）' in readme
-    assert '独立环境真模型 probe、UI 和验收待完成' in readme
-    current = (ROOT / 'docs/status.md').read_text().split('以下保留各阶段原始状态')[0]
-    assert 'I 限定 accepted' in current and 'T060 整体与 T070 未验收' in current
-    assert '生产P能力强制关闭（PACKAGE_SETUP_REQUIRED）' in current and '原生验收待完成' in current
+    assert '独立源码包工程限定 accepted' in readme and '685f2ef' in readme
+    assert '每个实际环境仍须当前源码绑定的 probe' in readme
+    assert 'ZIP 不含 Python/wheels' in readme
+    assert 'T070、正式实验与全项目交付尚未验收' in readme
+    current = (ROOT / 'docs/status.md').read_text().split('以下为历史检查点')[0]
+    assert 'T060 P 限定工程 accepted' in current
+    assert 'f3822aa07269b52407df203368b3ff7039802588' in current
+    assert 'T070' in current and '全项目交付未验收' in current
+    evidence = (ROOT / 'docs/evidence/T060-package-acceptance-2026-11-14.md').read_text()
+    assert '43632501786' in evidence and 'package_browser' in evidence
+    assert 'standalone_execution=not_run_for_this_artifact' in evidence
+    assert '不含 Python 解释器或 wheels' in evidence
 
 
 def test_current_api_and_export_text_does_not_restore_pre_inference_claims():

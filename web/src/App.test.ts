@@ -44,6 +44,7 @@ describe('authenticated workspace state', () => {
     let projectPageTwoReads = 0
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -87,6 +88,7 @@ describe('authenticated workspace state', () => {
     let projectReads = 0
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -140,6 +142,7 @@ describe('authenticated workspace state', () => {
     const logoutResponse = deferred<Response>()
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -165,6 +168,7 @@ describe('authenticated workspace state', () => {
   it('clears the workspace when password change reports an invalid session', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -221,6 +225,7 @@ describe('dataset upload client', () => {
     const lateUpload = deferred<Response>()
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -270,6 +275,7 @@ it.each(['export', 'inference', 'package'])('remounts the %s panel on stage navi
   let oldSignal: AbortSignal | undefined, jobReads = 0
   vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
     if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
     if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
     if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -296,6 +302,7 @@ it('invalidates the entire session when an active inference request receives 401
   const project = { id: 'inference-project', owner_id: admin.id, name: 'Inference project', description: '', archived_at: null, created_at: admin.created_at, updated_at: admin.created_at }
   vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
     const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
     if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
     if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
     if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -320,6 +327,7 @@ it.each(['same-user', 'different-user'])('scopes inference recovery to the authe
   let current = first
   vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
     if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
     if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
     if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -341,4 +349,19 @@ it.each(['same-user', 'different-user'])('scopes inference recovery to the authe
   expect(wrapper.find('.pending-recovery').exists()).toBe(mode === 'same-user')
   if (mode === 'same-user') expect(inferenceRequests(first.id, project.id, () => {}).last()?.key).toBe(saved.key)
   wrapper.unmount(); sessionStorage.clear()
+})
+
+it.each(['admin', 'user'] as const)('only renders global task administration for %s session', async role => {
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url=String(input)
+    if (url.endsWith('/auth/me')) return Promise.resolve(json({...admin,role}))
+    if (url.endsWith('/health/live')) return Promise.resolve(json({status:'ok'}))
+    if (url.endsWith('/health/ready')) return Promise.resolve(json({status:'ready'}))
+    if (url.endsWith('/capabilities')) return Promise.resolve(json({features}))
+    if (url.includes('?')) return Promise.resolve(json(emptyPage))
+    throw new Error(`unhandled ${url}`)
+  }))
+  const w=mount(App); await settle()
+  expect(w.find('[aria-label="管理员全局任务"]').exists()).toBe(role === 'admin')
+  w.unmount()
 })

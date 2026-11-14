@@ -661,4 +661,6 @@ def admin_jobs(request: Request, page: int = Query(1, ge=1), page_size: int = Qu
     with api_transaction() as connection:
         actor = require_actor(connection, request)
         require_admin(actor)
-    not_implemented()
+        total = connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        rows = connection.execute("SELECT * FROM jobs ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?", (page_size, (page - 1) * page_size)).fetchall()
+        return {"items": [job_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}

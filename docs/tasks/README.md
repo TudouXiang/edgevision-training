@@ -10,8 +10,8 @@
 |[T030 数据导入/校验核心](T030-dataset-core.md)|实现Agent|T020通过|accepted（Linux 核心）；[三项浏览器回归](../evidence/T030-browser-acceptance-2026-11-04.md)|
 |[T040 Worker与校验任务接线](T040-worker.md)|实现Agent|T030通过、进程方案明确|accepted（已实测范围）；[跨平台验收与限制](../evidence/T040-cross-platform-acceptance-2026-11-04.md)|
 |[T050 真实训练](T050-training.md)|实现Agent|T040通过、ML链路已核验|accepted（固定 Linux CPU 小规模闭环）；[验收与限制](../evidence/T050-ci-acceptance-2026-11-04.md)|
-|[T060 ONNX/推理/部署包](T060-onnx-deployment.md)|实现Agent|T050通过|E 限定accepted；I固定Linux CPU限定accepted；P仍501、可设计实施；[E验收](../evidence/T060-export-acceptance-2026-11-05.md)、[I整合证据](../evidence/T060-image-integration-2026-11-05.md)|
-|[T070 管理端/端到端/实验](T070-final-validation.md)|实现Agent，GPT6审查|T060通过|blocked；不得越过 T060 accepted 闸门|
+|[T060 ONNX/推理/部署包](T060-onnx-deployment.md)|实现Agent|T050通过|E/I/P 固定 Linux CPU 工程限定 accepted；[分阶段报告](../evidence/T060-report.md)、[P 精确验收](../evidence/T060-package-acceptance-2026-11-14.md)|
+|[T070 管理端/端到端/实验](T070-final-validation.md)|实现Agent，GPT6审查|T060通过|in_progress：前置限定工程路径已验收；管理员任务切片实施中，整体未验收|
 
 T060 按同一契约内的 E（导出）、I（推理）、P（模板包）顺序推进，不借拆任务增加产品范围。普通轻量 / 浏览器 CI 不替代真实 ONNX / ORT、隔离模型执行或 ML 浏览器验收；正在执行的验证以项目状态和新增证据为准。
 

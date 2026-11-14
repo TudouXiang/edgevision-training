@@ -42,3 +42,12 @@ it('preserves preview authentication errors and rejects unexpected content types
   vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'SESSION_EXPIRED', message: '会话失效' } }), { status: 401 })).mockResolvedValueOnce(new Response('html', { headers: { 'Content-Type': 'text/html' } })))
   await expect(inferenceApi.preview('result')).rejects.toMatchObject({ status: 401, code: 'SESSION_EXPIRED' }); await expect(inferenceApi.preview('result')).rejects.toThrow('Unexpected preview format')
 })
+
+it('reads bounded administrator task pages with same-origin session and cancellation signal',async()=>{
+ const {adminApi}=await import('./api')
+ const fetch=vi.fn().mockResolvedValue(new Response(JSON.stringify({items:[],total:0,page:2,page_size:20})))
+ vi.stubGlobal('fetch',fetch); const signal=new AbortController().signal
+ await adminApi.jobs(2,20,signal)
+ expect(fetch.mock.calls[0][0]).toBe('/api/v1/admin/jobs?page=2&page_size=20')
+ expect(fetch.mock.calls[0][1]).toMatchObject({credentials:'same-origin',signal})
+})

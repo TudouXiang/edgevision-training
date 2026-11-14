@@ -17,7 +17,7 @@
 | GET /projects/{id}/artifacts、GET /artifacts/{id}、/download | Page[ArtifactPublic]、ArtifactPublic、鉴权文件流 | 已实现dataset_report/PT/ONNX及I结果列表、详情与受限下载；unverified原图片不提供下载 |
 | POST /projects/{id}/images、GET /inferences/{id}、GET /inferences/{id}/image | 单图multipart返回InferenceInputArtifactPublic；结果为InferenceResult与鉴权净化PNG | I源码已实现；上传只存unverified字节，解码在受管子进程，固定 Linux CPU 实际模型/HTTP/浏览器已限定验收，其他环境需本地probe |
 | GET/POST /admin/users、PATCH /admin/users/{id}、GET /admin/projects | UserCreate/Update/Public、项目分页 | T020 已实现，accepted（Linux CI）；最后一个启用管理员不能被禁用 |
-| GET /admin/jobs | Page[JobPublic] | T070；管理员身份校验后仍返回 501 |
+| GET /admin/jobs | Page[JobPublic] | T070 候选已实现；管理员全局真实有界分页，待完整回归/浏览器审查 |
 
 JobCreate.kind 只接受 dataset_check/train/export_onnx/infer/package 且 params 与 kind 配对，不透传任意键。训练限预置 yolo11n.pt、epochs 1–100、batch 1–16、imgsz 320/640、cpu 或 cuda:0、seed 0–4294967295、学习率 1e-6–0.1；设备的 DTO 可解析不代表已验证可执行。导出限 batch=1/FP32/640；opset 与后处理须在目标版本真实烟测后锁定，当前不能接受任意 opset。推理DTO只可引用受限单图上传登记的图片artifact ID与本项目可信模型；真实执行须当前代码绑定的I双模式probe。
 
@@ -25,7 +25,7 @@ JobCreate.kind 只接受 dataset_check/train/export_onnx/infer/package 且 param
 
 登录及所有修改请求拒绝缺失、`null` 或不在明确允许列表中的 Origin。服务端只保存随机 session/CSRF 令牌的 SHA-256，浏览器收到 HttpOnly `edgevision_session` 与可供同源前端读取的 `edgevision_csrf`；修改请求同时验证 Origin、Cookie 和 `X-CSRF-Token`。改密撤销该用户所有旧会话并签发一组新令牌；登出、过期、禁用和撤销立即在后端查询时生效。密码采用 Argon2id。开发 Origin 与 HTTPS/Secure Cookie 配置见 README 和 ADR 0007。
 
-旧 SSE 路径和 /training-jobs 等历史路径不再属于本候选契约；理由与迁移见 ADR 0005。旧源码可用 Git 历史回溯，不向用户隐式返回模拟成功。T030 multipart 已真实受限落盘；异步 check 已接入固定 Worker；训练/导出/推理按各自当前probe放行，部署仍未实现；pending数据集不能训练或预览。
+旧 SSE 路径和 /training-jobs 等历史路径不再属于本候选契约；理由与迁移见 ADR 0005。旧源码可用 Git 历史回溯，不向用户隐式返回模拟成功。T030 multipart 已真实受限落盘；异步 check 已接入固定 Worker；训练/导出/推理按各自当前probe放行，部署按当前 P proof 放行；pending数据集不能训练或预览。
 
 
 T040 DatasetPublic 新增可空 validation_job_id/report_artifact_id；当前报告指针不指向上一次尝试。同一 Dataset 有 queued/running/cancelling 时不同键复用该活动 Job；ready 不能重新校验，上传新版本才能变更。取消/中断/基础设施失败恢复 pending，真实内容错误为 invalid + DATASET_INVALID 报告。归档拒绝全新提交，不影响已有任务完成/取消；同键重放仍可读取原任务。

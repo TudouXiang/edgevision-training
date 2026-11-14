@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import JobPanel from './components/JobPanel.vue'
+import AdminJobsPanel from './components/AdminJobsPanel.vue'
 import TrainingPanel from './components/TrainingPanel.vue'
 import ExportPanel from './components/ExportPanel.vue'
 import PackagePanel from './components/PackagePanel.vue'
@@ -498,6 +499,7 @@ onUnmounted(() => { sessionController?.abort(); systemController?.abort() })
       <PackagePanel v-if="selectedProject && user" :key="`package-${generation}-${selectedProjectId}-${route?.fullPath ?? ''}`" :user-id="user.id" :project="selectedProject" :capability="capabilities?.features.deployment" @error="handleError" />
       <InferencePanel v-if="selectedProject" :user-id="user.id" :key="`inference-${generation}-${selectedProjectId}-${route?.fullPath ?? ''}`" :project="selectedProject" :pt-capability="capabilities?.features.pt_inference" :onnx-capability="capabilities?.features.onnx_inference" @error="handleError" />
       <section class="panel"><h2><ShieldCheck :size="20" />账号安全</h2><form class="grid-form" @submit.prevent="changePassword"><label>当前密码<input v-model="currentPassword" required type="password" autocomplete="current-password" /></label><label>新密码<input v-model="replacementPassword" required minlength="12" maxlength="256" type="password" autocomplete="new-password" /></label><button :disabled="changingPassword" type="submit">{{ changingPassword ? '更新中…' : '修改密码' }}</button></form><p v-if="accountMessage" class="note" aria-live="polite">{{ accountMessage }}</p></section>
+      <AdminJobsPanel v-if="isAdmin" :key="`admin-jobs-${generation}`" @error="handleError" />
       <section v-if="isAdmin" class="panel"><div class="section-title"><h2><UserPlus :size="20" />用户管理</h2><span>已显示 {{ users.length }} / {{ userTotal }}</span></div><form class="grid-form admin-create" @submit.prevent="createUser"><label>用户名<input v-model="newUsername" required maxlength="128" /></label><label>初始密码<input v-model="newPassword" required minlength="12" maxlength="256" type="password" autocomplete="new-password" /></label><label>角色<select v-model="newRole"><option value="user">普通用户</option><option value="admin">管理员</option></select></label><button class="primary" :disabled="creatingUser" type="submit">{{ creatingUser ? '创建中…' : '创建用户' }}</button></form><article v-for="entry in users" :key="entry.id" class="row-card user-row"><div><div class="row-title"><strong>{{ entry.username }}</strong><span>{{ entry.role }}</span></div><small>{{ entry.is_active ? '账号已启用' : '账号已禁用' }}</small></div><button :disabled="userBusy === entry.id" @click="setUserActive(entry, !entry.is_active)">{{ entry.is_active ? '禁用' : '启用' }}</button></article><button v-if="users.length < userTotal" class="load-more" :disabled="loadingMoreUsers" @click="loadMoreUsers">{{ loadingMoreUsers ? '加载中…' : '加载更多用户' }}</button></section>
     </div>
   </div>

@@ -114,6 +114,7 @@ export const datasetApi = {
 }
 
 export const adminApi = {
+  jobs: (page = 1, pageSize = 20, signal?: AbortSignal) => request<JobPage>(`/admin/jobs?page=${page}&page_size=${pageSize}`, { signal }),
   users: (page = 1, pageSize = 20, signal?: AbortSignal) => request<UserPage>(`/admin/users?page=${page}&page_size=${pageSize}`, { signal }),
   createUser: (body: UserCreateBody, signal?: AbortSignal) => request<User>('/admin/users', { method: 'POST', body: JSON.stringify(body), signal }),
   setUserActive: (id: string, is_active: boolean, signal?: AbortSignal) => request<User>(`/admin/users/${id}`, {
