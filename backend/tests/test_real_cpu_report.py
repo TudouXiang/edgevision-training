@@ -94,3 +94,32 @@ def test_load_cost_is_separate_from_twenty_samples():
     result=m.measurements({key:[1]*20 for key in m.SERIES},{'pt':100.,'onnx':20.})
     assert result['model_load_ms']=={'pt':100.,'onnx':20.}
     with pytest.raises(ValueError):m.measurements({key:[1]*20 for key in m.SERIES},{'pt':True,'onnx':20.})
+
+
+def test_export_diagnostic_is_closed_and_failure_only():
+    m=load();v=m.initial()
+    v['stages'][m.STAGES.index('export')]['status']='failed'
+    v['export_failure']={'phase':'export_probe','error':'process_failed'}
+    assert m.validate(json.dumps(v))==v
+    for bad in ({'phase':'private/path','error':'unknown'}, {'phase':'export_probe','error':'secret'}, {'phase':'export_probe','error':'unknown','message':'secret'}):
+        v['export_failure']=bad
+        with pytest.raises(ValueError):m.validate(json.dumps(v))
+    v['export_failure']={'phase':'export_result','error':'assertion'}
+    v['stages'][m.STAGES.index('export')]['status']='passed'
+    with pytest.raises(ValueError):m.validate(json.dumps(v))
+
+
+def test_all_export_codes_and_phases_and_nonfailed_stages():
+    m=load();v=m.initial();index=m.STAGES.index('export')
+    v['stages'][index]['status']='failed'
+    for phase in m.EXPORT_PHASES:
+        for error in m.EXPORT_ERRORS:
+            v['export_failure']={'phase':phase,'error':error}
+            assert m.validate(json.dumps(v))==v
+    for status in ('passed','NOT_RUN','unverified'):
+        v['stages'][index]['status']=status
+        with pytest.raises(ValueError):m.validate(json.dumps(v))
+    v['stages'][index]['status']='failed'
+    for bad in (None,[],42,{}, {'phase':[], 'error':'unknown'}, {'phase':'export_probe','error':42}):
+        v['export_failure']=bad
+        with pytest.raises(ValueError):m.validate(json.dumps(v))

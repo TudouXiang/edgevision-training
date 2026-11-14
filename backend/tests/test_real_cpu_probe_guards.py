@@ -48,3 +48,31 @@ def test_cleanup_never_promotes_interrupted_or_unsettled_run(monkeypatch):
     def denied(_):raise RuntimeError('stop failed')
     monkeypatch.setattr(m,'stop',denied)
     assert m.cleanup_owned(True,[None],lambda:True)=='failed'
+
+
+@pytest.mark.parametrize('error,expected',[(AssertionError('private'),'assertion'),(ValueError('private'),'contract'),(RuntimeError('private'),'unknown')])
+def test_export_step_records_only_closed_class(error,expected):
+    m=probe();result={}
+    with pytest.raises(type(error)):
+        with m.export_step(result,'export_result'):
+            raise error
+    assert result=={'export_failure':{'phase':'export_result','error':expected}}
+
+
+def test_export_step_rejects_untrusted_phase_and_does_not_mark_success():
+    m=probe();result={}
+    with pytest.raises(ValueError):
+        with m.export_step(result,'private/path'):pass
+    assert result=={}
+    with m.export_step(result,'export_probe'):pass
+    assert result=={}
+
+
+def test_export_process_failures_never_expose_command_or_output():
+    import subprocess
+    m=probe()
+    for error,expected in ((subprocess.TimeoutExpired(['secret'],1,output='secret'),'timeout'),(subprocess.CalledProcessError(27,['secret'],output='secret'),'process_failed')):
+        result={}
+        with pytest.raises(type(error)):
+            with m.export_step(result,'export_probe'):raise error
+        assert result=={'export_failure':{'phase':'export_probe','error':expected}}

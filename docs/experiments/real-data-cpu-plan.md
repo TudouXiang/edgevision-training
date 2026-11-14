@@ -64,3 +64,11 @@
 恢复演练保留产品权限：`inference_input`下载应为409，不能为验收修改成200；其字节由停写后的全文件hash恢复校验覆盖，可下载产物核对200/长度/hash。恢复至全新私有目录，原会话与元数据读取校验不代表新主机原生能力已验收。
 
 预检发现 `.12g` YOLO标签转换回像素时一个零边界为 -1.875e-10 像素。由于源VOC为整数坐标，评价阶段仅在每坐标距整数<=1e-6像素且整数框严格在图内时恢复原整数，不夹紧任意坏框。20个冻结测试框已实际通过此验证；平台自身数据验证器也已验证100图/100标注（60/20/20），这些都不是模型结果。
+
+## 首次真实隔离运行记录
+
+[普通 CI #58](https://github.com/TudouXiang/edgevision-training/actions/runs/43647831716) 在 `a31f365937cb603ca50360fb64c22510b9e3306d` 通过：943 backend / 157 frontend、生产构建、契约、HTTP 重启及浏览器 5 passed / 1 预期跳过，Windows 进程检查通过。
+
+同一提交的[真实 CPU #59](https://github.com/TudouXiang/edgevision-training/actions/runs/43648780095) 明确通过 isolation、dataset、dependency_check、training，随后 export failed。evaluation、timings、cancel、worker_recovery、backup_restore 为 NOT_RUN，cleanup 为 unverified；没有精度或时延结果。训练通过不代表整体验收完成，不改冻结数据或阈值以追求通过。
+
+下一诊断仅增加可选 `export_failure={phase,error}` 闭集，且仅在 export failed / 总状态 failed 允许。分辨导出探测、提交、Worker、结果、下载、血缘，以及末尾的推理能力探测。`inference_probe` 失败不等于模型导出本身失败。`contract` 仅是值/结构检查类异常，不宣称一定为 HTTP 错误。异常文本、命令、路径、ID 和返回码均不公开；原断言、超时和清理门禁不变。

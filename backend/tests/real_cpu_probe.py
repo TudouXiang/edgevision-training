@@ -37,6 +37,21 @@ def command(args,log,timeout=120):
     subprocess.run([sys.executable,*args],cwd=ROOT/'backend',check=True,stdout=log,stderr=log,timeout=timeout)
 
 
+@contextmanager
+def export_step(result,phase):
+    report=load('real_cpu_report')
+    if phase not in report.EXPORT_PHASES:raise ValueError('invalid export phase')
+    try:yield
+    except BaseException as error:
+        category='unknown'
+        if isinstance(error,subprocess.TimeoutExpired):category='timeout'
+        elif isinstance(error,subprocess.CalledProcessError):category='process_failed'
+        elif isinstance(error,AssertionError):category='assertion'
+        elif isinstance(error,(ValueError,KeyError,TypeError,StopIteration)):category='contract'
+        result['export_failure']={'phase':phase,'error':category}
+        raise
+
+
 def stop(process):
     if process is None:return
     if process.poll() is None:
@@ -165,13 +180,21 @@ def run(result,save,log):
             download(pt,PRIVATE/'trained.pt')
             (PRIVATE/'validation-metrics.json').write_text(client.get(f'/api/v1/jobs/{training}/metrics').text)
         with stage('export'):
-            command(['-m','app.export_probe'],log,180)
-            export=submit({'kind':'export_onnx','params':{'model_artifact_id':pt['id'],'imgsz':640,'batch':1,'precision':'fp32'}},'real-export')
-            once(180);assert job(export)['state']=='succeeded'
-            onnx=next(a for a in artifacts() if a['kind']=='onnx' and a['job_id']==export)
-            download(onnx,PRIVATE/'trained.onnx')
-            assert onnx['metadata']['provenance']['source_sha256']==pt['sha256']
-            command(['-m','app.inference_probe','--onnx-artifact-id',onnx['id']],log,180)
+            with export_step(result,'export_probe'):
+                command(['-m','app.export_probe'],log,180)
+            with export_step(result,'export_submit'):
+                export=submit({'kind':'export_onnx','params':{'model_artifact_id':pt['id'],'imgsz':640,'batch':1,'precision':'fp32'}},'real-export')
+            with export_step(result,'export_worker'):
+                once(180)
+            with export_step(result,'export_result'):
+                assert job(export)['state']=='succeeded'
+                onnx=next(a for a in artifacts() if a['kind']=='onnx' and a['job_id']==export)
+            with export_step(result,'export_download'):
+                download(onnx,PRIVATE/'trained.onnx')
+            with export_step(result,'export_lineage'):
+                assert onnx['metadata']['provenance']['source_sha256']==pt['sha256']
+            with export_step(result,'inference_probe'):
+                command(['-m','app.inference_probe','--onnx-artifact-id',onnx['id']],log,180)
         measured={};series={}
         with stage('evaluation'):
             for backend in ('pt','onnx'):
