@@ -26,7 +26,7 @@ from .dataset_validation import DatasetValidationError, inspect_dataset_archive
 from .schemas import (
     ApiError, ArtifactPublic, CapabilitiesResponse, ChangePasswordRequest,
     DatasetPublic, DatasetSamplePublic, FeatureCapability, Incremental, JobAccepted, JobCreate,
-    InferenceResult, JobLog, JobPublic, LiveResponse, LoginRequest, Metric, Page, ProjectCreate,
+    InferenceResult, InferenceInputArtifactPublic, JobLog, JobPublic, LiveResponse, LoginRequest, Metric, Page, ProjectCreate,
     ProjectPublic, ProjectUpdate, ReadyResponse, UserCreate, UserPublic, UserUpdate,
 )
 from .security import (
@@ -115,13 +115,14 @@ def available() -> FeatureCapability:
 def capabilities():
     from .training_assets import capability
     from .export_assets import capability as export_capability
+    from .inference_assets import capability as inference_capability
     return {
         "schema_version": 1,
         "features": {
             "auth": available(), "projects": available(), "datasets": available(),
             "training_cpu": capability(), "training_cuda": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="CUDA device not verified", detected_version=None),
             "events": available(), "dataset_check": available(), "models": available(), "onnx_export": export_capability(),
-            "pt_inference": unavailable("ultralytics"), "onnx_inference": unavailable("onnxruntime"),
+            "pt_inference": inference_capability(), "onnx_inference": inference_capability(),
             "deployment": unavailable(), "rknn": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="No RKNN target or board verification", detected_version=None),
         },
     }
@@ -363,10 +364,10 @@ async def upload_dataset(project_id: UUID, request: Request):
             pass
 
 
-@app.post(API + "/projects/{project_id}/images", response_model=ArtifactPublic, status_code=201, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES}, openapi_extra=_UPLOAD_BODY)
-def upload_image(project_id: UUID, request: Request):
-    guard_project(request, project_id, mutation=True, require_active=True)
-    not_implemented()
+@app.post(API + "/projects/{project_id}/images", response_model=InferenceInputArtifactPublic, status_code=201, responses={**_AUTH_RESPONSES, **_DATASET_UPLOAD_RESPONSES, **_JOB_RESPONSES}, openapi_extra=_UPLOAD_BODY)
+async def upload_image(project_id: UUID, request: Request):
+    from .image_storage import upload
+    return await upload(str(project_id), request)
 
 
 @app.get(API + "/datasets/{dataset_id}", response_model=DatasetPublic, responses={**_AUTH_RESPONSES, **_DATASET_READ_RESPONSES})
@@ -442,7 +443,7 @@ def dataset_sample_image(dataset_id: UUID, sample_id: str, request: Request):
 def create_job(project_id: UUID, body: JobCreate, request: Request, idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=128)):
     require_allowed_origin(request)
     with api_transaction() as connection:
-        if body.kind != JobKind.EXPORT_ONNX:
+        if body.kind not in {JobKind.EXPORT_ONNX, JobKind.INFER}:
             begin_write(connection)
         actor = require_actor(connection, request, csrf=True)
         project = project_for_actor(connection, str(project_id), actor)
@@ -452,6 +453,9 @@ def create_job(project_id: UUID, body: JobCreate, request: Request, idempotency_
         if body.kind == JobKind.EXPORT_ONNX:
             from .export_service import submit_export
             return submit_export(connection, actor, str(project_id), body.params, idempotency_key, request.url.path, request)
+        if body.kind == JobKind.INFER:
+            from .inference_service import submit_inference
+            return submit_inference(connection, actor, str(project_id), body.params, str(body.source_job_id) if body.source_job_id else None, idempotency_key, request.url.path, request)
         if body.kind != JobKind.DATASET_CHECK:
             active_project(project)
             not_implemented()
@@ -502,6 +506,15 @@ def metrics(job_id: UUID, request: Request, cursor: str | None = None, limit: in
         return incremental(connection, str(job_id), "metric", cursor, limit)
 
 
+def image_aware_artifact_public(row):
+    if row['kind'] not in {'inference_input', 'inference_result'}:
+        return artifact_public(row)
+    try:
+        return ArtifactPublic.model_validate(artifact_public(row)).model_dump(mode='json')
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(409, {'code': 'ARTIFACT_UNAVAILABLE', 'message': 'Image artifact metadata is unavailable or changed'}) from exc
+
+
 @app.get(API + "/projects/{project_id}/artifacts", response_model=Page[ArtifactPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
 def artifacts(project_id: UUID, request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
     with api_transaction() as connection:
@@ -509,7 +522,7 @@ def artifacts(project_id: UUID, request: Request, page: int = Query(1, ge=1), pa
         project_for_actor(connection, str(project_id), actor)
         total = connection.execute("SELECT COUNT(*) FROM artifacts WHERE project_id=?", (str(project_id),)).fetchone()[0]
         rows = connection.execute("SELECT * FROM artifacts WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?", (str(project_id), page_size, (page-1)*page_size)).fetchall()
-        return {"items": [artifact_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}
+        return {"items": [image_aware_artifact_public(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
 @app.get(API + "/artifacts/{artifact_id}", response_model=ArtifactPublic, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
@@ -517,7 +530,7 @@ def artifact(artifact_id: UUID, request: Request):
     with api_transaction() as connection:
         actor = require_actor(connection, request)
         project_for_resource(connection, "artifacts", str(artifact_id), actor)
-        return artifact_public(connection.execute("SELECT * FROM artifacts WHERE id=?", (str(artifact_id),)).fetchone())
+        return image_aware_artifact_public(connection.execute("SELECT * FROM artifacts WHERE id=?", (str(artifact_id),)).fetchone())
 
 
 @app.get(API + "/artifacts/{artifact_id}/download", response_class=Response, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, 200: {"content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}})
@@ -532,6 +545,11 @@ def download_artifact(artifact_id: UUID, request: Request):
     if row["kind"] == "onnx":
         from .export_download import download_onnx
         return download_onnx(row, str(artifact_id))
+    if row["kind"] == "inference_result":
+        from .inference_download import download
+        return download(row)
+    if row["kind"] == "inference_input":
+        raise HTTPException(409, {"code": "ARTIFACT_UNAVAILABLE", "message": "Unverified image sources are not downloadable"})
     if row["kind"] != "dataset_report":
         not_implemented()
     if row["validation_status"] != "passed":
@@ -552,10 +570,26 @@ def download_artifact(artifact_id: UUID, request: Request):
     return Response(content, media_type="application/json", headers={"Content-Disposition": f'attachment; filename="dataset-report-{artifact_id}.json"', "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
-@app.get(API + "/inferences/{inference_id}", response_model=InferenceResult, responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
+@app.get(API + "/inferences/{inference_id}", response_model=InferenceResult, responses={**_AUTH_RESPONSES, **_JOB_RESPONSES})
 def inference_result(inference_id: UUID, request: Request):
-    guard_resource(request, "artifacts", inference_id)
-    not_implemented()
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, 'artifacts', str(inference_id), actor)
+        row = connection.execute("SELECT * FROM artifacts WHERE id=? AND kind='inference_result'", (str(inference_id),)).fetchone()
+    if not row: raise HTTPException(404, {'code': 'RESOURCE_NOT_FOUND', 'message': 'Inference result was not found'})
+    from .inference_download import result
+    return result(row)
+
+
+@app.get(API + "/inferences/{inference_id}/image", response_class=Response, responses={**_AUTH_RESPONSES, **_JOB_RESPONSES, 200: {"content": {"image/png": {"schema": {"type": "string", "format": "binary"}}}}})
+def inference_image(inference_id: UUID, request: Request):
+    with api_transaction() as connection:
+        actor = require_actor(connection, request)
+        project_for_resource(connection, 'artifacts', str(inference_id), actor)
+        row = connection.execute("SELECT * FROM artifacts WHERE id=? AND kind='inference_result'", (str(inference_id),)).fetchone()
+    if not row: raise HTTPException(404, {'code': 'RESOURCE_NOT_FOUND', 'message': 'Inference result was not found'})
+    from .inference_download import download
+    return download(row, preview=True)
 
 
 @app.get(API + "/admin/users", response_model=Page[UserPublic], responses=_AUTH_RESPONSES)

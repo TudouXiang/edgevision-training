@@ -56,3 +56,22 @@ T040 单个协议文档/报告上限 16 MiB，可能先于 20000 个条目触发
 
 全量数据、PT、ONNX 文件与运行身份校验在 SQLite 只读快照下完成，不能持有唯一 writer 做长时间 hash。
 提交与发布最终事务仅做已验证数据库行的精确比较、当前授权/状态/幂等检查及插入/CAS。并发取消、项目归档、用户禁用和会话撤销可在 hash 期间完成，并在最终事务被识别。
+
+## T060 I 原图和结果束
+
+图片输入 `images/{artifact_id}/source.jpg|png` 为50MiB内不可变原bytes，Artifact始终unverified且job_id=null。
+保存原bytes hash/size和声明format；不会让不同infer任务回写原输入宽高、状态或去元数据内容。
+HTTP只有有界上传，真实图片decode发生在共享受管执行槽内。
+
+infer run仍在 `jobs/{job_id}/runs/{run_id}`，复制可信模型和图片并冻结input.json；三文件束严格为
+result.json/metadata.json/preview.png。JSON每份<=1MiB，净化PNG<=8MiB，最大边1280，不放大。
+退出0不足以成功：drain/guardian退出证明→源与copy/完整束核验→intent→同卷rename至
+`inferences/{job_id}/{run_id}`→目标再核验→短事务登记passed inference_result并CAS成功。
+原图保留，取消/中断不修改原输入或其他成功结果，孤儿不自动升级成功。
+
+`inference-capability.json`是当前代码/解释器/锁/依赖绑定的新双模式图片能力记录；operator入口
+`python -m app.inference_probe --onnx-artifact-id <成功E的ONNX Artifact UUID>` 从同项目父PT构建来源对，
+共享worker.lock和training-probe-active.json，顺序两个全新guardian子进程，各自真实执行自有合成图。
+探针每次尝试先置available=false。两份私有raw.f32le各<=33,734,400字节，只有全树退出后才以stdlib
+有界同描述符逐元素比较；raw不在最终三文件束/公开报告/源码/备份上传中。
+该真实入口源码已具备，运行仍需精确SHA与非特权无外网边界审查授权，当前没有实际执行。

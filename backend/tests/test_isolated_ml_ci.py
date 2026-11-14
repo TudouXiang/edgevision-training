@@ -28,7 +28,7 @@ CID = 'c' * 64
 
 
 def full_summary():
-    return {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
+    return {'schema_version': ci.SCHEMA_VERSION, 'stage': 'isolated_ml', 'status': 'passed',
             'stages': [{'stage': stage, 'status': 'passed'} for stage in ci.STAGES]}
 
 
@@ -299,13 +299,13 @@ def test_stage_order_shared_deadline_and_private_logs(tmp_path, monkeypatch, cap
     monkeypatch.setattr(entry, 'ROOT', tmp_path)
     monkeypatch.setattr(entry, 'verify_boundary', lambda *a: None)
     monkeypatch.setattr(entry, 'stage_commands', lambda: [(stage, ['never-run'], tmp_path) for stage in ci.STAGES[1:]])
-    times = iter([0, 10, 20, 30, 40, 50, 60])
+    times = iter(range(0, 10 * len(ci.STAGES), 10))
     monkeypatch.setattr(entry.time, 'monotonic', lambda: next(times))
     calls = []
     monkeypatch.setattr(entry, 'run_stage', lambda *args: calls.append(args))
     monkeypatch.setattr(entry, 'verify_policy_report', lambda *args: None)
     assert entry.main(['--host-netns', 'net:[123]']) == 0
-    assert [call[-1] for call in calls] == [440, 430, 420, 410, 400, 390]
+    assert [call[-1] for call in calls] == [450 - 10 * i for i in range(1, len(ci.STAGES))]
     assert all(call[3].parent == tmp_path / 'private' for call in calls)
     assert all(call[2]['EDGEVISION_ONNX_POLICY_ROOT'] == str(tmp_path / 'private/http') for call in calls)
     assert ci.validate_summary(capsys.readouterr().out) == full_summary()
@@ -768,7 +768,7 @@ def test_dependency_failure_prevents_every_ml_stage(tmp_path, monkeypatch, capsy
     output = capsys.readouterr()
     assert 'private dependency conflict' not in output.out + output.err
     result = ci.validate_summary(output.out)
-    assert [row['status'] for row in result['stages']] == ['passed', 'failed'] + ['NOT_RUN'] * 5
+    assert [row['status'] for row in result['stages']] == ['passed', 'failed'] + ['NOT_RUN'] * (len(ci.STAGES) - 2)
 
 
 def test_tool_python_path_override_rejected_before_copy(tmp_path):
@@ -778,3 +778,80 @@ def test_tool_python_path_override_rejected_before_copy(tmp_path):
     destination = tmp_path / 'destination'
     with pytest.raises(ci.IsolationError): ci.copy_tool_prefix(source, destination, python=True)
     assert not destination.exists()
+
+
+def test_image_stages_have_new_schema_without_relabelling_historical_e():
+    assert ci.SCHEMA_VERSION == entry.SCHEMA_VERSION == 3
+    assert ci.STAGES == entry.STAGES == (*ci.LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+    historic = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
+                'stages': [{'stage': name, 'status': 'passed'} for name in ci.LEGACY_STAGES]}
+    assert ci.validate_summary(json.dumps(historic)) == historic
+    # Archive decoding does not authorize upgrading seven-stage evidence into I.
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(historic), expected_version=3)
+    with pytest.raises(ci.IsolationError):
+        ci.public_summary('complete', True, historic)
+    historic['schema_version'] = 3
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(historic))
+
+
+def test_image_stages_keep_budget_and_original_boundary(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(entry, 'ROOT', tmp_path)
+    monkeypatch.setattr(entry, 'verify_boundary', lambda *args: None)
+    calls = []
+    reports = []
+    monkeypatch.setattr(entry, 'run_stage', lambda *args: calls.append(args))
+    monkeypatch.setattr(entry, 'verify_policy_report', lambda path: reports.append(path.name))
+    assert entry.main(['--host-netns', 'net:[123]']) == 0
+    assert entry.STAGE_BUDGET == 450 and ci.EXECUTION_TIMEOUT == 480
+    assert reports == ['onnx_policy.xml', 'training_policy.xml', 'inference_policy.xml']
+    for _, _, environment, _, remaining in calls:
+        assert environment['EDGEVISION_INFERENCE_HTTP_ROOT'] == environment['PLATFORM_DATA_ROOT']
+        assert environment['EDGEVISION_INFERENCE_POLICY_ROOT'] == environment['PLATFORM_DATA_ROOT']
+        assert environment['ORT_DISABLE_TELEMETRY'] == '1' and 0 < remaining <= 450
+    assert ci.validate_summary(capsys.readouterr().out)['schema_version'] == 3
+
+
+def test_old_receipt_cannot_pass_new_container_execution(tmp_path):
+    class OldReceiptDocker(FakeDocker):
+        def docker(self, args, **kwargs):
+            if args[0] == 'start':
+                return json.dumps({'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
+                    'stages': [{'stage': name, 'status': 'passed'} for name in ci.LEGACY_STAGES]})
+            return super().docker(args, **kwargs)
+    docker = OldReceiptDocker(tmp_path)
+    result = ci.IsolatedRun(docker, tmp_path, token=TOKEN).run(tmp_path)
+    assert result['status'] == 'failed' and result['schema_version'] == 3
+    assert all(row['status'] == 'unverified' for row in result['stages'])
+    assert docker.current is None
+
+
+@pytest.mark.parametrize('missing', ['inference_http_probe.py', 'test_inference_runtime_policy.py', 'inference_policy_probe.py'])
+def test_image_inputs_must_be_present_in_frozen_source(tmp_path, missing):
+    git = FakeGit()
+    git.tree = ''.join(record + '\0' for record in git.tree.split('\0') if record and missing not in record)
+    with pytest.raises(ci.IsolationError):
+        ci.freeze_source(tmp_path, tmp_path / 'context', git, git.commit)
+
+
+@pytest.mark.parametrize('fault', ['missing', 'duplicate', 'order', 'old_version'])
+def test_current_image_summary_requires_exact_ten_stage_schema(fault):
+    payload = full_summary()
+    if fault == 'missing':
+        payload['stages'].pop()
+    elif fault == 'duplicate':
+        payload['stages'][-1] = payload['stages'][-2].copy()
+    elif fault == 'order':
+        payload['stages'][-1], payload['stages'][-2] = payload['stages'][-2], payload['stages'][-1]
+    else:
+        payload['schema_version'] = 2
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(payload), expected_version=3)
+
+
+def test_current_stage_order_requires_real_image_browser_source():
+    assert len(ci.STAGES) == 10
+    assert ci.STAGES[:7] == ci.LEGACY_STAGES
+    assert entry.stage_commands()[-1][1][-1] == '/opt/edgevision/scripts/inference_e2e.py'
+    assert {'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts'}.issubset(ci.REQUIRED_SOURCE)

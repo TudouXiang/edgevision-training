@@ -167,8 +167,8 @@ class InferenceParams(StrictModel):
     model_artifact_id: UUID
     image_artifact_id: UUID
     backend: Literal["pt", "onnx"]
-    confidence: FiniteFloat = Field(ge=0, le=1, default=0.25)
-    iou: FiniteFloat = Field(ge=0, le=1, default=0.45)
+    confidence: FiniteFloat = Field(strict=True, ge=0, le=1, default=0.25)
+    iou: FiniteFloat = Field(strict=True, ge=0, le=1, default=0.45)
 
 
 class PackageParams(StrictModel):
@@ -194,6 +194,7 @@ class ExportJobCreate(StrictModel):
 class InferenceJobCreate(StrictModel):
     kind: Literal[JobKind.INFER]
     params: InferenceParams
+    source_job_id: UUID | None = None
 
 
 class PackageJobCreate(StrictModel):
@@ -238,6 +239,24 @@ class ExportJobSource(StrictModel):
     code_version: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class InferenceJobSource(StrictModel):
+    model_artifact_id: UUID
+    model_job_id: UUID
+    model_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    image_artifact_id: UUID
+    image_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    params: InferenceParams
+    protocol: Literal["detection-image-v1"]
+    runtime_binding: str = Field(pattern=r"^[0-9a-f]{64}$")
+    code_version: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if (self.model_artifact_id, self.image_artifact_id) != (self.params.model_artifact_id, self.params.image_artifact_id):
+            raise ValueError('inference source summary resources mismatch')
+        return self
+
+
 class JobPublic(StrictModel):
     id: UUID
     project_id: UUID
@@ -252,6 +271,7 @@ class JobPublic(StrictModel):
     source_job_id: UUID | None
     training: TrainingProvenance | None = None
     export: ExportJobSource | None = None
+    inference: InferenceJobSource | None = None
 
 
 class JobLog(StrictModel):
@@ -531,25 +551,280 @@ class OnnxArtifactPublic(ArtifactBase):
         return self
 
 
+# Image protocol fields deliberately do not inherit permissive generic metadata.
+StrictFinite = Annotated[FiniteFloat, Field(strict=True)]
+StrictPositiveInt = Annotated[int, Field(strict=True, gt=0)]
+ImageDimension = Annotated[int, Field(strict=True, gt=0, le=30_000_000)]
+
+
+class StrictInferenceModel(StrictModel):
+    @model_validator(mode='before')
+    @classmethod
+    def literal_scalar_types(cls, value):
+        from typing import get_args, get_origin
+        if isinstance(value, dict):
+            for name, field in cls.model_fields.items():
+                choices = get_args(field.annotation)
+                if name in value and get_origin(field.annotation) is Literal and choices:
+                    if type(choices[0]) in (int, bool) and type(value[name]) is not type(choices[0]):
+                        raise ValueError('image protocol literal scalar type required')
+        return value
+
+
+class InferenceInputMetadata(StrictInferenceModel):
+    schema_version: Literal[1]
+    declared_format: Literal['jpeg', 'png']
+    validation_scope: Literal['bounded_upload_bytes']
+
+
+class InferenceInputArtifactPublic(ArtifactBase, StrictInferenceModel):
+    kind: Literal['inference_input']
+    format: Literal['jpeg', 'png']
+    job_id: None
+    size_bytes: int = Field(strict=True, gt=0, le=50 * 1024**2)
+    metadata_schema_version: Literal[1]
+    validation_state: Literal[ValidationState.UNVERIFIED]
+    metadata: InferenceInputMetadata
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if self.format != self.metadata.declared_format:
+            raise ValueError('image declared format mismatch')
+        return self
+
+
+class DecodedImageRecord(StrictInferenceModel):
+    encoded_width: ImageDimension
+    encoded_height: ImageDimension
+    image_width: ImageDimension
+    image_height: ImageDimension
+    orientation: int = Field(strict=True, ge=1, le=8)
+    format: Literal['jpeg', 'png']
+    rgb_sha256: str = Field(pattern=SHA256)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        dims = (self.encoded_width, self.encoded_height)
+        if self.encoded_width * self.encoded_height > 30_000_000 or (self.image_width, self.image_height) != (dims[::-1] if self.orientation >= 5 else dims):
+            raise ValueError('decoded image geometry mismatch')
+        return self
+
+
+class PreprocessRecord(StrictInferenceModel):
+    image_width: ImageDimension
+    image_height: ImageDimension
+    resized_width: int = Field(strict=True, ge=1, le=640)
+    resized_height: int = Field(strict=True, ge=1, le=640)
+    left: int = Field(strict=True, ge=0, le=639)
+    right: int = Field(strict=True, ge=0, le=639)
+    top: int = Field(strict=True, ge=0, le=639)
+    bottom: int = Field(strict=True, ge=0, le=639)
+    scale_x: StrictFinite = Field(gt=0)
+    scale_y: StrictFinite = Field(gt=0)
+    target_width: Literal[640]
+    target_height: Literal[640]
+    padding: Literal[114]
+    resampling: Literal['pillow_bilinear']
+    layout: Literal['NCHW']
+    dtype: Literal['float32']
+    color: Literal['RGB']
+    normalization: Literal['divide_255']
+    tensor_sha256: str = Field(pattern=SHA256)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        from .delivery_infer import letterbox_record
+        expected = letterbox_record(self.image_width, self.image_height)
+        if any(getattr(self, key) != value for key, value in expected.items()):
+            raise ValueError('integer letterbox protocol mismatch')
+        return self
+
+
+class PreviewRecord(StrictInferenceModel):
+    width: int = Field(strict=True, ge=1, le=1280)
+    height: int = Field(strict=True, ge=1, le=1280)
+    size_bytes: int = Field(strict=True, gt=0, le=8 * 1024**2)
+    sha256: str = Field(pattern=SHA256)
+    format: Literal['png']
+
+
+class InferenceVersions(StrictInferenceModel):
+    pillow: Literal['12.3.0']
+    numpy: Literal['2.5.4']
+    torch: Literal['2.15.0+cpu'] | None
+    torchvision: Literal['0.29.2+cpu'] | None
+    ultralytics: Literal['8.4.202'] | None
+    onnx: Literal['1.23.2'] | None
+    onnxruntime: Literal['1.31.1'] | None
+
+
+class InferenceRuntime(StrictInferenceModel):
+    backend: Literal['pt', 'onnx']
+    provider: Literal['pytorch_cpu', 'CPUExecutionProvider']
+    device: Literal['cpu']
+    threads: Literal[2]
+    interop_threads: Literal[1]
+    warmup_runs: Literal[0]
+    versions: InferenceVersions
+    raw_sha256: str = Field(pattern=SHA256)
+    raw_elements: int = Field(strict=True, ge=5 * 8400, le=1004 * 8400)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        versions = self.versions
+        pt = (versions.torch, versions.torchvision, versions.ultralytics)
+        ort = (versions.onnx, versions.onnxruntime)
+        if self.backend == 'pt':
+            valid = self.provider == 'pytorch_cpu' and all(x is not None for x in pt) and all(x is None for x in ort)
+        else:
+            valid = self.provider == 'CPUExecutionProvider' and all(x is None for x in pt) and all(x is not None for x in ort)
+        if not valid: raise ValueError('actual runtime and backend mismatch')
+        return self
+
+
+class InferenceProvenance(StrictInferenceModel):
+    schema_version: Literal[1]
+    job_id: UUID
+    run_id: UUID
+    project_id: UUID
+    frozen_input_sha256: str = Field(pattern=SHA256)
+    model_artifact_id: UUID
+    model_job_id: UUID
+    model_sha256: str = Field(pattern=SHA256)
+    model_size_bytes: int = Field(strict=True, gt=0, le=128 * 1024**2)
+    model_metadata_sha256: str = Field(pattern=SHA256)
+    image_artifact_id: UUID
+    image_sha256: str = Field(pattern=SHA256)
+    image_size_bytes: int = Field(strict=True, gt=0, le=50 * 1024**2)
+    runtime_binding: str = Field(pattern=SHA256)
+    code_version: str = Field(pattern=SHA256)
+
+
+class PostprocessCounts(StrictInferenceModel):
+    candidates: int = Field(strict=True, ge=0, le=8400)
+    candidate_truncated: int = Field(strict=True, ge=0, le=5400)
+    nms_kept: int = Field(strict=True, ge=0, le=3000)
+    result_truncated: int = Field(strict=True, ge=0, le=2700)
+    clip_removed: int = Field(strict=True, ge=0, le=300)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if self.candidate_truncated != max(0, self.candidates-3000) or self.nms_kept > min(3000, self.candidates) or self.result_truncated != max(0, self.nms_kept-300) or self.clip_removed > min(300, self.nms_kept):
+            raise ValueError('postprocess counts mismatch')
+        return self
+
+
+class InferenceTimings(StrictInferenceModel):
+    unit: Literal['ms']
+    decode: StrictFinite = Field(ge=0)
+    preprocess: StrictFinite = Field(ge=0)
+    load: StrictFinite = Field(ge=0)
+    infer: StrictFinite = Field(ge=0)
+    postprocess: StrictFinite = Field(ge=0)
+    total: StrictFinite = Field(ge=0)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if self.total + 1e-6 < sum((self.decode, self.preprocess, self.load, self.infer, self.postprocess)):
+            raise ValueError('timing phases exceed total')
+        return self
+
+
+class Detection(StrictInferenceModel):
+    class_id: int = Field(strict=True, ge=0, le=999)
+    score: StrictFinite = Field(ge=0, le=1)
+    xyxy: tuple[StrictFinite, StrictFinite, StrictFinite, StrictFinite]
+
+
+class InferenceOutputFields(StrictInferenceModel):
+    image_width: ImageDimension
+    image_height: ImageDimension
+    backend: Literal['pt', 'onnx']
+    provider: Literal['pytorch_cpu', 'CPUExecutionProvider']
+    classes: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(min_length=1, max_length=1000)
+    image: DecodedImageRecord
+    preprocess: PreprocessRecord
+    runtime: InferenceRuntime
+    preview: PreviewRecord
+    counts: PostprocessCounts
+    timings: InferenceTimings
+    detections: list[Detection] = Field(max_length=300)
+
+    @model_validator(mode='after')
+    def consistent(self):
+        import math
+        if (self.backend, self.provider) != (self.runtime.backend, self.runtime.provider):
+            raise ValueError('inference actual backend mismatch')
+        if (self.image_width, self.image_height) != (self.image.image_width, self.image.image_height) or (self.image_width, self.image_height) != (self.preprocess.image_width, self.preprocess.image_height):
+            raise ValueError('inference dimensions mismatch')
+        scale = min(1., 1280 / max(self.image_width, self.image_height))
+        if (self.preview.width, self.preview.height) != tuple(max(1, math.floor(v*scale+.5)) for v in (self.image_width, self.image_height)):
+            raise ValueError('preview geometry mismatch')
+        if self.runtime.raw_elements != (4 + len(self.classes)) * 8400 or len(self.detections) != min(300, self.counts.nms_kept) - self.counts.clip_removed:
+            raise ValueError('inference output counts mismatch')
+        for detection in self.detections:
+            x1, y1, x2, y2 = detection.xyxy
+            if detection.class_id >= len(self.classes) or not (0 <= x1 < x2 <= self.image_width and 0 <= y1 < y2 <= self.image_height):
+                raise ValueError('detection bounds mismatch')
+        return self
+
+
+class InferenceDocument(InferenceOutputFields):
+    schema_version: Literal[1]
+    protocol: Literal['detection-image-v1']
+    provenance: InferenceProvenance
+    params: InferenceParams
+
+    @model_validator(mode='after')
+    def document_binding(self):
+        if self.backend != self.params.backend or (self.params.model_artifact_id, self.params.image_artifact_id) != (self.provenance.model_artifact_id, self.provenance.image_artifact_id):
+            raise ValueError('inference resource or backend binding mismatch')
+        if any(d.score <= self.params.confidence for d in self.detections):
+            raise ValueError('detection confidence mismatch')
+        return self
+
+
+class InferenceResultMetadata(StrictInferenceModel):
+    schema_version: Literal[1]
+    protocol: Literal['detection-image-v1']
+    provenance: InferenceProvenance
+    result_sha256: str = Field(pattern=SHA256)
+    result_size_bytes: int = Field(strict=True, gt=0, le=1024**2)
+    preview: PreviewRecord
+    validation_scope: Literal['real_single_image_inference']
+
+
+class InferenceResultArtifactPublic(ArtifactBase, StrictInferenceModel):
+    kind: Literal['inference_result']
+    format: Literal['json']
+    job_id: UUID
+    size_bytes: int = Field(strict=True, gt=0, le=1024**2)
+    metadata_schema_version: Literal[1]
+    validation_state: Literal[ValidationState.PASSED]
+    metadata: InferenceResultMetadata
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if (self.project_id, self.job_id, self.sha256, self.size_bytes) != (self.metadata.provenance.project_id, self.metadata.provenance.job_id, self.metadata.result_sha256, self.metadata.result_size_bytes):
+            raise ValueError('result Artifact metadata mismatch')
+        return self
+
+
 class OtherArtifactPublic(ArtifactBase):
-    kind: Literal["dataset_report", "inference_input", "inference_result", "deployment_zip"]
+    kind: Literal['dataset_report', 'deployment_zip']
     metadata: dict[str, object]
 
 
-class ArtifactPublic(RootModel[Annotated[TrainingArtifactPublic | OnnxArtifactPublic | OtherArtifactPublic, Field(discriminator="kind")]]):
-    """Kind-discriminated public schema: malformed ONNX never falls back to dict."""
+class ArtifactPublic(RootModel[Annotated[TrainingArtifactPublic | OnnxArtifactPublic | InferenceInputArtifactPublic | InferenceResultArtifactPublic | OtherArtifactPublic, Field(discriminator='kind')]]):
+    """Malformed typed image/ONNX metadata never falls back to arbitrary dict."""
 
 
-class Detection(StrictModel):
-    class_id: int = Field(ge=0)
-    score: FiniteFloat = Field(ge=0, le=1)
-    xyxy: tuple[FiniteFloat, FiniteFloat, FiniteFloat, FiniteFloat]
-
-
-class InferenceResult(StrictModel):
+class InferenceResult(InferenceDocument):
     artifact_id: UUID
-    image_width: int = Field(gt=0)
-    image_height: int = Field(gt=0)
-    backend: Literal["pt", "onnx"]
-    provider: str
-    detections: list[Detection]
+    image_url: str = Field(pattern=r'^/api/v1/inferences/[0-9a-f-]{36}/image$')
+
+    @model_validator(mode='after')
+    def image_url_binding(self):
+        if self.image_url != f'/api/v1/inferences/{self.artifact_id}/image':
+            raise ValueError('preview route does not match result Artifact')
+        return self

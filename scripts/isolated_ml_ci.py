@@ -29,7 +29,10 @@ OWNER_LABEL = 'org.edgevision.isolated-ml-owner'
 BUILD_TIMEOUT = 600
 EXECUTION_TIMEOUT = 480
 CLEANUP_TIMEOUT = 30
-STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+# Historical E receipts retain the exact seven-stage v2 meaning.
+LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+SCHEMA_VERSION = 3
 PUBLIC_STAGES = ('preparation', 'build', 'create', 'inspect', 'execution', 'cleanup', 'cleanup_unknown', 'complete')
 IMAGE_ID = re.compile(r'sha256:[a-f0-9]{64}')
 CONTAINER_ID = re.compile(r'[a-f0-9]{64}')
@@ -91,37 +94,40 @@ def decode_json(value: str):
     return json.loads(value, object_pairs_hook=unique_object)
 
 
-def validate_summary(value: str) -> dict:
+def validate_summary(value: str, *, expected_version: int | None = None) -> dict:
     require(len(value) <= 8192)
     result = decode_json(value)
     require(isinstance(result, dict) and set(result) == {'schema_version', 'stage', 'status', 'stages'})
-    require(type(result['schema_version']) is int and result['schema_version'] == 2)
+    version = result['schema_version']
+    require(type(version) is int and version in (2, SCHEMA_VERSION))
+    require(expected_version is None or version == expected_version)
+    stages = LEGACY_STAGES if version == 2 else STAGES
     require(result['stage'] == 'isolated_ml' and result['status'] in ('passed', 'failed'))
     rows = result['stages']
-    require(isinstance(rows, list) and len(rows) == len(STAGES))
-    for name, row in zip(STAGES, rows, strict=True):
+    require(isinstance(rows, list) and len(rows) == len(stages))
+    for name, row in zip(stages, rows, strict=True):
         require(isinstance(row, dict) and set(row) == {'stage', 'status'})
         require(row['stage'] == name and row['status'] in ('passed', 'failed', 'NOT_RUN', 'unverified'))
     all_passed = all(row['status'] == 'passed' for row in rows)
     require((result['status'] == 'passed') == all_passed)
     # Return freshly built known fields; never relay arbitrary Docker output.
-    return {'schema_version': 2, 'stage': 'isolated_ml', 'status': result['status'],
-            'stages': [{'stage': name, 'status': row['status']} for name, row in zip(STAGES, rows, strict=True)]}
+    return {'schema_version': version, 'stage': 'isolated_ml', 'status': result['status'],
+            'stages': [{'stage': name, 'status': row['status']} for name, row in zip(stages, rows, strict=True)]}
 
 
 def public_summary(stage: str, passed: bool, result: dict | None = None) -> dict:
     require(stage in PUBLIC_STAGES)
     rows = [{'stage': name, 'status': 'NOT_RUN'} for name in STAGES]
     if result is not None:
-        rows = validate_summary(json.dumps(result))['stages']
+        rows = validate_summary(json.dumps(result), expected_version=SCHEMA_VERSION)['stages']
     require(not passed or (stage == 'complete' and all(row['status'] == 'passed' for row in rows)))
-    return {'schema_version': 2, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows}
+    return {'schema_version': SCHEMA_VERSION, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows}
 
 
 def failed_outer(stage: str, previous: dict) -> dict:
     # Cleanup/reporting faults cannot erase already verified child outcomes.
     rows = previous['stages']
-    evidence = {'schema_version': 2, 'stage': 'isolated_ml',
+    evidence = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
                 'status': 'passed' if all(row['status'] == 'passed' for row in rows) else 'failed',
                 'stages': rows}
     return public_summary(stage, False, evidence)
@@ -216,7 +222,9 @@ REQUIRED_SOURCE = (
     'scripts/isolated_ml_entry.py', 'scripts/install_ml.py', 'scripts/e2e.py',
     'scripts/fetch_training_asset.py', 'backend/requirements-delivery-linux-cpu.lock',
     'web/package-lock.json', 'backend/tests/export_http_probe.py',
-    'backend/tests/test_onnx_runtime_policy.py',
+    'backend/tests/test_onnx_runtime_policy.py', 'backend/tests/inference_http_probe.py',
+    'backend/tests/test_inference_runtime_policy.py', 'backend/tests/inference_policy_probe.py',
+    'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts',
 )
 RECIPE = 'ci/isolated-ml.Dockerfile'
 
@@ -419,15 +427,15 @@ class IsolatedRun:
         self.stage = 'execution'
         # If the client disappears or output is malformed, actual child outcomes
         # are unknown, not falsely reported as never run.
-        self.result = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'failed',
+        self.result = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml', 'status': 'failed',
                        'stages': [{'stage': name, 'status': 'unverified'} for name in STAGES]}
         try:
             output = self.commands.docker(['start', '--attach', container['Id']], timeout=remaining())
         except PrivateCommandError as failure:
             if failure.output.stat().st_size <= 8192:
-                self.result = validate_summary(failure.output.read_text())
+                self.result = validate_summary(failure.output.read_text(), expected_version=SCHEMA_VERSION)
             raise
-        self.result = validate_summary(output)
+        self.result = validate_summary(output, expected_version=SCHEMA_VERSION)
         require(self.result['status'] == 'passed')
         # Exit code alone or a forged/missing stage summary cannot mean success.
         self.stage = 'inspect'

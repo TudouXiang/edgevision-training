@@ -114,5 +114,24 @@ ONNX 成功验收同时需要结构检查和 ONNX Runtime 执行目标产物；�
 ADR 0013 冻结的 E 已有候选源码：`export_onnx` 只接受成功训练产生的同项目 passed PT；静态 640/FP32/batch1，无额外导出参数。
 Job 和 Artifact 复用既有表与状态机；E 使用同一 Worker/guardian/drain 槽，不增加迁移。
 ONNX 公共 Artifact 改为按 kind 判别的严格分支，元数据禁止通用字典回退；生成 OpenAPI/TS 同步。
-`JobPublic.export` 可读取脱敏源绑定。固定数值验证不代表 I 单图推理或 P 独立部署，二者继续 501。
+`JobPublic.export` 可读取脱敏源绑定。固定数值验证不构成I单图推理或P独立部署验收；I源码按下一节实现，P继续501。
 候选轻量测试与实际 ML 验收分开记录，运行能力只有新受管探针成功并且代码/环境绑定仍匹配时才可用。
+
+## T060 I 增量（源码候选，真实模型验收未执行）
+
+ADR0014冻结 `detection-image-v1`。图片上传仅受限不可变字节，201返回严格
+inference_input/unverified，job_id=null；不承诺上传幂等，不在HTTP解码，不提供原图下载。
+50MiB JPEG/PNG、单file part、实际body上限+128KiB、前后鉴权与归档检查。
+
+infer提交使用既有Idempotency-Key与同一Worker槽；backend必须匹配同项目可信PT或已通过E的ONNX。
+可空source_job_id仅允许同项目终态infer作为重试来源。冻结完整模型父来源与原图片字节摘要，
+输入和输出都严格typed，不接受路径、URL、任意权重或隐式backend fallback。
+
+GET /inferences/{id} 的id及响应artifact_id都是inference_result Artifact ID；返回真实backend/provider、
+校正后宽高/原图像素xyxy、classes/params/protocol、原bytes及tensor/raw摘要、实际计时和有界检测。
+GET /inferences/{id}/image为该结果独立净化PNG；result.json由既有Artifact download下载。
+空检测是实际执行后的成功，不是缺依赖/解码失败的替代结果。source输入仍unverified，不回填尺寸或改状态。
+结果读取和下载检查完整历史发布束，不要求当前probe仍有效。
+
+pt_inference/onnx_inference保留原capability keys，只在当前代码/环境绑定的新双模式受管图片probe通过后可用。
+E raw探针不能代替I。P仍501；源码、纯逻辑/普通进程和真实PT/ORT验收须分别记录。

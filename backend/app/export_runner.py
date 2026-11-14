@@ -8,6 +8,7 @@ from .export_inputs import verify_input, copy_input
 from .export_service import provenance
 from .training_assets import digest_json
 from .schemas import OnnxArtifactMetadata
+from .export_errors import ExportFailure
 
 
 def run(job_id, run_id):
@@ -23,6 +24,9 @@ def run(job_id, run_id):
     try:
         model, validation = export_and_validate(directory, source, frozen['source_metadata']['classes'],
             job_id=job_id, run_id=run_id, input_sha256=digest_json(frozen), source_sha256=frozen['source_sha256'])
+    except ExportFailure as exc:
+        log(str(exc), 'error')
+        return exc.exit_code
     except TrainingPolicyError:
         log('Export safety validation failed', 'error')
         return 68

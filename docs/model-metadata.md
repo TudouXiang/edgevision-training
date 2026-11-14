@@ -43,4 +43,4 @@ ONNX validation 至少含：导出命令/实际版本/opset、文件哈希、ONN
 - 验证范围明确为 `checker_ort_raw_tensor_equivalence`，不是单图产品推理、精度实验或独立部署验收。
 
 `validation_sha256` 绑定单独的验证文件；DB Artifact 的 hash/size/job 还需与 metadata 对齐。
-缺字段、额外字段和矛盾绑定不能通过公共 DTO 的通用 object 分支。这一结构和完整发布逻辑已重建；实际 ONNX/ORT 执行仍 **NOT_RUN**，待另行获准的无外网边界与新证据。
+缺字段、额外字段和矛盾绑定不能通过公共 DTO 的通用 object 分支。这一结构和完整发布逻辑已重建；实际 ONNX/ORT 在精确76af48f的无外网隔离运行中通过，见[E逐项验收](evidence/T060-export-acceptance-2026-11-05.md)。后续错误协议补丁未重跑原生，运行能力仍须当前绑定probe；本结构仍不是I/P图片预后处理或部署元数据。

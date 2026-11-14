@@ -20,7 +20,10 @@ from xml.etree import ElementTree
 
 ROOT = Path('/opt/edgevision')
 PYTHON = ROOT / 'backend/.venv-delivery/bin/python'
-STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+# Historical E receipts retain the exact seven-stage v2 meaning.
+LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+SCHEMA_VERSION = 3
 STAGE_BUDGET = 450
 
 
@@ -34,7 +37,7 @@ def interrupt_for_cleanup(_signal, _frame):
 
 
 def summary(statuses: dict[str, str]) -> dict:
-    return {'schema_version': 2, 'stage': 'isolated_ml',
+    return {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
             'status': 'passed' if all(statuses.get(s) == 'passed' for s in STAGES) else 'failed',
             'stages': [{'stage': s, 'status': statuses.get(s, 'NOT_RUN')} for s in STAGES]}
 
@@ -102,6 +105,10 @@ def stage_commands(root: Path = ROOT) -> list[tuple[str, list[str], Path]]:
         ('browser_delivery', [python, str(root / 'scripts/e2e.py'), '--delivery', '--ml-asset',
                               str(root / 'asset/yolo11n.pt'), '--report-dir',
                               str(root / 'private/browser-report')], root),
+        ('inference_http', [python, 'tests/inference_http_probe.py'], backend),
+        ('inference_policy', [python, '-m', 'pytest', 'tests/test_inference_runtime_policy.py', '-q',
+                              '--junitxml=' + str(root / 'private/inference_policy.xml')], backend),
+        ('inference_browser', [python, str(root / 'scripts/inference_e2e.py')], root),
     ]
 
 
@@ -154,17 +161,20 @@ def main(argv: list[str] | None = None) -> int:
         private = ROOT / 'private'
         private.mkdir(mode=0o700)
         data = private / 'http'
-        # Fresh shared HTTP evidence is used by both policy suites and export.
+        # All stages consume the same fresh private lineage; no capability copying.
         environment = {**os.environ, 'ORT_DISABLE_TELEMETRY': '1',
                        'PLATFORM_DATA_ROOT': str(data),
                        'EDGEVISION_SMOKE_ASSET': str(ROOT / 'asset/yolo11n.pt'),
                        'EDGEVISION_ML_POLICY_ROOT': str(data),
                        'EDGEVISION_ONNX_POLICY_ROOT': str(data),
+                       'EDGEVISION_INFERENCE_HTTP_ROOT': str(data),
+                       'EDGEVISION_INFERENCE_POLICY_ROOT': str(data),
+                       'EDGEVISION_ISOLATED_HOST_NETNS': args.host_netns,
                        'PYTHONPATH': str(ROOT / 'backend')}
         deadline = time.monotonic() + STAGE_BUDGET
         for current, command, cwd in stage_commands():
             run_stage(command, cwd, environment, private / f'{current}.log', deadline - time.monotonic())
-            if current in {'onnx_policy', 'training_policy'}:
+            if current in {'onnx_policy', 'training_policy', 'inference_policy'}:
                 verify_policy_report(private / f'{current}.xml')
             statuses[current] = 'passed'
     except BaseException:
