@@ -31,7 +31,28 @@ PRIVATE = ROOT / 'private/inference-browser'
 REPORT = ROOT / 'private/inference-browser-report'
 PYTHON = BACKEND / '.venv-delivery/bin/python'
 CURRENT_PHASE = 'boundary'
-PHASES = ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown')
+PHASES = ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete')
+
+
+
+def ui_failure_phase(directory: Path) -> str:
+    # This is diagnostic only: it cannot alter the browser exit/receipt gates.
+    try:
+        path = directory / 'ui-phase.json'
+        if path.is_symlink() or not path.is_file():
+            return 'browser'
+        with path.open('rb') as source:
+            raw = source.read(257)
+        if len(raw) > 256:
+            return 'browser'
+        value = json.loads(raw)
+        if (isinstance(value, dict) and set(value) == {'phase'}
+                and isinstance(value['phase'], str) and value['phase'] in PHASES
+                and value['phase'].startswith('ui_')):
+            return value['phase']
+    except Exception:
+        pass
+    return 'browser'
 
 
 def boundary():
@@ -118,7 +139,8 @@ def environments(origin, api_port, web_port, pair, cookies, image):
         'EDGEVISION_E2E_INFERENCE_PROJECT_ID': pair['pt']['project_id'],
         'EDGEVISION_E2E_INFERENCE_PT_ID': pair['pt']['source_artifact_id'],
         'EDGEVISION_E2E_INFERENCE_ONNX_ID': pair['onnx']['source_artifact_id'],
-        'EDGEVISION_E2E_INFERENCE_IMAGE': str(image)}
+        'EDGEVISION_E2E_INFERENCE_IMAGE': str(image),
+        'EDGEVISION_E2E_INFERENCE_PHASE_FILE': str(PRIVATE / 'ui-phase.json')}
     return service, browser
 
 
@@ -160,8 +182,12 @@ def run(diagnostic) -> int:
         child = subprocess.Popen([npm, 'run', 'test:e2e'], cwd=WEB, env=browser,
             stdin=subprocess.DEVNULL, stdout=diagnostic, stderr=diagnostic, start_new_session=True)
         owned.append(child)
-        code = child.wait(timeout=150)
-        CURRENT_PHASE = 'browser' if code else 'receipt'
+        try:
+            code = child.wait(timeout=150)
+        except subprocess.TimeoutExpired:
+            CURRENT_PHASE = ui_failure_phase(PRIVATE)
+            raise
+        CURRENT_PHASE = ui_failure_phase(PRIVATE) if code else 'receipt'
         status = browser_exit_code(REPORT, code, require_all_passed=True)
         if any(process.poll() is not None for process in (api, worker, web)):
             CURRENT_PHASE = 'services'

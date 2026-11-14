@@ -191,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
                 if len(raw) > 256:
                     raise ValueError('diagnostic too large')
                 value = json.loads(raw)
-                if set(value) == {'phase'} and isinstance(value['phase'], str) and value['phase'] in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup'):
+                if set(value) == {'phase'} and isinstance(value['phase'], str) and value['phase'] in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete'):
                     code = value['phase']
         except Exception:
             pass

@@ -909,3 +909,12 @@ def test_private_image_diagnostic_is_sanitized_at_container_boundary(tmp_path, m
     receipt = ci.validate_summary(output.out)
     assert receipt['inference_browser_failure'] == expected
     assert receipt['stages'][-1]['status'] == 'failed'
+
+
+@pytest.mark.parametrize('phase', ['ui_setup', 'ui_upload', 'ui_pt_result', 'ui_onnx_download', 'ui_responsive'])
+def test_closed_ui_phases_survive_public_boundary(phase):
+    value = full_summary()
+    value['status'] = 'failed'
+    value['stages'][-1]['status'] = 'failed'
+    value['inference_browser_failure'] = phase
+    assert ci.public_summary('execution', False, value)['inference_browser_failure'] == phase

@@ -229,3 +229,41 @@ def test_browser_failure_receipt_is_closed_and_has_no_exception(browser, monkeyp
     receipt = json.loads((browser.PRIVATE / 'failure.json').read_text())
     assert receipt == {'phase': 'inputs'}
     assert 'SECRET' not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(('payload', 'expected'), [
+    ('{"phase":"ui_upload"}', 'ui_upload'),
+    ('{"phase":"ui_pt_download"}', 'ui_pt_download'),
+    ('{"phase":"SECRET token"}', 'browser'),
+    ('{"phase":"ui_upload","error":"SECRET"}', 'browser'),
+    ('{"phase":"ui_upload"}' + ' ' * 300, 'browser'),
+])
+def test_private_ui_checkpoint_is_bounded_closed_and_non_authoritative(browser, tmp_path, payload, expected):
+    (tmp_path / 'ui-phase.json').write_text(payload)
+    assert browser.ui_failure_phase(tmp_path) == expected
+
+
+def test_all_ui_phases_cross_all_closed_boundaries(browser, monkeypatch, tmp_path, capsys):
+    import json
+    ci = load('isolated_ml_ci', ROOT / 'scripts')
+    entry = load('isolated_ml_entry', ROOT / 'scripts')
+    monkeypatch.setattr(entry, 'verify_boundary', lambda *a: None)
+    monkeypatch.setattr(entry, 'verify_policy_report', lambda *a: None)
+    monkeypatch.setattr(entry, 'stage_commands', lambda: [(stage, [stage], tmp_path) for stage in ci.STAGES[1:]])
+    for phase in (value for value in browser.PHASES if value.startswith('ui_')):
+        root = tmp_path / phase
+        root.mkdir()
+        monkeypatch.setattr(entry, 'ROOT', root)
+        def fail(command, *args):
+            if command == ['inference_browser']:
+                directory = root / 'private/inference-browser'
+                directory.mkdir()
+                (directory / 'ui-phase.json').write_text(json.dumps({'phase': phase}))
+                normalized = browser.ui_failure_phase(directory)
+                assert normalized == phase
+                (directory / 'failure.json').write_text(json.dumps({'phase': normalized}))
+                raise RuntimeError('private diagnostic')
+        monkeypatch.setattr(entry, 'run_stage', fail)
+        assert entry.main(['--host-netns', 'net:[123]']) == 1
+        value = ci.validate_summary(capsys.readouterr().out)
+        assert ci.public_summary('execution', False, value)['inference_browser_failure'] == phase

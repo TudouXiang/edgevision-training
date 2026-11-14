@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { expect, test, type Page } from '@playwright/test'
 import type { components } from '../../contracts/generated/openapi'
 
@@ -40,6 +40,12 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
   // Stay inside the harness's 150-second browser-child ceiling. Timeouts fail;
   // they never skip a backend or downgrade the checks below.
   test.setTimeout(135_000)
+  // Fixed phase literals only. Never serialize assertions, inputs or errors.
+  const checkpoint = async (phase: string) => {
+    const destination = process.env.EDGEVISION_E2E_INFERENCE_PHASE_FILE
+    if (destination) await writeFile(destination, JSON.stringify({ phase }), { mode: 0o600 })
+  }
+  await checkpoint('ui_setup')
   expect(process.env.EDGEVISION_E2E_INFERENCE).toBe('1')
   const base = new URL(required('EDGEVISION_E2E_BASE_URL'))
   if (!['http:', 'https:'].includes(base.protocol) || !['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname)) throw new Error('Inference harness must use loopback services')
@@ -56,9 +62,11 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
   expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a'); expect(bytes.subarray(12, 16).toString()).toBe('IHDR')
   const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20), imageSha = digest(bytes)
   expect(width).toBeGreaterThan(0); expect(height).toBeGreaterThan(0)
+  await checkpoint('ui_capabilities')
   const capabilityResponse = await page.request.get('/api/v1/capabilities'); expect(capabilityResponse.status()).toBe(200)
   const capability: components['schemas']['CapabilitiesResponse'] = await capabilityResponse.json()
   expect(capability.features.pt_inference.available).toBe(true); expect(capability.features.onnx_inference.available).toBe(true); expect(capability.features.deployment.available).toBe(false)
+  await checkpoint('ui_inventory')
   const inventory = await artifacts(page, projectId)
   const pt = inventory.find(item => item.id === ptId), onnx = inventory.find(item => item.id === onnxId)
   if (!pt || !['pt_best', 'pt_last'].includes(pt.kind) || pt.format !== 'pt' || !onnx || onnx.kind !== 'onnx') throw new Error('Harness source models do not match the required kinds')
@@ -68,6 +76,7 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
     const job: Job = await response.json(); expect(job.project_id).toBe(projectId); expect(job.state).toBe('succeeded'); expect(job.kind).toBe(source.kind === 'onnx' ? 'export_onnx' : 'train')
   }
   expect(onnx.metadata.provenance.parent_artifact_id).toBe(ptId)
+  await checkpoint('ui_upload')
   await page.goto('/inference'); await page.getByLabel('所属项目').selectOption(projectId)
   const panel = page.locator('.inference-panel')
   await panel.getByLabel('上传单张图片').setInputFiles(imagePath)
@@ -82,6 +91,7 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
 
   let lastJobId = ''
   for (const backend of ['pt', 'onnx'] as const) {
+    await checkpoint(`ui_${backend}_submit`)
     const source = backend === 'pt' ? pt : onnx, before = new Set((await jobs(page, projectId)).map(job => job.id))
     await panel.getByLabel('执行后端').selectOption(backend)
     await expect(panel.getByLabel('来源模型').locator('option', { hasText: source.id })).toHaveCount(1)
@@ -91,6 +101,7 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
     await panel.getByRole('button', { name: '创建推理任务', exact: true }).evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
     const response = await acceptedResponse; expect(response.status()).toBe(202)
     const accepted: components['schemas']['JobAccepted'] = await response.json(); lastJobId = accepted.job_id
+    await checkpoint(`ui_${backend}_result`)
     await expect(panel.locator('h3')).toContainText('succeeded', { timeout: 45_000 })
     await expect(panel.getByRole('region', { name: '推理日志' })).toContainText('已读取最终日志')
     const newJobs = (await jobs(page, projectId)).filter(job => !before.has(job.id))
@@ -114,6 +125,7 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
       const [x1, y1, x2, y2] = detection.xyxy
       expect(detection.xyxy.every(Number.isFinite) && 0 <= x1 && x1 < x2 && x2 <= width && 0 <= y1 && y1 < y2 && y2 <= height).toBe(true)
     }
+    await checkpoint(`ui_${backend}_preview`)
     await expect(panel.locator('.verified-inference')).toContainText(provider)
     await expect(panel.locator('.inference-preview')).toHaveAttribute('viewBox', `0 0 ${width} ${height}`)
     await expect(panel.locator('.inference-preview image')).toHaveAttribute('width', String(width)); await expect(panel.locator('.inference-preview image')).toHaveAttribute('height', String(height))
@@ -128,26 +140,32 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
     const previewResponse = await page.request.get(`/api/v1/inferences/${encodeURIComponent(output.id)}/image`); expect(previewResponse.status()).toBe(200)
     expect(previewResponse.headers()['content-type']).toContain('image/png'); const previewBytes = await previewResponse.body()
     expect(previewBytes.length).toBe(result.preview.size_bytes); expect(digest(previewBytes)).toBe(result.preview.sha256)
+    await checkpoint(`ui_${backend}_download`)
     const downloadEvent = page.waitForEvent('download'); await panel.getByRole('link', { name: '下载结果 JSON', exact: true }).click()
     const download = await downloadEvent; expect(await download.failure()).toBeNull(); expect(download.suggestedFilename()).toMatch(/\.json$/)
     const stream = await download.createReadStream(); expect(stream).not.toBeNull(); const hash = createHash('sha256'); let size = 0
     for await (const chunk of stream!) { size += chunk.length; hash.update(chunk) }
     expect(size).toBe(output.size_bytes); expect(hash.digest('hex')).toBe(output.sha256); await download.delete()
+    await checkpoint(`ui_${backend}_reload`)
     await page.reload(); await page.getByLabel('所属项目').selectOption(projectId)
     await expect(panel.locator('.inference-detail > .identity')).toHaveText(accepted.job_id)
     await expect(panel.locator('.verified-inference')).toContainText(provider)
     await expect(panel.getByRole('button', { name: '已接收推理任务', exact: true })).toBeDisabled()
     expect((await jobs(page, projectId)).filter(job => !before.has(job.id))).toHaveLength(1)
   }
+  await checkpoint('ui_offline')
   await context.setOffline(true)
   await expect(panel.getByRole('alert')).toContainText('将自动重试', { timeout: 20_000 })
+  await checkpoint('ui_recovery')
   await context.setOffline(false)
   await expect(panel.getByRole('alert')).toHaveCount(0, { timeout: 20_000 })
   await page.goto('/inference'); await page.getByLabel('所属项目').selectOption(projectId)
   await expect(panel.locator('.inference-detail > .identity')).toHaveText(lastJobId)
   await expect(panel.locator('.verified-inference')).toContainText('CPUExecutionProvider')
+  await checkpoint('ui_responsive')
   await page.setViewportSize({ width: 375, height: 812 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   const finalCapabilities: components['schemas']['CapabilitiesResponse'] = await (await page.request.get('/api/v1/capabilities')).json()
   expect(finalCapabilities.features.deployment.available).toBe(false)
+  await checkpoint('ui_complete')
 })

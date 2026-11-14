@@ -39,3 +39,23 @@ review regression cases were added after that run collected its cases; the
 final diagnostic plus documentation suite was rerun: 190 passed. Independent
 read-only review accepted the final diagnostic changes. Raw logs remain
 private; the next hosted run binds complete checks to the published SHA.
+
+## UI checkpoints
+
+[Run 43609069043](https://github.com/TudouXiang/edgevision-training/actions/runs/43609069043)
+passed ordinary Linux and Windows checks and the first nine isolated stages,
+but returned `inference_browser_failure=browser`. This locates the failure in
+the Playwright child, not input lineage checks or service startup.
+
+The next diagnostic increment adds fixed `ui_*` checkpoints for setup,
+capabilities, inventory, upload, each PT/ONNX submit/result/preview/download/
+reload, offline/recovery and responsive checks. The private checkpoint contains
+only a phase literal, never an assertion, URL, credential, input or error.
+The same bounded allowlist validation applies at every boundary; it does not
+change assertions or turn failures into success. A completed checkpoint is not
+an acceptance receipt. Independent read-only review found a misleading reload
+marker, corrected before publication; all UI codes are tested through all three
+boundaries. Focused final suite: 194 passed; e2e typecheck passed. Aggregate:
+671 passed, 14 native skipped, 117 frontend passed, build/contracts passed.
+The final all-codes boundary test was added after aggregate collection and
+passed in the focused final suite. Exact remote validation remains separate.
