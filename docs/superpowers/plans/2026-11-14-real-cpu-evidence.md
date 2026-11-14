@@ -51,3 +51,10 @@ Files: dedicated private-runtime HTTP exercise using existing product API/Worker
 - [ ] Verify PT/ONNX same input and preprocessing, collect bounded raw timings and finite metrics with no post-hoc threshold adjustment.
 - [ ] On isolated task data only: cancel a real running task; stop/restart only owned Worker and verify interrupted terminal state/no orphan process; backup quiescent DB plus referenced assets to fresh destination and verify restored readability/hashes.
 - [ ] Preserve failures and NOT_RUN. Report exact revision/environment/commands/exit codes; no whole-project acceptance until final gates close.
+
+## Execution ledger
+
+- Task 1 checkpoint: local c3b7266 / remote 914d628c4589188f54e5d55685c9e21fc3715a72, feature branch `feat/t070-real-cpu`; exact tree 4c35a31ae0356c9401d23695c4c271e4afceeffe, main untouched. Focused 18 passed; independent security review passed after private snapshot TOCTOU repair. Two real-data preparations yielded identical frozen receipts. CI #56 started, not yet claimed successful.
+- Task 2 in progress: separate `real_cpu_report.py` bounded numeric protocol with 16 focused passing tests; missing module red demonstrated before implementation. No execution profile/entry/runtime wired yet. Synthetic protocol test values are not experimental measurements.
+- Ruling: keep native experiment entirely separate from legacy 12-stage receipt and default budgets, with an explicit profile and exact-SHA gate; avoid monkeypatching runner globals. If insufficient budget, report failure rather than silently increasing or rerunning training.
+- Task 3 NOT_RUN: real training, evaluation, timing, cancellation, Worker recovery, backup/restore.
