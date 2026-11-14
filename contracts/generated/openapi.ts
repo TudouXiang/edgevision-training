@@ -547,7 +547,7 @@ export interface components {
          * ArtifactPublic
          * @description Malformed typed image/ONNX metadata never falls back to arbitrary dict.
          */
-        ArtifactPublic: components["schemas"]["TrainingArtifactPublic"] | components["schemas"]["OnnxArtifactPublic"] | components["schemas"]["InferenceInputArtifactPublic"] | components["schemas"]["InferenceResultArtifactPublic"] | components["schemas"]["OtherArtifactPublic"];
+        ArtifactPublic: components["schemas"]["TrainingArtifactPublic"] | components["schemas"]["OnnxArtifactPublic"] | components["schemas"]["InferenceInputArtifactPublic"] | components["schemas"]["InferenceResultArtifactPublic"] | components["schemas"]["PackageArtifactPublic"] | components["schemas"]["OtherArtifactPublic"];
         /** CapabilitiesResponse */
         CapabilitiesResponse: {
             /** Features */
@@ -1494,6 +1494,7 @@ export interface components {
             id: string;
             inference?: components["schemas"]["InferenceJobSource"] | null;
             kind: components["schemas"]["JobKind"];
+            package?: components["schemas"]["PackageJobSource"] | null;
             /** Params Schema Version */
             params_schema_version: number;
             /**
@@ -1643,7 +1644,7 @@ export interface components {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            kind: "dataset_report" | "deployment_zip";
+            kind: "dataset_report";
             /** Metadata */
             metadata: {
                 [key: string]: unknown;
@@ -1661,6 +1662,89 @@ export interface components {
             size_bytes: number;
             validation_state: components["schemas"]["ValidationState"];
         };
+        /** PackageArtifactMetadata */
+        PackageArtifactMetadata: {
+            /** Manifest Sha256 */
+            manifest_sha256: string;
+            /** Manifest Size Bytes */
+            manifest_size_bytes: number;
+            /** Package Sha256 */
+            package_sha256: string;
+            /** Package Size Bytes */
+            package_size_bytes: number;
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "edgevision-python-onnx-v1";
+            provenance: components["schemas"]["PackageProvenance"];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Standalone Execution
+             * @constant
+             */
+            standalone_execution: "not_run_for_this_artifact";
+            template: components["schemas"]["PackageTemplate"];
+            /** Template Validation Sha256 */
+            template_validation_sha256: string;
+            /**
+             * Validation Scope
+             * @constant
+             */
+            validation_scope: "trusted_model_fixed_package_integrity";
+        };
+        /** PackageArtifactPublic */
+        PackageArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Format
+             * @constant
+             */
+            format: "zip";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "deployment_zip";
+            metadata: components["schemas"]["PackageArtifactMetadata"];
+            /**
+             * Metadata Schema Version
+             * @constant
+             */
+            metadata_schema_version: 1;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Validation State
+             * @constant
+             */
+            validation_state: "passed";
+        };
         /** PackageJobCreate */
         PackageJobCreate: {
             /**
@@ -1669,6 +1753,30 @@ export interface components {
              */
             kind: "package";
             params: components["schemas"]["PackageParams"];
+            /** Source Job Id */
+            source_job_id?: string | null;
+        };
+        /** PackageJobSource */
+        PackageJobSource: {
+            /** Code Version */
+            code_version: string;
+            /**
+             * Export Job Id
+             * Format: uuid
+             */
+            export_job_id: string;
+            /**
+             * Onnx Artifact Id
+             * Format: uuid
+             */
+            onnx_artifact_id: string;
+            params: components["schemas"]["PackageParams"];
+            /** Runtime Binding */
+            runtime_binding: string;
+            /** Source Sha256 */
+            source_sha256: string;
+            /** Template Sha256 */
+            template_sha256: string;
         };
         /** PackageParams */
         PackageParams: {
@@ -1677,6 +1785,75 @@ export interface components {
              * Format: uuid
              */
             onnx_artifact_id: string;
+        };
+        /** PackageProvenance */
+        PackageProvenance: {
+            /** Code Version */
+            code_version: string;
+            /**
+             * Export Job Id
+             * Format: uuid
+             */
+            export_job_id: string;
+            /** Frozen Input Sha256 */
+            frozen_input_sha256: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Model Metadata Sha256 */
+            model_metadata_sha256: string;
+            /** Model Sha256 */
+            model_sha256: string;
+            /** Model Size Bytes */
+            model_size_bytes: number;
+            /**
+             * Onnx Artifact Id
+             * Format: uuid
+             */
+            onnx_artifact_id: string;
+            /**
+             * Parent Artifact Id
+             * Format: uuid
+             */
+            parent_artifact_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Runtime Binding */
+            runtime_binding: string;
+        };
+        /** PackageTemplate */
+        PackageTemplate: {
+            /** Core Sha256 */
+            core_sha256: string;
+            /**
+             * Image Protocol
+             * @constant
+             */
+            image_protocol: "detection-image-v1";
+            /** Lock Sha256 */
+            lock_sha256: string;
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "edgevision-python-onnx-v1";
+            /**
+             * Target
+             * @constant
+             */
+            target: "linux-x86_64-cpython312-cpu";
+            /** Template Sha256 */
+            template_sha256: string;
         };
         /** Page[ArtifactPublic] */
         Page_ArtifactPublic_: {

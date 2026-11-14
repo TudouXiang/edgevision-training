@@ -1,6 +1,6 @@
 # HTTP 契约 · T060 I 源码候选
 
-唯一机器可读来源：backend/app/schemas.py 与 backend/app/main.py 生成的 FastAPI OpenAPI，生成入口见 scripts/export_contract.py。本文件解释当前语义。T010–T050 已按各自证据限定验收；T060 E 限定工程accepted，I源码已完成独立审查但真实模型/浏览器未验收，P仍501。当前数据库目标为0003_worker；阶段及限制见[项目状态](status.md)、[验收矩阵](acceptance.md)。
+唯一机器可读来源：backend/app/schemas.py 与 backend/app/main.py 生成的 FastAPI OpenAPI，生成入口见 scripts/export_contract.py。本文件解释当前语义。T010–T050 已按各自证据限定验收；T060 E 限定工程accepted，I已按2026-11-14精确版本限定验收；P已接线但独立运行证明未完成，能力关闭。当前数据库目标为0003_worker；阶段及限制见[项目状态](status.md)、[验收矩阵](acceptance.md)。
 
 根 /api/v1，时间带时区 UTC ISO 8601、UUID、snake_case。成功直接返回 DTO；列表为 items、total、page、page_size，page 从 1 起且 page_size 1–100。增量日志/指标返回 items、next_cursor、eof、job_state，limit 1–500，游标绑定单 Job 且单调；轮询间隔约 2 秒，失败退避，终态最后拉取一次。V1 不使用 SSE。
 
@@ -12,7 +12,7 @@
 | GET/POST /projects/{id}/datasets、GET /datasets/{id} | Page[DatasetPublic]；multipart 的单一 `file` ZIP，成功登记真实 pending Dataset | T030 核心已实现、accepted（Linux CI）；完整校验不在 HTTP 请求执行 |
 | POST /datasets/{id}/check | Idempotency-Key，成功语义为 202 JobAccepted | T040 已实现；幂等同键返回原 Job 的当前 state，不仅 queued |
 | GET /datasets/{id}/samples、GET /datasets/{id}/samples/{sample_id}/image | Page[DatasetSamplePublic]；opaque sample ID 的鉴权图片流 | T030 核心已验收；仅 ready 且 manifest 合法时可读，pending/invalid 拒绝 |
-| GET/POST /projects/{id}/jobs、GET /jobs/{id}、POST /jobs/{id}/cancel | Page[JobPublic]、判别式 JobCreate(kind,params)、JobAccepted、JobPublic | 已实现列表/详情/取消及dataset_check/train/export_onnx/infer创建；模型执行要求当前受管probe，package仍501 |
+| GET/POST /projects/{id}/jobs、GET /jobs/{id}、POST /jobs/{id}/cancel | Page[JobPublic]、判别式 JobCreate(kind,params)、JobAccepted、JobPublic | 已实现列表/详情/取消及dataset_check/train/export_onnx/infer创建；模型执行要求当前受管probe，package创建已接线但当前能力不可用，返回409 PACKAGE_SETUP_REQUIRED |
 | GET /jobs/{id}/logs、/metrics | Incremental[JobLog/Metric]；cursor、limit | T040 已实现有界查询；dataset_check 没有虚构 metrics |
 | GET /projects/{id}/artifacts、GET /artifacts/{id}、/download | Page[ArtifactPublic]、ArtifactPublic、鉴权文件流 | 已实现dataset_report/PT/ONNX及I结果列表、详情与受限下载；unverified原图片不提供下载 |
 | POST /projects/{id}/images、GET /inferences/{id}、GET /inferences/{id}/image | 单图multipart返回InferenceInputArtifactPublic；结果为InferenceResult与鉴权净化PNG | I源码已实现；上传只存unverified字节，解码在受管子进程，固定 Linux CPU 实际模型/HTTP/浏览器已限定验收，其他环境需本地probe |
@@ -57,7 +57,7 @@ best/last 下载根据同一个已核验文件描述符流式读取，最大 128
 跨用户与跨项目资源仍 404；损坏产物返回 `409 ARTIFACT_UNAVAILABLE`。下载历史模型不要求当前代码探针仍有效。
 
 `/capabilities.features.onnx_export` 取自独立 `delivery-capability.json` 的当前绑定；`models` 表示已有模型列表/下载实现，不表示 ML 环境可用。
-`infer` 源码按下一节实现，只有当前I双模式probe有效才开放对应能力；`package`仍501。E的旧真实证据不替代新I验收。
+`infer` 源码按下一节实现，只有当前I双模式probe有效才开放对应能力；`package`当前返回409 PACKAGE_SETUP_REQUIRED。E的旧真实证据不替代新I验收。
 
 ## T060 I 图片接口增量
 
@@ -75,4 +75,14 @@ best/last 下载根据同一个已核验文件描述符流式读取，最大 128
 - GET /api/v1/artifacts/{result_artifact_id}/download：application/json结果；未验证原输入下载409。
 
 他人/非结果ID为404；损坏完整发布束或读取竞态为409 ARTIFACT_UNAVAILABLE。上传400/413/415/503、
-参数422、模型后端错配409、会话401/CSRF403/归档409均使用规范error envelope。P接口仍501。
+参数422、模型后端错配409、会话401/CSRF403/归档409均使用规范error envelope。P接口已接线，独立验证能力尚未实现，当前返回409 PACKAGE_SETUP_REQUIRED。
+
+## P 独立源码部署包（接线已实现，未验收）
+
+`package`参数仅接受`onnx_artifact_id`，可选`source_job_id`明确重试同项目终态任务。提交采用原幂等键、两阶段权限/来源复核；仅可信完整E来源可用。`JobPublic.package`仅暴露安全ID、摘要与参数，不返回存储路径。
+
+生产`deployment` capability当前强制不可用。I probe成功或随意创建JSON记录均不能启用；独立P probe验证器/写入器尚待实现，不能据当前合成测试发布可用声明。
+
+受管任务只核验固定源码ZIP与来源，不逐包执行模型。`deployment_zip`使用严格metadata，`validation_scope=trusted_model_fixed_package_integrity`、`standalone_execution=not_run_for_this_artifact`；必须具有完整进程退出证据后才能发布。详情、列表和下载损坏metadata归一化409，历史下载独立于当前probe但复核完整包。
+
+ZIP无解释器、wheel或平台后端；首次依赖安装需联网或另备匹配wheelhouse。独立CLI失败输出保留部分目录，不能当作成功。

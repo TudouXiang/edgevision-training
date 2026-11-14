@@ -2,7 +2,7 @@
 
 精确公开 SHA `bd8d554b6bc51d05d6c1b81119ea8e1416eed5b9` 在工作流 #30 的 checks、Windows、隔离 ML 三任务全部通过，十阶段含真实 PT/ONNX 图片 HTTP/probe/浏览器全部 passed。原生运行与审查源码 tree 均为 `c21a8d54ee8222d7f9402ca08aa0bdb01cd2e47e`。独立需求映射审查支持 I 在固定 Linux CPU/YOLO11n 范围限定 accepted，见[精确证据](evidence/T060-image-acceptance-2026-11-14.md)。
 
-P仍501，可进入设计实施，尚未验收；T060 整体与 T070 未验收。Windows ML、GPU/NPU、正式精度/性能及完整原生故障矩阵不在本次通过范围。能力仍需各运行环境的当前源码 probe。
+P已实现固定源码ZIP、独立CLI及受管API/发布/下载接线，合成与受管进程测试不等于独立模型验收。生产P能力强制关闭（PACKAGE_SETUP_REQUIRED），probe/UI/原生验收待完成；T060 整体与 T070 未验收。Windows ML、GPU/NPU、正式精度/性能及完整原生故障矩阵不在本次通过范围。能力仍需各运行环境的当前源码 probe。
 
 以下保留各阶段原始状态，不覆盖上述最新证据。
 

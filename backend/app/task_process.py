@@ -17,6 +17,8 @@ def execute(job_id: str, run_id: str) -> int:
         from .training_runner import run
     elif kind == "export_onnx":
         from .export_runner import run
+    elif kind == "package":
+        from .package_runner import run
     elif kind == "infer":
         from .inference_runner import run
     elif kind == "inference_probe":

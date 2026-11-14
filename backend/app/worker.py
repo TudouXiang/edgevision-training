@@ -198,7 +198,7 @@ def send_control(stream, command: bytes) -> bool:
 
 def process(job_id: str, run_id: str) -> None:
     job = get_job(job_id)
-    if job["kind"] not in {"dataset_check", "train", "export_onnx", "infer"}:
+    if job["kind"] not in {"dataset_check", "train", "export_onnx", "infer", "package"}:
         finish(job_id, run_id, "UNSUPPORTED_JOB")
         return
     # A claimed-only task cannot have launched a guardian. Prelaunch input errors
@@ -210,6 +210,9 @@ def process(job_id: str, run_id: str) -> None:
                 raise ValueError("archive fingerprint changed")
         elif job["kind"] == "train":
             from .training_inputs import verify_input
+            verify_input(frozen)
+        elif job["kind"] == "package":
+            from .package_inputs import verify_input
             verify_input(frozen)
         elif job["kind"] == "infer":
             from .inference_inputs import verify_input
@@ -325,6 +328,9 @@ def process(job_id: str, run_id: str) -> None:
             elif job["kind"] == "export_onnx":
                 from .export_publication import publish as publish_export
                 published = publish_export(job)
+            elif job["kind"] == "package":
+                from .package_publication import publish as publish_package
+                published = publish_package(job)
             elif job["kind"] == "infer":
                 from .inference_publication import publish as publish_inference
                 published = publish_inference(job)

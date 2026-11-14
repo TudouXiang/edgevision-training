@@ -200,6 +200,7 @@ class InferenceJobCreate(StrictModel):
 class PackageJobCreate(StrictModel):
     kind: Literal[JobKind.PACKAGE]
     params: PackageParams
+    source_job_id: UUID | None = None
 
 
 JobCreate = Annotated[
@@ -257,6 +258,16 @@ class InferenceJobSource(StrictModel):
         return self
 
 
+class PackageJobSource(StrictModel):
+    onnx_artifact_id: UUID
+    export_job_id: UUID
+    source_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    template_sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    params: PackageParams
+    runtime_binding: str = Field(pattern=r'^[0-9a-f]{64}$')
+    code_version: str = Field(pattern=r'^[0-9a-f]{64}$')
+
+
 class JobPublic(StrictModel):
     id: UUID
     project_id: UUID
@@ -272,6 +283,7 @@ class JobPublic(StrictModel):
     training: TrainingProvenance | None = None
     export: ExportJobSource | None = None
     inference: InferenceJobSource | None = None
+    package: PackageJobSource | None = None
 
 
 class JobLog(StrictModel):
@@ -810,12 +822,66 @@ class InferenceResultArtifactPublic(ArtifactBase, StrictInferenceModel):
         return self
 
 
+class PackageTemplate(StrictInferenceModel):
+    protocol: Literal['edgevision-python-onnx-v1']
+    image_protocol: Literal['detection-image-v1']
+    target: Literal['linux-x86_64-cpython312-cpu']
+    template_sha256: str = Field(pattern=SHA256)
+    core_sha256: str = Field(pattern=SHA256)
+    lock_sha256: str = Field(pattern=SHA256)
+
+
+class PackageProvenance(StrictInferenceModel):
+    job_id: UUID
+    run_id: UUID
+    project_id: UUID
+    onnx_artifact_id: UUID
+    export_job_id: UUID
+    parent_artifact_id: UUID
+    frozen_input_sha256: str = Field(pattern=SHA256)
+    model_sha256: str = Field(pattern=SHA256)
+    model_size_bytes: int = Field(strict=True, gt=0, le=128*1024**2)
+    model_metadata_sha256: str = Field(pattern=SHA256)
+    runtime_binding: str = Field(pattern=SHA256)
+    code_version: str = Field(pattern=SHA256)
+
+
+class PackageArtifactMetadata(StrictInferenceModel):
+    schema_version: Literal[1]
+    protocol: Literal['edgevision-python-onnx-v1']
+    provenance: PackageProvenance
+    template: PackageTemplate
+    package_sha256: str = Field(pattern=SHA256)
+    package_size_bytes: int = Field(strict=True, gt=0, le=144*1024**2)
+    manifest_sha256: str = Field(pattern=SHA256)
+    manifest_size_bytes: int = Field(strict=True, gt=0, le=1024**2)
+    template_validation_sha256: str = Field(pattern=SHA256)
+    validation_scope: Literal['trusted_model_fixed_package_integrity']
+    standalone_execution: Literal['not_run_for_this_artifact']
+
+
+class PackageArtifactPublic(ArtifactBase, StrictInferenceModel):
+    kind: Literal['deployment_zip']
+    format: Literal['zip']
+    job_id: UUID
+    size_bytes: int = Field(strict=True, gt=0, le=144*1024**2)
+    metadata_schema_version: Literal[1]
+    validation_state: Literal[ValidationState.PASSED]
+    metadata: PackageArtifactMetadata
+
+    @model_validator(mode='after')
+    def consistent(self):
+        if (self.project_id,self.job_id,self.sha256,self.size_bytes) != (self.metadata.provenance.project_id,self.metadata.provenance.job_id,self.metadata.package_sha256,self.metadata.package_size_bytes):
+            raise ValueError('package artifact metadata mismatch')
+        return self
+
+
 class OtherArtifactPublic(ArtifactBase):
-    kind: Literal['dataset_report', 'deployment_zip']
+    kind: Literal['dataset_report']
     metadata: dict[str, object]
 
 
-class ArtifactPublic(RootModel[Annotated[TrainingArtifactPublic | OnnxArtifactPublic | InferenceInputArtifactPublic | InferenceResultArtifactPublic | OtherArtifactPublic, Field(discriminator='kind')]]):
+class ArtifactPublic(RootModel[Annotated[TrainingArtifactPublic | OnnxArtifactPublic | InferenceInputArtifactPublic | InferenceResultArtifactPublic | PackageArtifactPublic | OtherArtifactPublic, Field(discriminator='kind')]]):
     """Malformed typed image/ONNX metadata never falls back to arbitrary dict."""
 
 

@@ -10,7 +10,7 @@ EdgeVision 面向单机计算机视觉场景，目标是把项目、数据集、
 - T050：固定 Linux CPU 小规模训练、真实指标、验证后的 best/last 产物及鉴权下载已在限定范围 accepted；见 [T050 验收](docs/evidence/T050-ci-acceptance-2026-11-04.md)。不代表 Windows ML、CUDA 或正式精度实验通过。
 - T060 E：固定 Linux CPU/YOLO11n 的可信 PT→ONNX 工程阶段 **E 限定 accepted**。`76af48f` 已完成真实隔离ONNX/ORT、HTTP与浏览器验证；后续错误协议补丁按未变正常路径与新增失败回归增量审查，未重跑原生ML。详见 [E逐项验收](docs/evidence/T060-export-acceptance-2026-11-05.md)。实际能力仍须当前代码绑定的受管probe。
 - T060 I：固定 Linux CPU / YOLO11n 单图工程限定 accepted。`bd8d554` 的 #30 全部 CI 成功，真实 PT/ONNX probe、HTTP、浏览器与原生策略测试通过；能力仍须当前运行环境的 probe。见 [精确 I 验收](docs/evidence/T060-image-acceptance-2026-11-14.md).
-- T060 P：独立部署包尚未实现，接口仍为规范化 501；I 已限定验收，P 可进入设计实施。T070 的完整管理员能力、全链路与正式实验仍受前置闸门约束。
+- T060 P：固定源码包、独立 CLI 与受管 API/发布/下载已接线并完成合成测试；生产能力仍关闭（PACKAGE_SETUP_REQUIRED），独立环境真模型 probe、UI 和验收待完成。I 已限定验收。T070 的完整管理员能力、全链路与正式实验仍受前置闸门约束。
 
 本轮文档/合成恢复测试修正前的普通 CI [41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873)对应源码 `b9cbc568`：371 项后端、47 项前端通过，9 项原生 opt-in 跳过；普通浏览器 4 项实际执行通过、1 项 ML 跳过；Windows 既有进程/API 检查通过，ML job 跳过。新增 27 项文档/合成恢复测试后的本地轻量回归为 398 后端通过、9 跳过、47 前端通过，见[限定恢复练习](docs/evidence/synthetic-backup-recovery-2026-11-04.md)。精确阶段状态见 [docs/status.md](docs/status.md)，验收条件与证据边界见 [验收矩阵](docs/acceptance.md)。这不是完整项目交付声明。
 
@@ -27,7 +27,7 @@ EdgeVision 面向单机计算机视觉场景，目标是把项目、数据集、
 ## 目录
 
 - `docs/`：范围、架构、环境、接口、表、存储、模型、验收、ADR、证据、T000–T070 任务。
-- `backend/`：FastAPI 身份/项目/数据集/任务/产物接口、独立 Worker、训练、导出与图片推理适配器、Alembic 迁移；尚未实现的部署路径明确 501。
+- `backend/`：FastAPI 身份/项目/数据集/任务/产物接口、独立 Worker、训练、导出与图片推理适配器、Alembic 迁移；部署能力在独立运行证明完成前明确不可用。
 - `web/`：Vue 3/TypeScript 工作台，展示项目、数据集、任务、训练、导出及单图推理状态；只报告 API 返回的事实。
 - `contracts/openapi.json`、`contracts/generated/openapi.ts`：从 FastAPI OpenAPI 生成的公共契约和前端类型；`contracts/api.ts` 临时桥接已移除。
 - `scripts/install_deps.py`：Linux/Windows 共用的项目依赖安装与预检；`scripts/dev.py`：共用的检查、启动、迁移、生成入口。`scripts/dev.sh` 保留为 Linux/Bash 兼容包装。

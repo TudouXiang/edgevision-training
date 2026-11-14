@@ -58,7 +58,7 @@
         "discriminator": {
           "mapping": {
             "dataset_report": "#/components/schemas/OtherArtifactPublic",
-            "deployment_zip": "#/components/schemas/OtherArtifactPublic",
+            "deployment_zip": "#/components/schemas/PackageArtifactPublic",
             "inference_input": "#/components/schemas/InferenceInputArtifactPublic",
             "inference_result": "#/components/schemas/InferenceResultArtifactPublic",
             "onnx": "#/components/schemas/OnnxArtifactPublic",
@@ -79,6 +79,9 @@
           },
           {
             "$ref": "#/components/schemas/InferenceResultArtifactPublic"
+          },
+          {
+            "$ref": "#/components/schemas/PackageArtifactPublic"
           },
           {
             "$ref": "#/components/schemas/OtherArtifactPublic"
@@ -2121,6 +2124,16 @@
           "kind": {
             "$ref": "#/components/schemas/JobKind"
           },
+          "package": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackageJobSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "params_schema_version": {
             "title": "Params Schema Version",
             "type": "integer"
@@ -2447,10 +2460,7 @@
             "title": "Job Id"
           },
           "kind": {
-            "enum": [
-              "dataset_report",
-              "deployment_zip"
-            ],
+            "const": "dataset_report",
             "title": "Kind",
             "type": "string"
           },
@@ -2498,6 +2508,153 @@
         "title": "OtherArtifactPublic",
         "type": "object"
       },
+      "PackageArtifactMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "manifest_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "manifest_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1048576.0,
+            "title": "Manifest Size Bytes",
+            "type": "integer"
+          },
+          "package_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "package_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 150994944.0,
+            "title": "Package Size Bytes",
+            "type": "integer"
+          },
+          "protocol": {
+            "const": "edgevision-python-onnx-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/PackageProvenance"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "standalone_execution": {
+            "const": "not_run_for_this_artifact",
+            "title": "Standalone Execution",
+            "type": "string"
+          },
+          "template": {
+            "$ref": "#/components/schemas/PackageTemplate"
+          },
+          "template_validation_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Template Validation Sha256",
+            "type": "string"
+          },
+          "validation_scope": {
+            "const": "trusted_model_fixed_package_integrity",
+            "title": "Validation Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "protocol",
+          "provenance",
+          "template",
+          "package_sha256",
+          "package_size_bytes",
+          "manifest_sha256",
+          "manifest_size_bytes",
+          "template_validation_sha256",
+          "validation_scope",
+          "standalone_execution"
+        ],
+        "title": "PackageArtifactMetadata",
+        "type": "object"
+      },
+      "PackageArtifactPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "const": "zip",
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "deployment_zip",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/PackageArtifactMetadata"
+          },
+          "metadata_schema_version": {
+            "const": 1,
+            "title": "Metadata Schema Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 150994944.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "validation_state": {
+            "const": "passed",
+            "title": "Validation State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
+        ],
+        "title": "PackageArtifactPublic",
+        "type": "object"
+      },
       "PackageJobCreate": {
         "additionalProperties": false,
         "properties": {
@@ -2508,6 +2665,18 @@
           },
           "params": {
             "$ref": "#/components/schemas/PackageParams"
+          },
+          "source_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Job Id"
           }
         },
         "required": [
@@ -2515,6 +2684,55 @@
           "params"
         ],
         "title": "PackageJobCreate",
+        "type": "object"
+      },
+      "PackageJobSource": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "export_job_id": {
+            "format": "uuid",
+            "title": "Export Job Id",
+            "type": "string"
+          },
+          "onnx_artifact_id": {
+            "format": "uuid",
+            "title": "Onnx Artifact Id",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/PackageParams"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "template_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Template Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "onnx_artifact_id",
+          "export_job_id",
+          "source_sha256",
+          "template_sha256",
+          "params",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "PackageJobSource",
         "type": "object"
       },
       "PackageParams": {
@@ -2530,6 +2748,133 @@
           "onnx_artifact_id"
         ],
         "title": "PackageParams",
+        "type": "object"
+      },
+      "PackageProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "export_job_id": {
+            "format": "uuid",
+            "title": "Export Job Id",
+            "type": "string"
+          },
+          "frozen_input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Frozen Input Sha256",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "model_metadata_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Metadata Sha256",
+            "type": "string"
+          },
+          "model_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Sha256",
+            "type": "string"
+          },
+          "model_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 134217728.0,
+            "title": "Model Size Bytes",
+            "type": "integer"
+          },
+          "onnx_artifact_id": {
+            "format": "uuid",
+            "title": "Onnx Artifact Id",
+            "type": "string"
+          },
+          "parent_artifact_id": {
+            "format": "uuid",
+            "title": "Parent Artifact Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "run_id",
+          "project_id",
+          "onnx_artifact_id",
+          "export_job_id",
+          "parent_artifact_id",
+          "frozen_input_sha256",
+          "model_sha256",
+          "model_size_bytes",
+          "model_metadata_sha256",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "PackageProvenance",
+        "type": "object"
+      },
+      "PackageTemplate": {
+        "additionalProperties": false,
+        "properties": {
+          "core_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Core Sha256",
+            "type": "string"
+          },
+          "image_protocol": {
+            "const": "detection-image-v1",
+            "title": "Image Protocol",
+            "type": "string"
+          },
+          "lock_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Lock Sha256",
+            "type": "string"
+          },
+          "protocol": {
+            "const": "edgevision-python-onnx-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "target": {
+            "const": "linux-x86_64-cpython312-cpu",
+            "title": "Target",
+            "type": "string"
+          },
+          "template_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Template Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "protocol",
+          "image_protocol",
+          "target",
+          "template_sha256",
+          "core_sha256",
+          "lock_sha256"
+        ],
+        "title": "PackageTemplate",
         "type": "object"
       },
       "Page_ArtifactPublic_": {

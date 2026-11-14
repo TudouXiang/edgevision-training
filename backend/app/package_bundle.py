@@ -18,8 +18,19 @@ def entry(name, content):
     return {'path': name, 'size_bytes': len(content), 'sha256': sha256(content).hexdigest()}
 
 
+def synthetic_example():
+    """Fixed PNG encoded with stdlib only: identity checks never import Pillow."""
+    import zlib
+    width, height = 257, 193
+    rows = b''.join(b'\x00' + bytes(value for x in range(width)
+        for value in ((3*x+y)%256, (x+5*y)%256, (7*x+11*y)%256)) for y in range(height))
+    def chunk(kind, content):
+        body = kind + content
+        return struct.pack('>I', len(content)) + body + struct.pack('>I', zlib.crc32(body))
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>2I5B',width,height,8,2,0,0,0)) + chunk(b'IDAT', zlib.compress(rows,9)) + chunk(b'IEND',b'')
+
+
 def template_files():
-    from .delivery_infer import synthetic_png
     lines = (ROOT/'backend/requirements-delivery-linux-cpu.lock').read_text().splitlines()
     selected = sorted(line for line in lines if line.split('==')[0].lower() in LOCK_NAMES)
     if len(selected) != len(LOCK_NAMES): portable.fail()
@@ -27,7 +38,7 @@ def template_files():
         'run.py': Path(__file__).with_name('package_cli.py').read_bytes(),
         'delivery_infer.py': Path(__file__).with_name('delivery_infer.py').read_bytes(),
         'requirements.lock': ('\n'.join(selected)+'\n').encode(),
-        'example.png': synthetic_png(),
+        'example.png': synthetic_example(),
         'LICENSE': (ROOT/'LICENSE').read_bytes(),
         'README.md': b'# EdgeVision independent ONNX source package\n\nTarget: Linux x86_64, glibc >= 2.28, CPython 3.12, CPU.\nThis archive contains no Python interpreter, wheels, Torch, or platform server.\nInstall the exact hashed dependencies in an isolated virtual environment:\n\n    python -m pip install --require-hashes --only-binary=:all: -r requirements.lock\n\nInitial installation requires internet access or a separately prepared matching wheelhouse.\nFor offline installation add --no-index --find-links=/path/to/wheelhouse.\nArchive integrity is not proof that inference ran for this particular model.\nRun once per fresh process with Python isolated mode:\n\n    python -I run.py --image example.png --format png --output results\n\nThe output directory must not already exist. Outputs: result.json and preview.png.\nPreview is a sanitized source image; result.json contains detections.\nOn an output-write failure, the partial directory is retained. Do not treat it as successful.\nInspect/remove it yourself before reusing that path; the CLI never deletes existing files.\n',
         'LICENSE_SCOPE.md': (ROOT/'LICENSE_SCOPE.md').read_bytes() + b'\n## Independent package supplement\n\nThe original repository scope above is preserved, including AGPL-3.0-only.\nRepository paths mentioned there do not imply those assets are bundled here.\nNo dependency wheels, original training data or legacy prototype are included.\nThird-party dependencies and model inputs retain their separate rights.\n',
@@ -85,6 +96,13 @@ def build_bundle(value, directory):
 
 
 def verify_bundle(path, value):
+    try:
+        return _verify_bundle(path, value)
+    except (zipfile.BadZipFile, struct.error, UnicodeError) as exc:
+        raise ValueError("PACKAGE_BUNDLE_INVALID") from exc
+
+
+def _verify_bundle(path, value):
     frozen = FrozenPackage.model_validate(value).model_dump(mode='json')
     # Bound and fingerprint from one descriptor, then parse that immutable byte snapshot.
     size, fingerprint, raw = portable.verified_file(path, portable.MAX_TOTAL, capture=True)

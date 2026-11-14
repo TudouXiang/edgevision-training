@@ -2,20 +2,12 @@
 from typing import Literal
 from uuid import UUID
 from pydantic import Field, model_validator
-from .schemas import StrictInferenceModel, PackageParams, SHA256
+from .schemas import StrictInferenceModel, PackageParams, SHA256, PackageTemplate as TemplateIdentity, PackageArtifactMetadata
 from .inference_contract import TrustedOnnx
 
 MAX_PACKAGE_BYTES = 144 * 1024**2
 MAX_PACKAGE_JSON_BYTES = 1024**2
 
-
-class TemplateIdentity(StrictInferenceModel):
-    protocol: Literal['edgevision-python-onnx-v1']
-    image_protocol: Literal['detection-image-v1']
-    target: Literal['linux-x86_64-cpython312-cpu']
-    template_sha256: str = Field(pattern=SHA256)
-    core_sha256: str = Field(pattern=SHA256)
-    lock_sha256: str = Field(pattern=SHA256)
 
 
 class FrozenPackage(StrictInferenceModel):
@@ -66,4 +58,28 @@ class PackageEvidence(StrictInferenceModel):
     def complete(self):
         if {entry.path for entry in self.outputs} != {'package.zip', 'metadata.json', 'validation.json'}:
             raise ValueError('package output members mismatch')
+        return self
+
+
+class PackageValidation(StrictInferenceModel):
+    schema_version: Literal[1]
+    metadata: PackageArtifactMetadata
+    manifest: dict[str, object]
+
+    @model_validator(mode='after')
+    def consistent(self):
+        from .package_cli import validate_manifest, canonical
+        from hashlib import sha256
+        value = validate_manifest(self.manifest)
+        raw = canonical(value)
+        if (len(raw), sha256(raw).hexdigest()) != (self.metadata.manifest_size_bytes, self.metadata.manifest_sha256):
+            raise ValueError('manifest metadata mismatch')
+        proof = self.metadata.provenance
+        expected = {'onnx_artifact_id':str(proof.onnx_artifact_id),'export_job_id':str(proof.export_job_id),
+            'parent_artifact_id':str(proof.parent_artifact_id),'sha256':proof.model_sha256,
+            'size_bytes':proof.model_size_bytes,'metadata_sha256':proof.model_metadata_sha256}
+        if value['source'] != expected:
+            raise ValueError('manifest source mismatch')
+        if value['template'] != {key:getattr(self.metadata.template,key) for key in value['template']}:
+            raise ValueError('manifest template mismatch')
         return self

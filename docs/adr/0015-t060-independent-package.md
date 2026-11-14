@@ -42,7 +42,7 @@ requirements.lock 是现有联合 lock 中 Pillow12.3.0、NumPy2.5.4、ONNX1.23.
 
 沿用单 Worker/单重任务槽、worker.lock、guardian、GO、取消、drain/started/logs_complete/exit0 receipt；不嵌套任意 Popen 或加队列。package runner 只做来源、固定模板与完整 ZIP 字节校验，不导入 ML、不执行模型。每包 metadata 明示 standalone_execution=not_run_for_this_artifact、validation_scope=trusted_model_fixed_package_integrity；不得把 ZIP 成功当成独立模型执行成功。P 首次开放必须另有精确模板及候选包的独立环境实跑证据。此取舍复用旧 cf97d02 proposed D1，避免每次打包重复运行模型与额外进程；不是扩大验收范围。
 
-每个生产 package 子进程仅执行一次复制后 standalone 合成推理，重验清单/源/model/core/lock、结果协议/摘要/有限值后写严格 evidence；不要求历史同模型 I 任务，也不能在同进程再次 load_onnx（其已导入 ORT 门槛会拒绝）。独立 CI 或显式 package probe 用已有 guardian 顺序启动全新子进程，生成/读取同源已核验 I 私有参考结果，再与 standalone 结果按冻结检测匹配规则（IoU>=.99、score差<=.001、xyxy各<=.5px）比较。双模式 I capability 是协议能力，不要求探针模型就是本包模型。不强求非空框，非空算法另有逻辑测试；不事后放宽容差。成功须完整树退出及 receipt，然后 intent → 同卷 rename → 短事务 Artifact 登记与成功 CAS。取消抢先不发布，缺 receipt 停领，孤儿不自动恢复为成功；无自动重跑。下载按资源 ID 鉴权，同一已验证 fd 有界流式传输，损坏返回 409。
+每个生产 package 子进程仅构建并校验固定包，不执行 standalone 推理。独立证明不要求历史同模型 I 任务；比较进程各自只 load_onnx 一次。独立 CI 或显式 package probe 用已有 guardian 顺序启动全新子进程，生成/读取同源已核验 I 私有参考结果，再与 standalone 结果按冻结检测匹配规则（IoU>=.99、score差<=.001、xyxy各<=.5px）比较。双模式 I capability 是协议能力，不要求探针模型就是本包模型。不强求非空框，非空算法另有逻辑测试；不事后放宽容差。成功须完整树退出及 receipt，然后 intent → 同卷 rename → 短事务 Artifact 登记与成功 CAS。取消抢先不发布，缺 receipt 停领，孤儿不自动恢复为成功；无自动重跑。下载按资源 ID 鉴权，同一已验证 fd 有界流式传输，损坏返回 409。
 
 新增闭集 PACKAGE_SOURCE_CHANGED / PACKAGE_RUNTIME_CHANGED / PACKAGE_BUNDLE_INVALID / PACKAGE_VALIDATION_FAILED / PACKAGE_STORAGE_FAILED；权限/归档/取消/幂等冲突沿用现有规范。重试来源身份和前端恢复记录按用户+项目分区，不因刷新/超时产生新任务。
 
@@ -56,6 +56,6 @@ requirements.lock 是现有联合 lock 中 Pillow12.3.0、NumPy2.5.4、ONNX1.23.
 
 ## 7. 当前具体开放项
 
-没有必须等待用户选型的架构问题。实施前需工程核验：依赖子集在当前准备镜像能否形成真正独立 venv、模型再分发条款的准确来源、历史 deployment_zip 是否存在。分别由锁闭包/隔离测试、许可清单、只读数据核查解决；失败仅阻断相应验收/发行。P 仍未实现、未验收。
+没有必须等待用户选型的架构问题。实施前需工程核验：依赖子集在当前准备镜像能否形成真正独立 venv、模型再分发条款的准确来源、历史 deployment_zip 是否存在。分别由锁闭包/隔离测试、许可清单、只读数据核查解决；失败仅阻断相应验收/发行。P 分阶段实现中，尚未验收。
 
 独立运行验收必须比较同一输入的完整 raw tensor（atol=1e-4、rtol=1e-4）以及 detections（IoU≥0.99、score差≤0.001、坐标差≤0.5px）；不能以空检测列表相等替代 raw 验证。CLI 不公开写出 raw，内部执行函数仅供验收比较。

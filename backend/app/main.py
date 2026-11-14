@@ -116,6 +116,7 @@ def capabilities():
     from .training_assets import capability
     from .export_assets import capability as export_capability
     from .inference_assets import capability as inference_capability
+    from .package_assets import capability as package_capability
     return {
         "schema_version": 1,
         "features": {
@@ -123,7 +124,7 @@ def capabilities():
             "training_cpu": capability(), "training_cuda": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="CUDA device not verified", detected_version=None),
             "events": available(), "dataset_check": available(), "models": available(), "onnx_export": export_capability(),
             "pt_inference": inference_capability(), "onnx_inference": inference_capability(),
-            "deployment": unavailable(), "rknn": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="No RKNN target or board verification", detected_version=None),
+            "deployment": package_capability(), "rknn": FeatureCapability(available=False, reason_code="NOT_PROBED", reason="No RKNN target or board verification", detected_version=None),
         },
     }
 
@@ -443,7 +444,7 @@ def dataset_sample_image(dataset_id: UUID, sample_id: str, request: Request):
 def create_job(project_id: UUID, body: JobCreate, request: Request, idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=128)):
     require_allowed_origin(request)
     with api_transaction() as connection:
-        if body.kind not in {JobKind.EXPORT_ONNX, JobKind.INFER}:
+        if body.kind not in {JobKind.EXPORT_ONNX, JobKind.INFER, JobKind.PACKAGE}:
             begin_write(connection)
         actor = require_actor(connection, request, csrf=True)
         project = project_for_actor(connection, str(project_id), actor)
@@ -456,6 +457,9 @@ def create_job(project_id: UUID, body: JobCreate, request: Request, idempotency_
         if body.kind == JobKind.INFER:
             from .inference_service import submit_inference
             return submit_inference(connection, actor, str(project_id), body.params, str(body.source_job_id) if body.source_job_id else None, idempotency_key, request.url.path, request)
+        if body.kind == JobKind.PACKAGE:
+            from .package_service import submit_package
+            return submit_package(connection, actor, str(project_id), body.params, str(body.source_job_id) if body.source_job_id else None, idempotency_key, request.url.path, request)
         if body.kind != JobKind.DATASET_CHECK:
             active_project(project)
             not_implemented()
@@ -507,12 +511,12 @@ def metrics(job_id: UUID, request: Request, cursor: str | None = None, limit: in
 
 
 def image_aware_artifact_public(row):
-    if row['kind'] not in {'inference_input', 'inference_result'}:
+    if row['kind'] not in {'inference_input', 'inference_result', 'deployment_zip'}:
         return artifact_public(row)
     try:
         return ArtifactPublic.model_validate(artifact_public(row)).model_dump(mode='json')
     except (ValueError, TypeError, KeyError) as exc:
-        raise HTTPException(409, {'code': 'ARTIFACT_UNAVAILABLE', 'message': 'Image artifact metadata is unavailable or changed'}) from exc
+        raise HTTPException(409, {'code': 'ARTIFACT_UNAVAILABLE', 'message': 'Artifact metadata is unavailable or changed'}) from exc
 
 
 @app.get(API + "/projects/{project_id}/artifacts", response_model=Page[ArtifactPublic], responses={**_AUTH_RESPONSES, **_ERROR_RESPONSE, **_JOB_RESPONSES})
@@ -545,6 +549,9 @@ def download_artifact(artifact_id: UUID, request: Request):
     if row["kind"] == "onnx":
         from .export_download import download_onnx
         return download_onnx(row, str(artifact_id))
+    if row["kind"] == "deployment_zip":
+        from .package_download import download
+        return download(row)
     if row["kind"] == "inference_result":
         from .inference_download import download
         return download(row)

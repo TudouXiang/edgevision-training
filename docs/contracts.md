@@ -134,4 +134,4 @@ GET /inferences/{id}/image为该结果独立净化PNG；result.json由既有Arti
 结果读取和下载检查完整历史发布束，不要求当前probe仍有效。
 
 pt_inference/onnx_inference保留原capability keys，只在当前代码/环境绑定的新双模式受管图片probe通过后可用。
-E raw探针不能代替I。P仍501；源码、纯逻辑/普通进程和真实PT/ORT验收须分别记录。
+E raw探针不能代替I。P受管API/发布/下载已接线，但生产能力在独立probe前关闭，返回409 PACKAGE_SETUP_REQUIRED；包完整性校验明确不等于逐包执行。源码、纯逻辑/普通进程和真实PT/ORT验收须分别记录。

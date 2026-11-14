@@ -123,6 +123,11 @@ def guardian(behavior: str, job_id: str, run_id: str) -> int:
 
 def worker(behavior: str) -> int:
     from app import worker as module
+    is_package = behavior.startswith("package_")
+    if is_package:
+        from app import package_inputs
+        package_inputs.verify_input = lambda value: value
+        behavior = behavior[len("package_"):]
     is_inference = behavior.startswith("infer_")
     if is_inference:
         from app import inference_inputs
@@ -140,7 +145,7 @@ def worker(behavior: str) -> int:
         behavior = behavior[len("training_"):]
 
     if behavior.startswith("kill_") or behavior in {"pre_go", "go_commit_failure"}:
-        runner_behavior = "wait" if (is_export or is_inference) else "valid_then_wait"
+        runner_behavior = "wait" if (is_export or is_inference or is_package) else "valid_then_wait"
     else:
         runner_behavior = behavior
     module.guardian_command = lambda job, run: [sys.executable, HERE, "guardian", runner_behavior, job, run]

@@ -48,10 +48,11 @@ def test_current_image_acceptance_stays_scoped_and_keeps_package_pending():
     readme = (ROOT / 'README.md').read_text()
     assert '真实图片推理与独立部署包尚未实现' not in readme
     assert '单图工程限定 accepted' in readme and 'bd8d554' in readme
-    assert 'P：独立部署包尚未实现' in readme
+    assert '生产能力仍关闭（PACKAGE_SETUP_REQUIRED）' in readme
+    assert '独立环境真模型 probe、UI 和验收待完成' in readme
     current = (ROOT / 'docs/status.md').read_text().split('以下保留各阶段原始状态')[0]
     assert 'I 限定 accepted' in current and 'T060 整体与 T070 未验收' in current
-    assert 'P仍501' in current and '尚未验收' in current
+    assert '生产P能力强制关闭（PACKAGE_SETUP_REQUIRED）' in current and '原生验收待完成' in current
 
 
 def test_current_api_and_export_text_does_not_restore_pre_inference_claims():
