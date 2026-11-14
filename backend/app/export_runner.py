@@ -8,7 +8,20 @@ from .export_inputs import verify_input, copy_input
 from .export_service import provenance
 from .training_assets import digest_json
 from .schemas import OnnxArtifactMetadata
-from .export_errors import ExportFailure
+from .export_errors import ExportFailure, EXPORT_DIAGNOSTICS
+
+
+def write_failure_diagnostic(directory, error):
+    """Best-effort private fixed code; never replaces the original task failure."""
+    if error.exit_code != 74:
+        return
+    code = error.diagnostic
+    if type(code) is not str or code not in EXPORT_DIAGNOSTICS:
+        code = "unknown"
+    try:
+        atomic_json(directory / "export-failure.json", {"schema_version": 1, "code": code})
+    except Exception:
+        pass
 
 
 def run(job_id, run_id):
@@ -25,6 +38,7 @@ def run(job_id, run_id):
         model, validation = export_and_validate(directory, source, frozen['source_metadata']['classes'],
             job_id=job_id, run_id=run_id, input_sha256=digest_json(frozen), source_sha256=frozen['source_sha256'])
     except ExportFailure as exc:
+        write_failure_diagnostic(directory, exc)
         log(str(exc), 'error')
         return exc.exit_code
     except TrainingPolicyError:

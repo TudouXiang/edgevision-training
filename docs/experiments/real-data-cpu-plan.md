@@ -74,3 +74,9 @@
 下一诊断仅增加可选 `export_failure={phase,error}` 闭集，且仅在 export failed / 总状态 failed 允许。分辨导出探测、提交、Worker、结果、下载、血缘，以及末尾的推理能力探测。`inference_probe` 失败不等于模型导出本身失败。`contract` 仅是值/结构检查类异常，不宣称一定为 HTTP 错误。异常文本、命令、路径、ID 和返回码均不公开；原断言、超时和清理门禁不变。
 
 普通 [CI #60](https://github.com/TudouXiang/edgevision-training/actions/runs/43650280419) 成功。诊断提交 `f204cf0390fc36ac2c0373631cd470467c58098f` 的[原生 #61](https://github.com/TudouXiang/edgevision-training/actions/runs/43651174024) 再次训练通过，错误为 `export_result / assertion`：前置探测、提交及 Worker 命令返回正常，但任务并非 succeeded；下载/血缘/推理探测尚未执行。下一闭集增量仅在该断言失败时映射现有 API 的 task_state/task_code，未知值归 unknown，不复制 error_message 或 ID。它只保留失败事实，不让任何非 succeeded 任务通过。
+
+[CI #62](https://github.com/TudouXiang/edgevision-training/actions/runs/43652429337) 成功。[原生 #63](https://github.com/TudouXiang/edgevision-training/actions/runs/43653312729) exact `f0de61ee38519f2795ecd3831409c6224e613ca4` 进一步确认 `failed / ONNX_MODEL_INVALID`，官方 asset export probe 通过，真实训练产物失败；普通 checks 与 Windows 通过。这仍不能区分图契约、checker 与固定张量比较错误。
+
+下一诊断沿用原受管导出进程，失败时仅将闭集图阶段写入当前 run 私有 sidecar。未增开模型进程，未更改输出、错误码74、比较阈值和发布门禁。harness 仅在绑定任务为 failed/ONNX_MODEL_INVALID 且 guardian drain 完整确认后读取至多1024字节普通非链接文件；缺失或坏文件为 unknown。公开仅固定 detail 枚举，不含原生错误文本、路径、ID、张量或测量值。成功导出不会写失败诊断。
+
+安全复核补充：sidecar 的普通写入/查询异常不覆盖原失败；安全策略 BaseException 不吞掉，允许其保持另一失败分类而不是掩盖安全信号。已覆盖 sqlite3 查询异常、父目录符号链接与安全异常透传。此诊断变化更改原生源码绑定，必须重新执行能力探测。

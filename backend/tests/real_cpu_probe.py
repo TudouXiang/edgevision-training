@@ -12,6 +12,7 @@ from pathlib import Path
 import secrets
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
 import time
@@ -38,15 +39,16 @@ def command(args,log,timeout=120):
 
 
 class ExportTaskFailure(AssertionError):
-    def __init__(self,state,code):
+    def __init__(self,state,code,detail=None):
         report=load('real_cpu_report')
         self.state=state if type(state) is str and state in report.EXPORT_TASK_STATES else 'unknown'
         self.code=code if type(code) is str and code in report.EXPORT_TASK_CODES else 'unknown'
+        self.detail=detail if type(detail) is str and detail in report.EXPORT_DETAILS else None
         super().__init__('export task did not succeed')
 
 
-def require_export_success(result,task):
-    if task['state']!='succeeded':raise ExportTaskFailure(task['state'],task.get('error_code'))
+def require_export_success(result,task,detail=None):
+    if task['state']!='succeeded':raise ExportTaskFailure(task['state'],task.get('error_code'),detail)
 
 
 @contextmanager
@@ -63,8 +65,51 @@ def export_step(result,phase):
         result['export_failure']={'phase':phase,'error':category}
         if phase=='export_result' and isinstance(error,ExportTaskFailure):
             result['export_failure'].update(task_state=error.state,task_code=error.code)
+            if error.state=='failed' and error.code=='ONNX_MODEL_INVALID' and error.detail is not None:
+                result['export_failure']['detail']=error.detail
         raise
 
+
+def completed_export_drain(row,receipt):
+    return (type(receipt) is dict and row.get('kind')=='export_onnx' and row.get('status')=='failed'
+            and row.get('error_code')=='ONNX_MODEL_INVALID' and bool(row.get('run_id'))
+            and receipt.get('job_id')==row.get('id') and receipt.get('run_id')==row.get('run_id')
+            and receipt.get('tree_exited') is True and receipt.get('reason')=='completed'
+            and type(receipt.get('exit_code')) is int and receipt['exit_code']==74
+            and receipt.get('started') is True and receipt.get('logs_complete') is True)
+
+
+def read_export_detail(path):
+    report=load('real_cpu_report')
+    try:
+        # Fail closed on links/special files before parsing a tiny immutable snapshot.
+        if any(parent.is_symlink() for parent in path.parents):return 'unknown'
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as source:
+            info=os.fstat(source.fileno())
+            if not stat.S_ISREG(info.st_mode) or not 0<info.st_size<=1024:return 'unknown'
+            raw=source.read(1025)
+        if len(raw)!=info.st_size:return 'unknown'
+        value=json.loads(raw,object_pairs_hook=report.unique)
+        if (type(value) is dict and set(value)=={'schema_version','code'}
+                and type(value['schema_version']) is int and value['schema_version']==1
+                and type(value['code']) is str and value['code'] in report.EXPORT_DETAILS):return value['code']
+    except (OSError,ValueError,TypeError):pass
+    return 'unknown'
+
+
+def export_diagnostic(identity,task,transaction,drain_receipt,run_directory):
+    if task.get('state')!='failed' or task.get('error_code')!='ONNX_MODEL_INVALID':return None
+    try:
+        with transaction() as connection:
+            found=connection.execute('SELECT * FROM jobs WHERE id=?',(identity,)).fetchone()
+        if found is None:return 'unknown'
+        row=dict(found)
+        if row['kind']!='export_onnx' or row['status']!='failed' or row['error_code']!='ONNX_MODEL_INVALID' or not row['run_id']:return 'unknown'
+        receipt=drain_receipt(row,wait_seconds=20)
+        if not completed_export_drain(row,receipt):return 'unknown'
+        return read_export_detail(run_directory(identity,row['run_id'])/'export-failure.json')
+    except Exception:return 'unknown'
 
 def stop(process):
     if process is None:return
@@ -201,7 +246,9 @@ def run(result,save,log):
             with export_step(result,'export_worker'):
                 once(180)
             with export_step(result,'export_result'):
-                require_export_success(result,job(export))
+                from app.run_files import run_directory
+                task=job(export)
+                require_export_success(result,task,export_diagnostic(export,task,transaction,drain_receipt,run_directory))
                 onnx=next(a for a in artifacts() if a['kind']=='onnx' and a['job_id']==export)
             with export_step(result,'export_download'):
                 download(onnx,PRIVATE/'trained.onnx')

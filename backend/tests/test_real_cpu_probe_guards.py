@@ -89,3 +89,56 @@ def test_export_task_diagnostic_drops_private_payload():
         with m.export_step(result,'export_result'):
             m.require_export_success(result,{'state':'secret','error_code':'secret'})
     assert result['export_failure']['task_state']==result['export_failure']['task_code']=='unknown'
+
+
+def test_export_sidecar_bounded_closed_and_no_links(tmp_path):
+    m=probe();path=tmp_path/'export-failure.json'
+    assert m.read_export_detail(path)=='unknown'
+    for raw in ('{"schema_version":1,"code":"compare_tolerance"}',):
+        path.write_text(raw);assert m.read_export_detail(path)=='compare_tolerance'
+    for raw in ('{"schema_version":true,"code":"graph_guard"}','{"schema_version":1,"code":"secret"}','{"schema_version":1,"code":"graph_guard","private":"secret"}','{"schema_version":1,"code":"graph_guard","code":"compare_tolerance"}','x'*1025):
+        path.write_text(raw);assert m.read_export_detail(path)=='unknown'
+    path.unlink();source=tmp_path/'private';source.write_text('{"schema_version":1,"code":"graph_guard"}')
+    path.symlink_to(source);assert m.read_export_detail(path)=='unknown'
+
+
+def test_export_detail_requires_bound_completed_drain():
+    m=probe();row={'id':'job','run_id':'run','kind':'export_onnx','status':'failed','error_code':'ONNX_MODEL_INVALID'}
+    receipt={'job_id':'job','run_id':'run','tree_exited':True,'reason':'completed','exit_code':74,'started':True,'logs_complete':True}
+    assert m.completed_export_drain(row,receipt)
+    for key,bad in (('job_id','other'),('run_id','other'),('tree_exited',False),('started',False),('logs_complete',False),('exit_code',0),('reason','timeout')):
+        assert not m.completed_export_drain(row,{**receipt,key:bad})
+    for key,bad in (('kind','train'),('status','running'),('error_code','RUNNER_FAILED')):
+        assert not m.completed_export_drain({**row,key:bad},receipt)
+    assert not m.completed_export_drain(row,None)
+
+
+def test_verified_export_detail_propagates_only_model_invalid():
+    m=probe()
+    for code in ('ONNX_MODEL_INVALID','RUNNER_FAILED'):
+        result={}
+        with pytest.raises(AssertionError):
+            with m.export_step(result,'export_result'):
+                m.require_export_success(result,{'state':'failed','error_code':code},'graph_guard')
+        assert ('detail' in result['export_failure'])==(code=='ONNX_MODEL_INVALID')
+
+
+def test_export_ancillary_database_failure_keeps_original_failure():
+    import sqlite3
+    m=probe();task={'state':'failed','error_code':'ONNX_MODEL_INVALID'}
+    def broken():raise sqlite3.OperationalError('private database')
+    def forbidden(*args,**kwargs):raise AssertionError('must not read sidecar')
+    detail=m.export_diagnostic('private-id',task,broken,forbidden,forbidden)
+    assert detail=='unknown'
+    result={}
+    with pytest.raises(AssertionError):
+        with m.export_step(result,'export_result'):m.require_export_success(result,task,detail)
+    assert result['export_failure']['task_code']=='ONNX_MODEL_INVALID'
+    assert result['export_failure']['detail']=='unknown'
+
+
+def test_export_sidecar_symlink_parent_is_unknown(tmp_path):
+    m=probe();directory=tmp_path/'real';directory.mkdir()
+    (directory/'export-failure.json').write_text('{"schema_version":1,"code":"graph_guard"}')
+    link=tmp_path/'link';link.symlink_to(directory,target_is_directory=True)
+    assert m.read_export_detail(link/'export-failure.json')=='unknown'

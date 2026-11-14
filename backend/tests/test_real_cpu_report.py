@@ -147,3 +147,22 @@ def test_export_task_enums_and_partial_keys():
         for bad in (None,[],{},True,42):
             w=json.loads(json.dumps(v));w['export_failure'][key]=bad
             with pytest.raises(ValueError):m.validate(json.dumps(w))
+
+
+def test_export_detail_only_for_verified_model_failure():
+    m=load();v=m.initial();v['stages'][m.STAGES.index('export')]['status']='failed'
+    v['export_failure']={'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID','detail':'compare_tolerance'}
+    assert m.validate(json.dumps(v))==v
+    for key,bad in (('detail','private'),('task_code','RUNNER_FAILED'),('task_state','running'),('phase','export_probe')):
+        w=json.loads(json.dumps(v));w['export_failure'][key]=bad
+        with pytest.raises(ValueError):m.validate(json.dumps(w))
+
+
+def test_export_detail_enumeration_and_invalid_types():
+    m=load();v=m.initial();v['stages'][m.STAGES.index('export')]['status']='failed'
+    for detail in m.EXPORT_DETAILS:
+        v['export_failure']={'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID','detail':detail}
+        assert m.validate(json.dumps(v))==v
+    for detail in ([],{},None,True,42):
+        v['export_failure']['detail']=detail
+        with pytest.raises(ValueError):m.validate(json.dumps(v))

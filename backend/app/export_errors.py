@@ -11,10 +11,28 @@ EXPORT_EXIT_ERRORS = {
 }
 
 
+EXPORT_DIAGNOSTICS = (
+    "graph_read", "graph_parse", "graph_guard", "graph_checker",
+    "compare_shape_dtype", "compare_nonfinite", "compare_tolerance",
+    "final_integrity", "unknown",
+)
+
+
+class ExportGraphError(ValueError):
+    def __init__(self, message, diagnostic):
+        if type(diagnostic) is not str or diagnostic not in EXPORT_DIAGNOSTICS:
+            raise ValueError("unknown export diagnostic")
+        self.diagnostic = diagnostic
+        super().__init__(message)
+
+
 class ExportFailure(ValueError):
-    def __init__(self, exit_code: int):
+    def __init__(self, exit_code: int, *, diagnostic="unknown"):
         if type(exit_code) is not int or exit_code not in EXPORT_EXIT_ERRORS:
             raise ValueError("unknown export failure")
+        if type(diagnostic) is not str or diagnostic not in EXPORT_DIAGNOSTICS:
+            raise ValueError("unknown export diagnostic")
+        self.diagnostic = diagnostic if exit_code == 74 else "unknown"
         self.exit_code = exit_code
         # Never retain or expose an upstream exception's text in the public code.
         super().__init__(EXPORT_EXIT_ERRORS[exit_code])
@@ -25,9 +43,11 @@ def unsupported_operator():
 
 
 @contextmanager
-def export_boundary(stage: str, *, passthrough: tuple[type[Exception], ...] = ()):
+def export_boundary(stage: str, *, passthrough: tuple[type[Exception], ...] = (), diagnostic="unknown"):
     if stage not in {"dependency", "graph", "runtime"}:
         raise ValueError("unknown export boundary")
+    if type(diagnostic) is not str or diagnostic not in EXPORT_DIAGNOSTICS:
+        raise ValueError("unknown export diagnostic")
     try:
         yield
     except ExportFailure:
@@ -49,4 +69,5 @@ def export_boundary(stage: str, *, passthrough: tuple[type[Exception], ...] = ()
             code = 75
         else:
             code = 74 if stage == "graph" else 76
-        raise ExportFailure(code) from exc
+        detail = exc.diagnostic if type(exc) is ExportGraphError else diagnostic
+        raise ExportFailure(code, diagnostic=detail) from exc

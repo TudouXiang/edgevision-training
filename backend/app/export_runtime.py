@@ -10,7 +10,7 @@ import stat
 from .export_contract import MAX_ONNX_BYTES, INPUT_SHAPE, TENSOR_NAMES, tensor_bytes
 from .run_files import fingerprint
 from .schemas import ExportValidation
-from .export_errors import export_boundary, unsupported_operator
+from .export_errors import export_boundary, unsupported_operator, ExportGraphError
 
 
 def read_model_bytes(path):
@@ -62,14 +62,14 @@ def guard_graph(model, onnx, classes):
 
 def compare_arrays(np, reference, actual, name):
     if reference.shape != actual.shape or reference.dtype != np.float32 or actual.dtype != np.float32:
-        raise ValueError('raw output shape or dtype mismatch')
+        raise ExportGraphError('raw output shape or dtype mismatch', 'compare_shape_dtype')
     if not np.isfinite(reference).all() or not np.isfinite(actual).all():
-        raise ValueError('raw output contains nonfinite values')
+        raise ExportGraphError('raw output contains nonfinite values', 'compare_nonfinite')
     # Float64 arithmetic prevents overflow/cancellation in the validator itself.
     delta = np.abs(actual.astype(np.float64) - reference.astype(np.float64))
     allowed = 1e-4 + 1e-4 * np.abs(reference.astype(np.float64))
     if not np.all(delta <= allowed):
-        raise ValueError('fixed raw tensor equivalence threshold exceeded')
+        raise ExportGraphError('fixed raw tensor equivalence threshold exceeded', 'compare_tolerance')
     return {'name': name, 'input_sha256': sha256(tensor_bytes(name)).hexdigest(),
         'pt_sha256': sha256(reference.astype('<f4', copy=False).tobytes(order='C')).hexdigest(),
         'ort_sha256': sha256(actual.astype('<f4', copy=False).tobytes(order='C')).hexdigest(),
@@ -124,10 +124,13 @@ def export_and_validate(root, source, classes, *, job_id, run_id, input_sha256, 
             export_params=True, opset_version=18, do_constant_folding=True,
             input_names=['images'], output_names=['output0'], dynamic_axes=None,
             dynamo=False, external_data=False, verbose=False)
-    with export_boundary('graph', passthrough=(TrainingPolicyError,)):
+    with export_boundary('graph', passthrough=(TrainingPolicyError,), diagnostic='graph_read'):
         raw = read_model_bytes(candidate)  # Bound BEFORE any protobuf parsing.
+    with export_boundary('graph', passthrough=(TrainingPolicyError,), diagnostic='graph_parse'):
         model_proto = onnx.load_model_from_string(raw)
+    with export_boundary('graph', passthrough=(TrainingPolicyError,), diagnostic='graph_guard'):
         guard_graph(model_proto, onnx, classes)
+    with export_boundary('graph', passthrough=(TrainingPolicyError,), diagnostic='graph_checker'):
         onnx.checker.check_model(raw, full_check=True)
     with export_boundary('runtime', passthrough=(TrainingPolicyError,)):
         options = ort.SessionOptions()
@@ -148,7 +151,7 @@ def export_and_validate(root, source, classes, *, job_id, run_id, input_sha256, 
         if len(outputs) != 1: fail('ORT_OUTPUT_SCHEMA_INVALID')
         with export_boundary('graph', passthrough=(TrainingPolicyError,)):
             samples.append(compare_arrays(np, references[name], outputs[0], name))
-    with export_boundary('graph', passthrough=(TrainingPolicyError,)):
+    with export_boundary('graph', passthrough=(TrainingPolicyError,), diagnostic='final_integrity'):
         if fatal or fingerprint(source) != before or read_model_bytes(candidate) != raw: fail('EXPORT_INPUT_OR_GRAPH_CHANGED')
     runtime = {'versions': {'torch': torch.__version__, 'torchvision': torchvision.__version__, 'ultralytics': ultralytics.__version__, 'onnx': onnx.__version__, 'onnxruntime': ort.__version__},
         'provider': 'CPUExecutionProvider', 'device': 'cpu', 'threads': 2, 'opset': 18, 'ir_version': 8,
