@@ -51,3 +51,7 @@
 - 后端完整回归执行中。原生双任务浏览器尚未执行，不能以普通 CI 的 ML skip 代替。
 - 真实浏览器复用原可信合成数据、CPU、1 epoch，再执行一次真实训练；逐项比较两次服务端记录与页面，不写入伪造任务/指标。仍属工程烟测，不是正式准确率实验。隔离与 450 秒总预算不放宽。
 - Ruling: 旧 App 路由/401 目标测试以专属 panel stub 隔离新增对比请求，保留原断言；新增对比 App 测试独立验证挂载/卸载。
+
+## Native run #49 diagnostic follow-up
+
+Exact remote 213726fff9f457f25f122222cfb18ebd2597bdfe: checks and Windows succeeded; Linux stopped at browser_delivery, closed phase ui_training_result. All six preceding stages passed; I/P stages NOT_RUN. This phase conflated first/second training and comparison assertions, so it does not prove a model or product defect. Independent review found no deterministic error. Add five anonymous fixed comparison subphases; preserve every assertion, timeout, isolation boundary and data policy. Red test: five unrecognized phases failed. Green: 194 isolation tests, 156 frontend tests, E2E typecheck passed. Revalidate the new exact commit; main integration remains blocked pending native acceptance.

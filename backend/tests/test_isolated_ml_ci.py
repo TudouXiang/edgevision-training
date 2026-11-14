@@ -959,7 +959,7 @@ def test_package_private_phase_never_relays_arbitrary_text(tmp_path,http,probe,e
     assert entry.package_failure(tmp_path)==expected
 
 
-@pytest.mark.parametrize('phase',['bootstrap','training_probe','export_probe','api','web','browser','receipt','cleanup','ui_export_submit'])
+@pytest.mark.parametrize('phase',['bootstrap','training_probe','export_probe','api','web','browser','receipt','cleanup','ui_export_submit','ui_comparison_submit','ui_comparison_selected','ui_comparison_result','ui_comparison_inventory','ui_comparison_metrics'])
 def test_delivery_diagnostic_is_closed_and_failure_only(tmp_path,phase):
     report=tmp_path/'private/browser-report';report.mkdir(parents=True)
     (report/'harness-phase.json').write_text(json.dumps({'phase':'browser' if phase.startswith('ui_') else phase}))

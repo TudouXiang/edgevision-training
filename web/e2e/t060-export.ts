@@ -6,7 +6,7 @@ import type { components } from '../../contracts/generated/openapi'
 type Job = components['schemas']['JobPublic']
 type Artifact = components['schemas']['ArtifactPublic']
 
-export const deliveryPhases = ['ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_responsive', 'ui_complete'] as const
+export const deliveryPhases = ['ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete'] as const
 export async function markDeliveryPhase(phase: typeof deliveryPhases[number]) {
   if (process.env.EDGEVISION_E2E_DELIVERY !== '1') return
   const path = process.env.EDGEVISION_E2E_DELIVERY_PHASE_FILE
