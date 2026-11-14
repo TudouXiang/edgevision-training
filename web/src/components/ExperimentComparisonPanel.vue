@@ -68,7 +68,7 @@ onUnmounted(()=>{lifetime.abort();run?.abort();revision++;listRevision++})
   <p v-if="warning" role="alert">{{ warning }}</p>
   <div class="actions"><button :disabled="listing" @click="refresh()">刷新实验</button><button :disabled="listing||page<=1" @click="refresh(page-1)">上一页实验</button><span>任务第 {{ page }} 页</span><button :disabled="listing||page*20>=total" @click="refresh(page+1)">下一页实验</button></div>
   <p v-if="!listing&&!list.length" class="note">当前任务页没有成功训练，可切换任务页。没有模拟实验。</p>
-  <div class="grid-form"><label>实验 A<select v-model="left"><option value="">选择实验</option><option v-for="j in choices" :key="j.id" :value="j.id">{{ j.training?.params.experiment_name??j.id }} · {{ j.id }}</option></select></label><label>实验 B<select v-model="right"><option value="">选择实验</option><option v-for="j in choices" :key="j.id" :value="j.id">{{ j.training?.params.experiment_name??j.id }} · {{ j.id }}</option></select></label><button :disabled="loading||!left||!right||left===right" @click="compare">对比所选实验</button></div>
+  <div class="grid-form"><label>实验 A<select v-model="left" aria-label="实验 A"><option value="">选择实验</option><option v-for="j in choices" :key="j.id" :value="j.id">{{ j.training?.params.experiment_name??j.id }} · {{ j.id }}</option></select></label><label>实验 B<select v-model="right" aria-label="实验 B"><option value="">选择实验</option><option v-for="j in choices" :key="j.id" :value="j.id">{{ j.training?.params.experiment_name??j.id }} · {{ j.id }}</option></select></label><button :disabled="loading||!left||!right||left===right" @click="compare">对比所选实验</button></div>
   <p v-if="loading" role="status">正在读取完整指标…</p>
   <section v-if="results" data-results aria-label="实验对比结果">
    <p v-if="differs" role="status">数据来源、基础权重、环境或代码不同，不宜直接排名。请先确认实验口径。</p>

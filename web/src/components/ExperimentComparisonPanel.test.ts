@@ -25,3 +25,10 @@ it('can retry a failed read without stale results',async()=>{setup();vi.mocked(j
 
 it.each(['nan','duplicate-seq'])('rejects corrupt metric stream %s',async mode=>{setup();const row={seq:1,epoch:1,name:'loss',value:mode==='nan'?NaN:1,at:date};vi.mocked(jobApi.metrics).mockResolvedValue({items:mode==='nan'?[row]:[row,row],next_cursor:'c',eof:true,job_state:'succeeded'});const w=create();await select(w);await compare(w);expect(w.find('[role="alert"]').text()).toContain('不完整');expect(w.find('[data-results]').exists()).toBe(false)})
 it('clears prior results and ignores metrics actually resolved after unmount',async()=>{setup();const w=create();await select(w);await compare(w);expect(w.find('[data-results]').exists()).toBe(true);let resolve!:(v:Awaited<ReturnType<typeof jobApi.metrics>>)=>void;vi.mocked(jobApi.metrics).mockReturnValueOnce(new Promise(done=>resolve=done));await compare(w);expect(w.find('[data-results]').exists()).toBe(false);const count=vi.mocked(jobApi.metrics).mock.calls.length;const signal=vi.mocked(jobApi.metrics).mock.calls.at(-1)![2]!;w.unmount();expect(signal.aborted).toBe(true);resolve({items:[],next_cursor:'c',eof:true,job_state:'succeeded'});await flushPromises();expect(jobApi.metrics).toHaveBeenCalledTimes(count);expect(w.emitted('error')).toBeUndefined()})
+
+it('gives comparison selectors exact stable accessible labels independent of option text',async()=>{
+ setup();const w=create();await flushPromises()
+ const selects=w.findAll('select')
+ expect(selects.map(s=>s.attributes('aria-label'))).toEqual(['实验 A','实验 B'])
+ expect(selects.every(s=>s.findAll('option').length===3)).toBe(true)
+})
