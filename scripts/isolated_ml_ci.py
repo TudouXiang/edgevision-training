@@ -114,7 +114,7 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
     if 'inference_browser_failure' in result:
         code = result['inference_browser_failure']
         require(version == SCHEMA_VERSION and rows[-1]['status'] == 'failed')
-        require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete'))
+        require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_submit_inventory', 'ui_pt_submit_model', 'ui_pt_submit_thresholds', 'ui_pt_submit_ready', 'ui_pt_submit_request', 'ui_pt_submit_response', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_submit_inventory', 'ui_onnx_submit_model', 'ui_onnx_submit_thresholds', 'ui_onnx_submit_ready', 'ui_onnx_submit_request', 'ui_onnx_submit_response', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete'))
         diagnostic = {'inference_browser_failure': code}
     # Return freshly built known fields; never relay arbitrary Docker output.
     return {'schema_version': version, 'stage': 'isolated_ml', 'status': result['status'],

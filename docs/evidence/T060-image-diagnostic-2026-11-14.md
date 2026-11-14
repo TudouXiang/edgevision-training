@@ -59,3 +59,21 @@ boundaries. Focused final suite: 194 passed; e2e typecheck passed. Aggregate:
 671 passed, 14 native skipped, 117 frontend passed, build/contracts passed.
 The final all-codes boundary test was added after aggregate collection and
 passed in the focused final suite. Exact remote validation remains separate.
+
+## Submit boundary refinement
+
+Run 43610853801 at de00ca066213c97229c005b08e1b9b35fcf5a71a passed checks,
+Windows and the first nine native stages, but returned `ui_pt_submit`.
+This does not identify a product root cause: that block includes inventory,
+model selection, thresholds, clicking and the acceptance response.
+The next increment adds six fixed subphases per backend and an enabled-button
+assertion before the same synchronous double click. The one-job, exact-202,
+result identity and all other assertions remain intact. No raw errors, status
+bodies or identifiers are published. Twelve new vocabulary tests failed
+before implementation; the focused boundary suite then passed 206 cases and
+e2e typechecking passed. Local sandboxed Chromium reproduction was unavailable
+(socket EPERM); no browser sandbox or system setting was weakened.
+
+Final local aggregate: 684 passed, 14 native skipped, 117 frontend passed;
+build and contract checks passed, exit 0. Independent read-only review approved
+the six-file diff; native acceptance remains pending.

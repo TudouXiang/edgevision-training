@@ -267,3 +267,9 @@ def test_all_ui_phases_cross_all_closed_boundaries(browser, monkeypatch, tmp_pat
         assert entry.main(['--host-netns', 'net:[123]']) == 1
         value = ci.validate_summary(capsys.readouterr().out)
         assert ci.public_summary('execution', False, value)['inference_browser_failure'] == phase
+
+
+@pytest.mark.parametrize('backend', ['pt', 'onnx'])
+@pytest.mark.parametrize('step', ['inventory', 'model', 'thresholds', 'ready', 'request', 'response'])
+def test_submit_subphases_are_closed_and_registered(browser, backend, step):
+    assert f'ui_{backend}_submit_{step}' in browser.PHASES

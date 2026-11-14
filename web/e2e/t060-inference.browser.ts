@@ -91,15 +91,23 @@ test('real PT and ONNX single-image UI preserves job identity and verified resul
 
   let lastJobId = ''
   for (const backend of ['pt', 'onnx'] as const) {
-    await checkpoint(`ui_${backend}_submit`)
+    await checkpoint(`ui_${backend}_submit_inventory`)
     const source = backend === 'pt' ? pt : onnx, before = new Set((await jobs(page, projectId)).map(job => job.id))
+    await checkpoint(`ui_${backend}_submit_model`)
     await panel.getByLabel('执行后端').selectOption(backend)
     await expect(panel.getByLabel('来源模型').locator('option', { hasText: source.id })).toHaveCount(1)
     await panel.getByLabel('来源模型').selectOption(source.id); await panel.getByLabel('不可变图片输入').selectOption(input.id)
+    await checkpoint(`ui_${backend}_submit_thresholds`)
     await panel.getByLabel('置信度阈值').fill('0.25'); await panel.getByLabel('IoU 阈值').fill('0.45')
+    await checkpoint(`ui_${backend}_submit_ready`)
+    const submit = panel.getByRole('button', { name: '创建推理任务', exact: true })
+    await expect(submit).toBeEnabled()
+    await checkpoint(`ui_${backend}_submit_request`)
     const acceptedResponse = page.waitForResponse(response => response.url().endsWith(`/projects/${projectId}/jobs`) && response.request().method() === 'POST' && response.request().postDataJSON()?.kind === 'infer')
-    await panel.getByRole('button', { name: '创建推理任务', exact: true }).evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
-    const response = await acceptedResponse; expect(response.status()).toBe(202)
+    await submit.evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
+    const response = await acceptedResponse
+    await checkpoint(`ui_${backend}_submit_response`)
+    expect(response.status()).toBe(202)
     const accepted: components['schemas']['JobAccepted'] = await response.json(); lastJobId = accepted.job_id
     await checkpoint(`ui_${backend}_result`)
     await expect(panel.locator('h3')).toContainText('succeeded', { timeout: 45_000 })
