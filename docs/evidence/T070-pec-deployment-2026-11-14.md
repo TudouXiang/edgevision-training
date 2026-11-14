@@ -24,6 +24,14 @@
 - 全新隔离数据目录执行迁移成功；不读写旧工作区数据库。
 - `npm run build`退出0，Vue类型检查及Vite构建成功。
 
+## 本机普通浏览器实际验证
+
+`python3 scripts/e2e.py --report-dir <独立证据目录>/ordinary-e2e`退出0。项目内固定Playwright 1.64.1 Chromium/FFmpeg准备完成；UOS被上游标为非官方支持且使用Ubuntu24.04 fallback，此次实际运行成功，无缺失共享库，不扩大为所有UOS版本支持承诺。未运行系统依赖安装。
+
+Harness在自有临时DB、合成受控fixture和自动选择的回环端口上真实启动API/Worker/Web/浏览器，结束清理成功。匿名结果：discovered=6、executed=5、passed=5、expected_skipped=1、unexpected=0、flaky=0、reporter_errors=0、cleanup_status=passed。T020/T030/T040/T070普通用例实际执行；T050模型训练是明确的ML预期跳过，不计模型验证。
+
 ## 待执行
 
-API/Worker/前端启动和本机普通浏览器验证仍待逐项证据。当前不能称常驻服务已运行。正式数据实验、用户机 ML probe/训练/导出/推理/包执行未验收。
+新隔离API/Worker/Web随后已实际启动，未配置系统自启。API回环8000健康HTTP200，返回数据库已迁移、存储可用；Web回环5173返回HTTP200。自有PID/进程组及日志保留于本机部署目录，未终止其它进程。首次管理员尚未初始化，没有代造/发送密码；页面实际渲染另待确认，不能仅凭HTTP200称可登录。正式数据实验、用户机 ML probe/训练/导出/推理/包执行未验收。
+
+本机匿名Harness receipt SHA256：`a8a9733d80715a62ef929473be9e12d9ded9d9e70f4f6a5ee7b804cd0391cd5d`。准备摘要 SHA256：`362a6fd2316e46a79d8996c6509da1c3d2f104ee94eeec41b92e7b814d949999`。原始证据保留于本机独立部署目录；公开文档不包含账户、密码、截图或用户数据。
