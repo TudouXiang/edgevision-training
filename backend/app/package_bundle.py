@@ -32,8 +32,9 @@ def synthetic_example():
 
 def template_files():
     lines = (ROOT/'backend/requirements-delivery-linux-cpu.lock').read_text().splitlines()
-    selected = sorted(line for line in lines if line.split('==')[0].lower() in LOCK_NAMES)
-    if len(selected) != len(LOCK_NAMES): portable.fail()
+    selected = (ROOT/'backend/requirements-package-linux-cpu.lock').read_text().splitlines()
+    expected = {line for line in lines if line.split('==')[0].lower() in LOCK_NAMES}
+    if len(selected) != len(LOCK_NAMES) or set(selected) != expected: portable.fail()
     return {
         'run.py': Path(__file__).with_name('package_cli.py').read_bytes(),
         'delivery_infer.py': Path(__file__).with_name('delivery_infer.py').read_bytes(),

@@ -10,7 +10,7 @@ import time
 
 from .job_service import MAX_LOG_BYTES, MAX_LOG_EVENTS, MAX_LOG_LINE_BYTES, canonical
 from .process_identity import identity
-from .run_files import atomic_json, run_directory
+from .run_files import atomic_json, run_directory, read_json
 
 
 POLL_SECONDS = 0.05
@@ -135,7 +135,13 @@ def supervise(job_id: str, run_id: str) -> int:
     root_exit_at = None
     began = time.monotonic()
     try:
-        tree = ProcessTree(runner_command(job_id, run_id))
+        if read_json(directory / 'input.json').get('kind') == 'package_standalone_probe':
+            if os.name == 'nt': raise ValueError('Standalone package probe is Linux-only')
+            from .package_launch import launch
+            command, environment = launch(job_id, run_id)
+            tree = ProcessTree(command, environment=environment)
+        else:
+            tree = ProcessTree(runner_command(job_id, run_id))
         tree.start()
         capture = threading.Thread(target=capture_output, args=(tree.output, directory / "logs.jsonl", log_result), daemon=True)
         capture.start()

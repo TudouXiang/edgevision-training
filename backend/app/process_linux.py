@@ -10,20 +10,21 @@ from .process_identity import identity, linux_identity
 
 
 class ProcessTree:
-    def __init__(self, command: list[str]):
+    def __init__(self, command: list[str], environment: dict[str, str] | None = None):
         libc = ctypes.CDLL(None, use_errno=True)
         libc.prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
         libc.prctl.restype = ctypes.c_int
         if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
             raise OSError(ctypes.get_errno(), "Cannot establish child subreaper")
         self.command = command
+        self.environment = dict(environment) if environment is not None else None
         self.child = None
         self.root_code = None
         self.output = None
         self.record = None
 
     def start(self) -> None:
-        self.child = subprocess.Popen(self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
+        self.child = subprocess.Popen(self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True, env=self.environment)
         self.output = self.child.stdout
         self.record = identity(self.child.pid)
 

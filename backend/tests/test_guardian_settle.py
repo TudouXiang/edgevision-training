@@ -59,6 +59,7 @@ def simulate(monkeypatch, tmp_path, *, converges_at=None, clears_on_stop=False, 
     monkeypatch.setattr(guardian, "run_directory", lambda *_: tmp_path)
     monkeypatch.setattr(guardian, "atomic_json", lambda path, value: writes.update({path.name: value}))
     # No wall-clock wait: every poll advances a deterministic clock.
+    monkeypatch.setattr(guardian, "read_json", lambda *args: {"kind": "dataset_check"})
     result = guardian.supervise("job", "run")
     return result, writes.get("drained.json"), stops
 
