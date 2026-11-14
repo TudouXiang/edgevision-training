@@ -5,7 +5,7 @@ from importlib import metadata
 import os
 from pathlib import Path
 import sys
-from .run_files import run_directory,read_json
+from .run_files import run_directory,read_json,fingerprint
 from .package_probe_contract import StandaloneInput
 from .training_assets import digest_json
 
@@ -20,9 +20,17 @@ def installer():
     return module
 
 
+def verify_interpreter():
+    # EnvBuilder defaults to executable copies, not symlinks. Bind bytes to
+    # the fixed base interpreter; verify_environment separately binds pyvenv.cfg.
+    base=Path(getattr(sys,'_base_executable',sys.executable)).resolve(strict=True)
+    if fingerprint(PYTHON.resolve(strict=True))!=fingerprint(base):
+        raise ValueError('standalone interpreter is not the fixed base Python')
+
+
 def check_environment():
     if sys.platform!='linux' or sys.version_info[:2]!=(3,12):raise ValueError('standalone target unsupported')
-    if PYTHON.resolve(strict=True)!=Path(sys.executable).resolve(strict=True):raise ValueError('standalone interpreter is not the fixed base Python')
+    verify_interpreter()
     prefix=PYTHON.parent.parent
     spec=importlib.util.spec_from_file_location('edgevision_fixed_install_security',ROOT/'scripts/install_ml.py')
     security=importlib.util.module_from_spec(spec);spec.loader.exec_module(security)

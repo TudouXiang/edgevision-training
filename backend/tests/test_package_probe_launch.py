@@ -2,6 +2,7 @@
 from uuid import uuid4
 from pathlib import Path
 import pytest
+import sys
 
 
 def task():
@@ -44,3 +45,27 @@ def test_launch_rejects_changed_or_wrong_run_task(tmp_path,monkeypatch):
     monkeypatch.setattr(package_launch,'source_hashes',lambda:{'cli_sha256':'0'*64,'bootstrap_sha256':'b'*64})
     with pytest.raises(ValueError):package_launch.launch(value['job_id'],value['run_id'])
     with pytest.raises(ValueError):package_launch.launch(str(uuid4()),value['run_id'])
+
+
+@pytest.mark.skipif(sys.platform != 'linux', reason='fixed standalone runtime targets Linux')
+def test_fixed_interpreter_accepts_real_venv_copy(tmp_path, monkeypatch):
+    import sys
+    import venv
+    from app import package_launch
+    environment = tmp_path / 'isolated'
+    venv.EnvBuilder(with_pip=False).create(environment)
+    executable = environment / 'bin/python'
+    base = Path(sys._base_executable).resolve()
+    assert not executable.is_symlink()
+    assert executable.resolve() != base
+    monkeypatch.setattr(package_launch, 'PYTHON', executable)
+    package_launch.verify_interpreter()
+
+
+def test_fixed_interpreter_rejects_changed_copy(tmp_path, monkeypatch):
+    from app import package_launch
+    executable = tmp_path / 'python'
+    executable.write_bytes(b'not the approved interpreter')
+    monkeypatch.setattr(package_launch, 'PYTHON', executable)
+    with pytest.raises(ValueError, match='fixed base Python'):
+        package_launch.verify_interpreter()
