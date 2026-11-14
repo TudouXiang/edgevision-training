@@ -261,7 +261,7 @@ describe('dataset upload client', () => {
   })
 })
 
-it.each(['export', 'inference'])('remounts the %s panel on stage navigation and ignores the old route request', async panel => {
+it.each(['export', 'inference', 'package'])('remounts the %s panel on stage navigation and ignores the old route request', async panel => {
   const { createRouter, createMemoryHistory } = await import('vue-router')
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:stage?', component: App }] })
   await router.push('/training'); await router.isReady()
@@ -283,7 +283,7 @@ it.each(['export', 'inference'])('remounts the %s panel on stage navigation and 
     if (url.includes('/datasets?') || url.includes('/artifacts?') || url.includes('/admin/users?')) return Promise.resolve(json(emptyPage))
     throw new Error(`unhandled ${url}`)
   }))
-  const wrapper = mount(App, { global: { plugins: [router], stubs: { TrainingPanel: true, JobPanel: true, [panel === 'export' ? 'InferencePanel' : 'ExportPanel']: true } } })
+  const wrapper = mount(App, { global: { plugins: [router], stubs: { TrainingPanel: true, JobPanel: true, ...Object.fromEntries(['export', 'inference', 'package'].filter(name => name !== panel).map(name => [name[0].toUpperCase() + name.slice(1) + 'Panel', true])) } } })
   await settle(); await wrapper.find('.project-picker select').setValue('route-project'); await settle()
   await router.push('/onnx'); await settle()
   expect(oldSignal?.aborted).toBe(true); expect(jobReads).toBe(2)

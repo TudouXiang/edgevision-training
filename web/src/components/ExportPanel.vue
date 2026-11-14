@@ -212,7 +212,7 @@ onUnmounted(() => { controller.abort(); invalidate() })
       <p v-if="selected.state === 'succeeded' && !outputs.length" class="note">任务已成功，尚未读取到验证通过的 ONNX 产物；不提供未经验证的下载。</p>
       <article v-for="item in outputs" :key="item.id" class="verified-output"><strong>ONNX · passed</strong><p class="identity">SHA-256 {{ item.sha256 }}</p><a :href="`/api/v1/artifacts/${item.id}/download`">下载已验证 ONNX（{{ item.size_bytes.toLocaleString() }} bytes）</a><details><summary>验证与来源追溯</summary><dl class="source-identity"><dt>来源 PT</dt><dd>{{ item.metadata.provenance.parent_artifact_id }}</dd><dt>类别顺序</dt><dd>{{ item.metadata.classes.join('、') }}</dd><dt>实际执行提供方</dt><dd>{{ item.metadata.validation.runtime.provider }}</dd><dt>输入 / 原始输出</dt><dd>{{ item.metadata.validation.input_shape.join(' × ') }} / {{ item.metadata.validation.output_shape.join(' × ') }}</dd><dt>冻结容差</dt><dd>atol {{ item.metadata.validation.atol }} · rtol {{ item.metadata.validation.rtol }}</dd><dt>固定张量验证</dt><dd v-for="sample in item.metadata.validation.samples" :key="sample.name">{{ sample.name }} · 最大绝对误差 {{ sample.max_absolute_error }} · 容差比 {{ sample.max_tolerance_ratio }}</dd><dt>验证记录 SHA-256</dt><dd>{{ item.metadata.validation_sha256 }}</dd><dt>代码 / 环境指纹</dt><dd>{{ item.metadata.provenance.code_version }} / {{ item.metadata.provenance.runtime_binding }}</dd></dl></details></article>
     </article>
-    <p class="note">单张图片推理请在下方按当前能力提交；独立部署包尚不可用。导出校验不代表精度达标或边缘硬件验证。</p>
+    <p class="note">单张图片推理和独立部署包请在下方按当前能力提交。导出校验不代表精度达标或边缘硬件验证。</p>
   </section>
 </template>
 <style scoped>

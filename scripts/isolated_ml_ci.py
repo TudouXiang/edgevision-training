@@ -98,7 +98,8 @@ def decode_json(value: str):
 def validate_summary(value: str, *, expected_version: int | None = None) -> dict:
     require(len(value) <= 8192)
     result = decode_json(value)
-    require(isinstance(result, dict) and set(result) in ({'schema_version', 'stage', 'status', 'stages'}, {'schema_version', 'stage', 'status', 'stages', 'inference_browser_failure'}))
+    base={'schema_version','stage','status','stages'}
+    require(isinstance(result, dict) and base.issubset(result) and set(result).issubset(base | {'inference_browser_failure','package_http_failure'}))
     version = result['schema_version']
     require(type(version) is int and version in (2, 3, SCHEMA_VERSION))
     require(expected_version is None or version == expected_version)
@@ -117,6 +118,12 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
         require(version in (3, SCHEMA_VERSION) and rows[stages.index('inference_browser')]['status'] == 'failed')
         require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_submit_inventory', 'ui_pt_submit_model', 'ui_pt_submit_thresholds', 'ui_pt_submit_ready', 'ui_pt_submit_request', 'ui_pt_submit_response', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_submit_inventory', 'ui_onnx_submit_model', 'ui_onnx_submit_thresholds', 'ui_onnx_submit_ready', 'ui_onnx_submit_request', 'ui_onnx_submit_response', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete'))
         diagnostic = {'inference_browser_failure': code}
+    if 'package_http_failure' in result:
+        code=result['package_http_failure']
+        require(version == SCHEMA_VERSION and rows[stages.index('package_http')]['status']=='failed')
+        allowed={*('inputs','probe','api','submit','worker','download','standalone','receipt','complete'), *('probe_'+phase for phase in ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')), 'unknown'}
+        require(isinstance(code,str) and code in allowed)
+        diagnostic['package_http_failure']=code
     # Return freshly built known fields; never relay arbitrary Docker output.
     return {'schema_version': version, 'stage': 'isolated_ml', 'status': result['status'],
             'stages': [{'stage': name, 'status': row['status']} for name, row in zip(stages, rows, strict=True)], **diagnostic}
@@ -129,8 +136,7 @@ def public_summary(stage: str, passed: bool, result: dict | None = None) -> dict
     if result is not None:
         checked = validate_summary(json.dumps(result), expected_version=SCHEMA_VERSION)
         rows = checked['stages']
-        if 'inference_browser_failure' in checked:
-            diagnostic = {'inference_browser_failure': checked['inference_browser_failure']}
+        diagnostic = {key:checked[key] for key in ('inference_browser_failure','package_http_failure') if key in checked}
     require(not passed or (stage == 'complete' and all(row['status'] == 'passed' for row in rows)))
     return {'schema_version': SCHEMA_VERSION, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows, **diagnostic}
 
@@ -141,8 +147,8 @@ def failed_outer(stage: str, previous: dict) -> dict:
     evidence = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
                 'status': 'passed' if all(row['status'] == 'passed' for row in rows) else 'failed',
                 'stages': rows}
-    if 'inference_browser_failure' in previous:
-        evidence['inference_browser_failure'] = previous['inference_browser_failure']
+    for key in ('inference_browser_failure','package_http_failure'):
+        if key in previous:evidence[key]=previous[key]
     return public_summary(stage, False, evidence)
 
 

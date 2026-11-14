@@ -12,6 +12,7 @@ export type Metric = components['schemas']['Metric']
 export type Artifact = components['schemas']['ArtifactPublic']
 export type TrainParams = components['schemas']['TrainParams']
 export type ExportOnnxParams = components['schemas']['ExportOnnxParams']
+export type PackageParams = components['schemas']['PackageParams']
 export type InferenceParams = components['schemas']['InferenceParams']
 export type InferenceResult = components['schemas']['InferenceResult']
 export type InferenceInput = components['schemas']['InferenceInputArtifactPublic']
@@ -88,6 +89,7 @@ export const projectApi = {
 }
 
 export const jobApi = {
+  package: (projectId: string, params: PackageParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${encodeURIComponent(projectId)}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'package', params, source_job_id}), headers: {'Idempotency-Key': key}, signal }),
   infer: (projectId: string, params: InferenceParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${encodeURIComponent(projectId)}/jobs`, { method: 'POST', body: JSON.stringify({ kind: 'infer', params, source_job_id }), headers: { 'Idempotency-Key': key }, signal }),
   exportOnnx: (projectId: string, params: ExportOnnxParams, key: string, signal?: AbortSignal) => request<JobAccepted>(`/projects/${projectId}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'export_onnx', params}), headers: {'Idempotency-Key': key}, signal }),
   train: (projectId: string, params: TrainParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${projectId}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'train', params, source_job_id}), headers: {'Idempotency-Key': key}, signal }),

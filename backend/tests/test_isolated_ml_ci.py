@@ -937,3 +937,23 @@ def test_package_stage_requires_new_schema_and_cannot_relabel_i_receipt():
         'stages':[{'stage':name,'status':'passed'} for name in ci.INFERENCE_STAGES]}
     assert ci.validate_summary(json.dumps(historic))==historic
     with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(historic),expected_version=4)
+
+
+def test_package_diagnostic_is_closed_and_not_attached_to_success():
+    value=full_summary();value['status']='failed';value['stages'][-1]['status']='failed'
+    value['package_http_failure']='probe_identity'
+    assert ci.validate_summary(json.dumps(value))==value
+    assert ci.public_summary('execution',False,value)['package_http_failure']=='probe_identity'
+    assert ci.failed_outer('cleanup',ci.public_summary('execution',False,value))['package_http_failure']=='probe_identity'
+    value['package_http_failure']='private /home/user/model'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+    value=full_summary();value['package_http_failure']='probe_identity'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize(('http','probe','expected'),[('probe','identity','probe_identity'),('worker','secret','worker'),('secret','identity','unknown'),('probe','secret','unknown')])
+def test_package_private_phase_never_relays_arbitrary_text(tmp_path,http,probe,expected):
+    root=tmp_path/'private/http';root.mkdir(parents=True)
+    (root/'package-http-phase.json').write_text(json.dumps({'phase':http}))
+    (root/'package-probe-phase.json').write_text(json.dumps({'phase':probe}))
+    assert entry.package_failure(tmp_path)==expected

@@ -23,6 +23,12 @@ def prerequisites():
     return root
 
 
+def phase(root,value):
+    from app.run_files import atomic_json
+    if value not in ('inputs','probe','api','submit','worker','download','standalone','receipt','complete'):raise ValueError('phase')
+    atomic_json(root/'package-http-phase.json',{'phase':value})
+
+
 def run(root,diagnostic):
     import httpx
     from app.run_files import read_json,atomic_json
@@ -38,6 +44,7 @@ def run(root,diagnostic):
     from app.inference_files import write_bytes
     from app.package_bundle import verify_bundle
     from inference_http_probe import execute,json_response
+    phase(root,'inputs')
     training=JobPublic.model_validate(read_json(root/'first-result.json')).model_dump(mode='json')
     exported=JobPublic.model_validate(read_json(root/'export-result.json')).model_dump(mode='json')
     onnx=ArtifactPublic.model_validate(read_json(root/'export-artifact.json')).model_dump(mode='json')
@@ -46,11 +53,13 @@ def run(root,diagnostic):
     project=training['project_id'];assert onnx['project_id']==exported['project_id']==project
     assert read_json(root/'inference-http-result.json')['status']=='passed'
     atomic_json(root/'package-http-started.json',{'schema_version':1,'status':'started'})
+    phase(root,'probe')
     execute(['-m','app.package_probe','--onnx-artifact-id',onnx['id']],diagnostic,330)
     record=PackageProbeRecord.model_validate(read_json(root/'package-capability.json')).model_dump(mode='json')
     before=runtime_identity();assert record['runtime_binding']==digest_json(before)
     assert capability()['available'] is True
     assert validated_template()['record_sha256']==digest_json(record)
+    phase(root,'api')
     port=8894
     server=subprocess.Popen([sys.executable,'-m','uvicorn','app.main:app','--host','127.0.0.1','--port',str(port)],stdout=diagnostic,stderr=diagnostic)
     try:
@@ -66,8 +75,10 @@ def run(root,diagnostic):
             headers={'Origin':'http://127.0.0.1:5173','X-CSRF-Token':cookies['edgevision_csrf'],'Idempotency-Key':'actual-independent-package'}
             assert json_response(client.get('/api/v1/capabilities'))['features']['deployment']['available'] is True
             body={'kind':'package','params':{'onnx_artifact_id':onnx['id']}}
+            phase(root,'submit')
             accepted=json_response(client.post(f'/api/v1/projects/{project}/jobs',json=body,headers=headers),202)
             assert json_response(client.post(f'/api/v1/projects/{project}/jobs',json=body,headers=headers),202)==accepted
+            phase(root,'worker')
             execute(['-m','app.worker','--once'],diagnostic)
             job=json_response(client.get('/api/v1/jobs/'+accepted['job_id']))
             JobPublic.model_validate(job);assert job['state']=='succeeded' and job['kind']=='package'
@@ -77,6 +88,7 @@ def run(root,diagnostic):
             metadata=artifact['metadata']
             assert metadata['validation_scope']=='trusted_model_fixed_package_integrity'
             assert metadata['standalone_execution']=='not_run_for_this_artifact'
+            phase(root,'download')
             response=client.get('/api/v1/artifacts/'+artifact['id']+'/download');assert response.status_code==200
             assert (len(response.content),sha256(response.content).hexdigest())==(artifact['size_bytes'],artifact['sha256'])
             assert artifact['sha256']==record['package_sha256']
@@ -92,14 +104,17 @@ def run(root,diagnostic):
             info=verify_bundle(downloaded/'package.zip',frozen)
             # Fourth fresh process proves the actual authenticated download, not just a template.
             # This evidence is private; metadata is not rewritten to overclaim all packages.
+            phase(root,'standalone')
             with worker_lock(root):
                 task,proof,_=standalone_stage('cli',frozen,before,(downloaded/'package.zip',info))
+            phase(root,'receipt')
             assert proof['output']==record['cli']['output']
             assert runtime_identity()==before and validated_template()['record_sha256']==digest_json(record)
             atomic_json(root/'package-http-job.json',job)
             atomic_json(root/'package-http-artifact.json',artifact)
             atomic_json(root/'package-http-result.json',{'schema_version':1,'status':'passed','job_id':job['id'],'artifact_id':artifact['id'],
                 'proof_sha256':digest_json(record),'download_task':task,'download_proof':proof})
+            phase(root,'complete')
     finally:
         server.terminate()
         try:server.wait(timeout=10)

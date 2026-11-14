@@ -86,3 +86,10 @@ Coordinator reviews before implementation. No user-choice blocker. Engineering c
 - Added the separate hash-locked nine-package installation to the existing isolated Docker build and exactly two root license files to committed-source freezing. No broader root-directory copying or execution security relaxation.
 - New schema 4 requires `package_http` in addition to all ten I stages. Historical schemas 2 and 3 retain E/I-only meanings and cannot pass a current run. P browser integration remains pending; schema 4 is not full UI/project acceptance.
 - Ordinary evidence so far: 129 package tests and 168 isolated-entry/HTTP opt-in tests pass. Full ordinary backend regression is pending for this checkpoint. No package dependency installation, ABI check, native P inference or P browser execution has been performed.
+
+## First actual P attempt and follow-up
+
+- Exact remote `2f056c944371a2cdb589c5f9c168de02a5bf91c7`, Actions #36 (`43623696620`) executed schema 4. All ten previous I stages passed; `package_http` failed. Thus P remains unaccepted. Isolated build/installation completed far enough to enter execution; this does not establish successful standalone inference.
+- Complete local ordinary backend regression for that source: 817 passed, 14 skipped, 42 subtests passed (395.77 s). The skips are not native evidence.
+- Added only closed anonymous HTTP/probe phase markers for the next diagnostic attempt, not private exception text, IDs, paths, results or model bytes. No safety or numerical conditions were loosened. 177 targeted boundary tests passed.
+- Implemented the minimal package panel using the existing guarded polling lifecycle, user/project-scoped persisted request and acceptance receipts, retry-source identity, cancellation/logs, and same-job verified ZIP links. Full frontend: 130 tests passed, build and E2E type check passed; final targeted panel suite: 12 passed. A native browser acceptance for P remains pending.

@@ -32,3 +32,12 @@ def test_expansion_is_exact_and_preserves_existing_destination(inference_ready,t
     assert expand_candidate(source/'package.zip',value,target)==info
     assert verify_package(target/'package')==info['manifest']
     with pytest.raises(FileExistsError):expand_candidate(source/'package.zip',value,target)
+
+
+def test_probe_phase_accepts_only_closed_anonymous_labels(monkeypatch,tmp_path):
+    from app import package_probe as probe
+    monkeypatch.setattr(probe,'data_root',lambda:tmp_path)
+    probe.phase('raw')
+    from app.run_files import read_json
+    assert read_json(tmp_path/'package-probe-phase.json')=={'phase':'raw'}
+    with pytest.raises(ValueError):probe.phase('secret /home/person/model')

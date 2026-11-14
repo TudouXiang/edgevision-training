@@ -4,6 +4,14 @@ from .inference_assets import capability as reference_capability
 from .run_files import atomic_json
 
 
+PHASES = ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')
+
+
+def phase(value):
+    if value not in PHASES:raise ValueError('unknown package probe phase')
+    atomic_json(data_root()/'package-probe-phase.json',{'phase':value})
+
+
 def completed_receipt(receipt):
     if not receipt or receipt.get('reason')!='completed' or receipt.get('exit_code')!=0 or receipt.get('logs_complete') is not True or receipt.get('started') is not True:
         raise ValueError('standalone tree exit or execution failed')
@@ -15,13 +23,16 @@ def run_probe(artifact_id):
     root=data_root();root.mkdir(parents=True,exist_ok=True)
     with worker_lock(root):
         atomic_json(root/'package-capability.json',{'schema_version':1,'available':False})
+        phase('reference_capability')
         if not reference_capability()['available']:raise ValueError('current managed reference capability required')
         from .training_probe import recover_probe
         from .worker import recover
+        phase('recover')
         if not recover_probe():raise RuntimeError('Previous shared probe exit is unconfirmed')
         if recover():raise RuntimeError('Existing task exit is unconfirmed')
         record=assemble_proof(artifact_id)
         atomic_json(root/'package-capability.json',record)
+        phase('complete')
 
 
 def expand_candidate(path,frozen,directory):
@@ -62,6 +73,7 @@ def standalone_stage(mode,frozen,before,source=None):
     from .training_assets import digest_json
     job_id,run_id=str(uuid4()),str(uuid4())
     directory=run_directory(job_id,run_id,create=True)
+    phase('bundle')
     if source is None:build_bundle(frozen,directory)
     else:
         path,info=source
@@ -75,6 +87,7 @@ def standalone_stage(mode,frozen,before,source=None):
         'runtime_binding':digest_json(before),'code_version':digest_json(before['adapter']),
         'model_sha256':frozen['model']['source_sha256'],'template_sha256':frozen['template']['template_sha256'],
         'image_sha256':image['sha256'],'image_size_bytes':image['size_bytes']}).model_dump(mode='json')
+    phase(mode)
     atomic_json(directory/'input.json',task)
     active={'job_id':job_id,'run_id':run_id,'guardian':None}
     atomic_json(data_root()/'training-probe-active.json',active)
@@ -118,19 +131,24 @@ def assemble_proof(artifact_id):
     from .package_contract import FrozenPackage
     from .package_probe_contract import PackageProbeRecord
     from .training_assets import digest_json
+    phase('source')
     with transaction() as connection:
         connection.execute('BEGIN');pair=sources(connection,artifact_id)
+    phase('identity')
     before=runtime_identity();reference_before=reference_identity()
+    phase('reference')
     reference=stage(pair,'onnx',reference_before,synthetic_png())
     frozen=FrozenPackage.model_validate({'schema_version':1,'project_id':pair['onnx']['project_id'],'model':pair['onnx'],
         'params':{'onnx_artifact_id':artifact_id},'template':before['package_template'],'runtime_binding':digest_json(before),
         'code_version':digest_json(before['adapter']),'template_validation_sha256':digest_json({'candidate_only':True})}).model_dump(mode='json')
     raw_task,raw,candidate=standalone_stage('raw',frozen,before)
     cli_task,cli,_=standalone_stage('cli',frozen,before,candidate)
+    phase('comparison')
     comparison=compare_raw(reference,{'job_id':raw['job_id'],'run_id':raw['run_id'],
         'raw_size_bytes':raw['output']['raw_elements']*4,'raw_sha256':raw['output']['raw_sha256']})
     verify_pair(pair)
     if runtime_identity()!=before or reference_identity()!=reference_before:raise ValueError('probe environment changed')
+    phase('record')
     return PackageProbeRecord.model_validate({'schema_version':1,'available':True,'protocol':'edgevision-python-onnx-v1',
         'runtime_binding':digest_json(before),'code_version':digest_json(before['adapter']),
         'reference_runtime_binding':digest_json(reference_before),'reference_code_version':digest_json(reference_before['adapter']),

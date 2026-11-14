@@ -114,6 +114,25 @@ def stage_commands(root: Path = ROOT) -> list[tuple[str, list[str], Path]]:
     ]
 
 
+PACKAGE_HTTP_PHASES = ('inputs','probe','api','submit','worker','download','standalone','receipt','complete')
+PACKAGE_PROBE_PHASES = ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')
+
+
+def package_failure(root):
+    def read_phase(name, allowed):
+        path=root/'private/http'/name
+        if path.is_symlink() or not path.is_file():raise ValueError('phase file')
+        with path.open('rb') as source:raw=source.read(257)
+        if len(raw)>256:raise ValueError('phase size')
+        value=json.loads(raw)
+        if not isinstance(value,dict) or set(value)!={'phase'} or not isinstance(value['phase'],str) or value['phase'] not in allowed:raise ValueError('phase value')
+        return value['phase']
+    try:
+        value=read_phase('package-http-phase.json',PACKAGE_HTTP_PHASES)
+        return 'probe_'+read_phase('package-probe-phase.json',PACKAGE_PROBE_PHASES) if value=='probe' else value
+    except Exception:return 'unknown'
+
+
 def verify_policy_report(path: Path) -> None:
     # Pytest exit 0 may mean every case was skipped. That is not ML evidence.
     if not path.is_file() or path.stat().st_size > 1024 * 1024:
@@ -199,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
         result['inference_browser_failure'] = code
+    if current == 'package_http' and statuses[current] == 'failed':
+        result['package_http_failure'] = package_failure(ROOT)
     os.umask(previous_mask)
     signal.signal(signal.SIGTERM, previous_signal)
     print(json.dumps(result, separators=(',', ':')), flush=True)
