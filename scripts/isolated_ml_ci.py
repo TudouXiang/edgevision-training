@@ -169,7 +169,8 @@ def reject_overrides(environment: dict[str, str]) -> None:
     require(not any(key in environment for key in BLOCKED_OVERRIDES))
 
 
-def verify_hosted_workflow(environment: dict[str, str], expected_commit: str) -> None:
+def verify_hosted_workflow(environment: dict[str, str], expected_commit: str, *, profile: str = 'legacy') -> None:
+    require(profile in ('legacy', 'real_cpu_v1'))
     # Accident-prevention gate, not authentication against a malicious owner who
     # can forge env vars or edit this program. Trust the reviewed hosted workflow.
     require(bool(re.fullmatch(r'[a-f0-9]{40}', expected_commit)))
@@ -177,7 +178,8 @@ def verify_hosted_workflow(environment: dict[str, str], expected_commit: str) ->
     require(environment.get('RUNNER_ENVIRONMENT') == 'github-hosted')
     require(environment.get('GITHUB_EVENT_NAME') == 'workflow_dispatch')
     require(environment.get('GITHUB_WORKFLOW') == 'EdgeVision feature checks')
-    require(environment.get('EDGEVISION_RUN_ISOLATED_ML') == 'true')
+    flag = 'EDGEVISION_RUN_ISOLATED_ML' if profile == 'legacy' else 'EDGEVISION_RUN_REAL_CPU'
+    require(environment.get(flag) == 'true')
     require(environment.get('GITHUB_SHA') == expected_commit)
     require(environment.get('GITHUB_WORKFLOW_SHA') == expected_commit)
     repository = environment.get('GITHUB_REPOSITORY', '')
@@ -266,15 +268,16 @@ REQUIRED_SOURCE = (
 RECIPE = 'ci/isolated-ml.Dockerfile'
 
 
-def copy_source(context: Path, tree: str, read_blob) -> None:
+def copy_source(context: Path, tree: str, read_blob, *, recipe: str = RECIPE) -> None:
     """Copy verified committed blob bytes, never the mutable worktree/index."""
+    require(recipe in (RECIPE, 'ci/isolated-real-cpu.Dockerfile'))
     copied = set()
     for record in tree.split('\0'):
         if not record:
             continue
         metadata, relative = record.split('\t', 1)
         mode, kind, object_id = metadata.split()
-        if not source_allowed(relative) and relative != RECIPE:
+        if not source_allowed(relative) and relative != recipe:
             continue
         require(mode in {'100644', '100755'} and kind == 'blob')
         require(bool(re.fullmatch(r'[a-f0-9]{40}', object_id)))
@@ -282,16 +285,16 @@ def copy_source(context: Path, tree: str, read_blob) -> None:
         require(isinstance(content, bytes))
         header = b'blob ' + str(len(content)).encode('ascii') + b'\0'
         require(sha1(header + content, usedforsecurity=False).hexdigest() == object_id)
-        destination = context / ('Dockerfile' if relative == RECIPE else 'source/' + relative)
+        destination = context / ('Dockerfile' if relative == recipe else 'source/' + relative)
         destination.parent.mkdir(parents=True, exist_ok=True)
         with destination.open('xb') as target:
             target.write(content)
         destination.chmod(0o755 if mode == '100755' else 0o644)
         copied.add(relative)
-    require(set(REQUIRED_SOURCE).issubset(copied) and RECIPE in copied)
+    require(set(REQUIRED_SOURCE).issubset(copied) and recipe in copied)
 
 
-def freeze_source(root: Path, context: Path, commands: PrivateCommands, expected_commit: str) -> None:
+def freeze_source(root: Path, context: Path, commands: PrivateCommands, expected_commit: str, *, recipe: str = RECIPE) -> None:
     require(bool(re.fullmatch(r'[a-f0-9]{40}', expected_commit)))
     def git(*args):
         return commands.command(['git', '-c', 'core.fsmonitor=false', *args], cwd=root, timeout=15)
@@ -299,7 +302,7 @@ def freeze_source(root: Path, context: Path, commands: PrivateCommands, expected
     paths = ('backend', 'web', 'scripts', 'contracts', 'ci', 'LICENSE', 'LICENSE_SCOPE.md')
     require(git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--', *paths) == '')
     tree = git('ls-tree', '-r', '-z', expected_commit, '--', *paths)
-    copy_source(context, tree, lambda object_id: git('cat-file', 'blob', object_id).encode('utf-8'))
+    copy_source(context, tree, lambda object_id: git('cat-file', 'blob', object_id).encode('utf-8'), recipe=recipe)
     # A checkout/commit race is not evidence for the requested source revision.
     require(git('rev-parse', '--verify', 'HEAD').strip() == expected_commit)
     require(git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--', *paths) == '')
@@ -319,14 +322,14 @@ def copy_tool_prefix(source: Path, destination: Path, *, python: bool = False) -
     shutil.copytree(source, destination, symlinks=True)
 
 
-def prepare_context(root: Path, private: Path, commands: PrivateCommands, expected_commit: str) -> Path:
+def prepare_context(root: Path, private: Path, commands: PrivateCommands, expected_commit: str, *, recipe: str = RECIPE) -> Path:
     # Python/Node are official setup-action prefixes on the same Ubuntu 24.04 host.
     require(sys.platform == 'linux' and sys.version_info[:3] == (3, 12, 14))
     release = Path('/etc/os-release').read_text()
     require('ID=ubuntu\n' in release and 'VERSION_ID="24.04"\n' in release)
     context = private / 'build-context'
     context.mkdir(mode=0o700)
-    freeze_source(root, context, commands, expected_commit)
+    freeze_source(root, context, commands, expected_commit, recipe=recipe)
     copy_tool_prefix(PYTHON_PREFIX, context / 'tool-python', python=True)
     copy_tool_prefix(NODE_PREFIX, context / 'tool-node')
     asset = context / 'asset/yolo11n.pt'
@@ -355,10 +358,12 @@ def verify_owned(container: dict, name: str, token: str, image: str) -> None:
 
 
 def verify_container(container: dict, name: str, token: str, image: str, host_netns: str,
-                     *, exited: bool = False) -> None:
+                     *, exited: bool = False, profile: str = 'legacy') -> None:
+    require(profile in ('legacy', 'real_cpu_v1'))
+    entry = ENTRY if profile == 'legacy' else '/opt/edgevision/scripts/real_cpu_entry.py'
     verify_owned(container, name, token, image)
     config, host, state = container['Config'], container['HostConfig'], container['State']
-    args = ['-I', '-S', ENTRY, '--host-netns', host_netns]
+    args = ['-I', '-S', entry, '--host-netns', host_netns]
     require(config.get('Image') == image and config.get('User') == '10001:10001')
     require(config.get('Entrypoint') == [CONTAINER_PYTHON] and config.get('Cmd') == args)
     require(container.get('Path') == CONTAINER_PYTHON and container.get('Args') == args)

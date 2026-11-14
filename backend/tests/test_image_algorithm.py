@@ -165,3 +165,21 @@ def test_reject_encoded_16bit_rgb_rgba_before_pillow_downcast(tmp_path, color_ty
 def test_error_codes_are_closed():
     from app.delivery_infer import ImageInferenceError
     with pytest.raises(ValueError, match='unknown image failure code'): ImageInferenceError('private untrusted text')
+
+
+def test_memory_decode_matches_file_without_disk_reads(tmp_path,monkeypatch):
+    from app import delivery_infer as infer
+    content=encode(Image.new('RGB',(17,11),(40,80,120)),fmt='JPEG')
+    path=tmp_path/'input.jpg';path.write_bytes(content)
+    first,metadata=infer.decode_image(path,'jpeg')
+    assert hasattr(infer,'decode_image_bytes'),'bounded byte decoder absent'
+    import builtins
+    monkeypatch.setattr(builtins,'open',lambda *a,**k:pytest.fail('memory decode performed IO'))
+    second,other=infer.decode_image_bytes(content,'jpeg')
+    assert second.tobytes()==first.tobytes() and other==metadata
+
+
+def test_file_decode_preserves_format_gate_before_open(tmp_path):
+    from app.delivery_infer import decode_image,ImageInferenceError
+    with pytest.raises(ImageInferenceError,match='IMAGE_FORMAT_MISMATCH'):
+        decode_image(tmp_path/'missing','unknown')

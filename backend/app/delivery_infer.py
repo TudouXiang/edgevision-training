@@ -50,12 +50,21 @@ def letterbox_record(width, height):
 
 def decode_image(path, declared_format):
     """Read bounded local copy; classify decoder OSError separately from storage."""
-    from PIL import Image, ImageOps, ImageFile, __version__
+    from PIL import __version__
     if __version__ != '12.3.0': fail('RUNTIME_CHANGED')
     if declared_format not in {'jpeg', 'png'}: fail('IMAGE_FORMAT_MISMATCH')
     # Actual filesystem failures occur before the decoder exception boundary.
     with open(path, 'rb') as source:
         content = source.read(MAX_IMAGE_BYTES + 1)
+    return decode_image_bytes(content, declared_format)
+
+
+def decode_image_bytes(content, declared_format):
+    """Same bounded protocol for preloaded bytes; no filesystem/model IO."""
+    from PIL import Image, ImageOps, ImageFile, __version__
+    if __version__ != '12.3.0': fail('RUNTIME_CHANGED')
+    if declared_format not in {'jpeg', 'png'}: fail('IMAGE_FORMAT_MISMATCH')
+    if type(content) is not bytes: fail('IMAGE_DECODE_FAILED')
     if not content or len(content) > MAX_IMAGE_BYTES: fail('IMAGE_DECODE_FAILED')
     # Pillow silently reduces 16-bit RGB/RGBA PNG to mode RGB/RGBA. Inspect the
     # encoded IHDR before mode conversion; verify() below still checks its CRC.

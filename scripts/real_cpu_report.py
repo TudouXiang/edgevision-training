@@ -25,16 +25,22 @@ def statistics(values):
     return {'median_ms':(ordered[9]+ordered[10])/2,'p95_ms':ordered[18]}
 
 
-def measurements(series):
+def validate_loads(value):
+    require(type(value) is dict and set(value)=={'pt','onnx'})
+    require(all(type(v) in (int,float) and math.isfinite(v) and 0<=v<=600000 for v in value.values()))
+
+
+def measurements(series,loads):
+    validate_loads(loads)
     require(type(series) is dict and set(series)==set(SERIES))
     return {'unit':'ms','samples':20,'warmups':5,'threads':2,'batch':1,
-            'series':{key:{'raw':list(series[key]),'summary':statistics(series[key])} for key in SERIES}}
+            'model_load_ms':loads,'series':{key:{'raw':list(series[key]),'summary':statistics(series[key])} for key in SERIES}}
 
 
 def initial():
     return {'schema_version':SCHEMA_VERSION,'profile':PROFILE,'status':'failed',
             'manifest_sha256':MANIFEST_SHA,'dataset_sha256':DATASET_SHA,
-            'stages':[{'stage':s,'status':'NOT_RUN'} for s in STAGES],'measurements':None}
+            'stages':[{'stage':s,'status':'NOT_RUN'} for s in STAGES],'measurements':None,'evaluation':None}
 
 
 def unique(pairs):
@@ -57,10 +63,11 @@ def validate(raw):
         require(item['stage']==name and item['status'] in ('passed','failed','NOT_RUN','unverified'))
     measured=value['measurements']
     if measured is not None:
-        require(type(measured) is dict and set(measured)=={'unit','samples','warmups','threads','batch','series'})
+        require(type(measured) is dict and set(measured)=={'unit','samples','warmups','threads','batch','series','model_load_ms'})
         for key,expected in (('samples',20),('warmups',5),('threads',2),('batch',1)):
             require(type(measured[key]) is int and measured[key]==expected)
         require(measured['unit']=='ms')
+        validate_loads(measured['model_load_ms'])
         series=measured['series'];require(type(series) is dict and set(series)==set(SERIES))
         for item in series.values():
             require(type(item) is dict and set(item)=={'raw','summary'})
@@ -68,6 +75,24 @@ def validate(raw):
             summary=item['summary'];require(type(summary) is dict and set(summary)==set(expected))
             require(all(type(summary[k]) in (int,float) and math.isfinite(summary[k]) and summary[k]==v for k,v in expected.items()))
         require(stages[STAGES.index('timings')]['status']=='passed')
+    evaluation=value['evaluation']
+    if evaluation is not None:
+        require(type(evaluation) is dict and set(evaluation)=={'protocol','pt','onnx','comparison'})
+        require(evaluation['protocol']=='single-head-p025-iou050-v1')
+        require(stages[STAGES.index('evaluation')]['status']=='passed')
+        proof=evaluation['comparison']
+        require(type(proof) is dict and set(proof)=={'images','elements','max_absolute_error','max_tolerance_ratio','atol','rtol','detections_matched'})
+        require(type(proof['images']) is int and proof['images']==20 and type(proof['elements']) is int and proof['elements']==1008000)
+        require(proof['detections_matched'] is True and type(proof['atol']) is float and proof['atol']==1e-4 and type(proof['rtol']) is float and proof['rtol']==1e-4)
+        require(all(type(proof[k]) in (int,float) and math.isfinite(proof[k]) and 0<=proof[k]<=maximum for k,maximum in (('max_absolute_error',1e6),('max_tolerance_ratio',1))))
+        for backend in ('pt','onnx'):
+            metrics=evaluation[backend]
+            require(type(metrics) is dict and set(metrics)=={'images','ground_truth','tp','fp','fn','precision','recall'})
+            require(all(type(metrics[k]) is int for k in ('images','ground_truth','tp','fp','fn')))
+            require(metrics['images']==metrics['ground_truth']==20 and 0<=metrics['tp']<=20 and 0<=metrics['fp']<=6000 and metrics['fn']==20-metrics['tp'])
+            total=metrics['tp']+metrics['fp']
+            expected={'precision':metrics['tp']/total if total else 0.,'recall':metrics['tp']/20}
+            require(all(type(metrics[k]) in (int,float) and math.isfinite(metrics[k]) and metrics[k]==v for k,v in expected.items()))
     if value['status']=='passed':
-        require(all(s['status']=='passed' for s in stages) and measured is not None)
+        require(all(s['status']=='passed' for s in stages) and measured is not None and evaluation is not None)
     return value
