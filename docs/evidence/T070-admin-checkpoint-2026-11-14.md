@@ -1,6 +1,6 @@
 # T070 管理员任务切片候选
 
-状态：review_required，非 T070 或全项目验收。前置 P 的限定验收版本和本切片分别记录，不把旧 probe 复制为新环境能力。
+状态：管理员任务纵向切片限定工程验收通过，非 T070 或全项目验收。前置 P 的限定验收版本和本切片分别记录，不把旧 probe 复制为新环境能力。
 
 ## 实现
 
@@ -16,9 +16,9 @@
 - 前端最终完整 139 passed；build、typecheck:e2e 通过。面板最初空实现 4 例失败，接入前 App 管理员门禁失败，完成后转绿。
 - 新补强：晚取消响应切换详情、卸载后 resolve、日志 600→保留500、实际 HTTP wrapper 的凭据与 AbortSignal。
 - `scripts/export_contract.py --check`：匹配，无公共类型漂移。
-- 全量后端首次仍在执行，旧文档断言已单独复现并修正，最终以精确 CI 为准。
+- 首轮全后端 860 passed、1 个旧文档断言 failed、14 skipped；修正后最终本地完整 861 passed、14 skipped、42 subtests passed（399.52 秒）。
 - 本地普通浏览器：6 discovered / 6 failed / 0 passed，cleanup passed。固定 Playwright Chromium executable 不存在；不算 UI 执行通过。留待有浏览器的 CI。
-- 独立审查未发现阻塞性权限/执行缺陷，仍要求全量和浏览器通过。
+- 独立审查未发现阻塞性权限/执行缺陷；之后全量和浏览器结果见下方。
 
 ## 历史文档回归修正
 
@@ -32,3 +32,10 @@ P 文档备份 `f0a97b93d62b665151618a9447de1534080b3ecc` 的 #45 / 43633778327�
 3. 干净环境复现与用户目标机部署；每环境的新 probe、可运行入口和用户验收。尚无本版本 PEC003909/XIAOHU 部署证据。
 4. 操作/部署说明、演示脚本、架构/模块说明、完整测试报告、论文素材索引；学校正式题名/硬件硬性要求不能凭空补写。
 5. 安全集成至 main 或明确最终交付分支，核对其他贡献、CI 与回退。当前功能分支推送不代表 main 已交付。
+
+## 精确 CI 验收（后续补证）
+
+公开 SHA `a45421849c4b888be4ee01137c75de113b05d746`，本地 `7ae7f5dfed28320483b86389f39bd4028c5caf14`，同一 tree `844dc4d4d65b5fdc7045c5ad3ecc2dd7a5798ee2`。
+[工作流 #46 / 43635223317](https://github.com/TudouXiang/edgevision-training/actions/runs/43635223317) 的 checks `132570433036` 与 Windows `132570433311` 均 success；原生 ML job skipped。
+checks 日志在 20:08:10 UTC 记录 861 passed / 14 skipped，前端 139 passed，契约一致。20:08:52 UTC 浏览器记录 6 discovered / 5 executed / 5 passed / 1 expected ML skip / 0 failed / 0 unexpected，包含新增管理员真实跨用户场景。
+本节补足上方本地缺 Chromium 的验证缺口，不改写本地失败。仅管理员任务切片通过；基础实验对比、正式实验、最终干净部署和 T070 整体仍待完成。

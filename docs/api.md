@@ -17,7 +17,7 @@
 | GET /projects/{id}/artifacts、GET /artifacts/{id}、/download | Page[ArtifactPublic]、ArtifactPublic、鉴权文件流 | 已实现dataset_report/PT/ONNX及I结果列表、详情与受限下载；unverified原图片不提供下载 |
 | POST /projects/{id}/images、GET /inferences/{id}、GET /inferences/{id}/image | 单图multipart返回InferenceInputArtifactPublic；结果为InferenceResult与鉴权净化PNG | I源码已实现；上传只存unverified字节，解码在受管子进程，固定 Linux CPU 实际模型/HTTP/浏览器已限定验收，其他环境需本地probe |
 | GET/POST /admin/users、PATCH /admin/users/{id}、GET /admin/projects | UserCreate/Update/Public、项目分页 | T020 已实现，accepted（Linux CI）；最后一个启用管理员不能被禁用 |
-| GET /admin/jobs | Page[JobPublic] | T070 候选已实现；管理员全局真实有界分页，待完整回归/浏览器审查 |
+| GET /admin/jobs | Page[JobPublic] | T070 管理员切片限定通过；真实有界分页，#46 完整回归/普通浏览器验证 |
 
 JobCreate.kind 只接受 dataset_check/train/export_onnx/infer/package 且 params 与 kind 配对，不透传任意键。训练限预置 yolo11n.pt、epochs 1–100、batch 1–16、imgsz 320/640、cpu 或 cuda:0、seed 0–4294967295、学习率 1e-6–0.1；设备的 DTO 可解析不代表已验证可执行。导出限 batch=1/FP32/640；opset 与后处理须在目标版本真实烟测后锁定，当前不能接受任意 opset。推理DTO只可引用受限单图上传登记的图片artifact ID与本项目可信模型；真实执行须当前代码绑定的I双模式probe。
 

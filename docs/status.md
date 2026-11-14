@@ -1,3 +1,11 @@
+# 当前增量 · T070 管理员任务切片通过（2026-11-14 UTC）
+
+精确 `a45421849c4b888be4ee01137c75de113b05d746` 的 #46 checks/Windows 均 success；后端 861 passed（14 原生 skipped）、前端 139 passed、契约一致；普通浏览器 5 实际通过、1 预期 ML 跳过。已补齐全局任务 API/分页/详情/日志/单任务取消，保留服务器鉴权与会话隔离。见 [精确检查点与限制](evidence/T070-admin-checkpoint-2026-11-14.md)。
+
+T070 整体未验收：下一项为基础实验对比，另有正式实验、干净部署、演示/论文材料、main 集成与用户机验收。原生 ML 本次未重跑，每个实际环境须新鲜 probe。下方保留 P 及更早检查点。
+
+---
+
 # 当前增量 · T060 P 限定工程 accepted（2026-11-14 UTC）
 
 公开 SHA `685f2efa56165fb5bd45641c81a1539ad94759ea`、tree `f3822aa07269b52407df203368b3ff7039802588` 的 #44 三个 CI 任务全部成功，schema 5 十二阶段全部 passed，含 E/I 重验、独立九依赖模型执行、HTTP 下载 ZIP 再执行及 P 专属浏览器闭环。独立审查支持固定 Linux x86_64 / CPython 3.12 / CPU / 可信 YOLO11n 的源码部署包工程验收。见 [P 精确证据](evidence/T060-package-acceptance-2026-11-14.md)和 [T060 分阶段报告](evidence/T060-report.md)。
