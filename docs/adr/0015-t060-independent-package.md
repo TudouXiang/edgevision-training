@@ -1,6 +1,6 @@
 # ADR 0015: T060 P 独立 ONNX CPU 部署包
 
-日期：2026-11-14。状态：协调者已审查，按用户委托进入实施；本文件不实施 P，当前 package 仍 501、deployment unavailable。I 的限定验收见 `../evidence/T060-image-acceptance-2026-11-14.md`，不扩张为 Windows ML、GPU/NPU、精度或全项目验收。
+日期：2026-11-14。状态：已实施并通过固定范围工程验收；精确版本、独立运行及浏览器证据见 [P 验收](../evidence/T060-package-acceptance-2026-11-14.md)。以下保留设计约束，不将设计文字单独作为运行证据。每个实际环境的部署能力仍须当前源码绑定的 probe。I 的限定验收见 `../evidence/T060-image-acceptance-2026-11-14.md`，不扩张为 Windows ML、GPU/NPU、精度或全项目验收。
 
 ## 1. 目标、选择与边界
 

@@ -1,3 +1,13 @@
+# 当前增量 · T060 P 限定工程 accepted（2026-11-14 UTC）
+
+公开 SHA `685f2efa56165fb5bd45641c81a1539ad94759ea`、tree `f3822aa07269b52407df203368b3ff7039802588` 的 #44 三个 CI 任务全部成功，schema 5 十二阶段全部 passed，含 E/I 重验、独立九依赖模型执行、HTTP 下载 ZIP 再执行及 P 专属浏览器闭环。独立审查支持固定 Linux x86_64 / CPython 3.12 / CPU / 可信 YOLO11n 的源码部署包工程验收。见 [P 精确证据](evidence/T060-package-acceptance-2026-11-14.md)和 [T060 分阶段报告](evidence/T060-report.md)。
+
+本地普通回归 858 passed、14 原生 opt-in skipped、42 subtests passed；前端 130 passed，build/typecheck 通过。每个部署环境仍须当前源码绑定的 probe；源码 ZIP 不含解释器/wheels，初次安装需网络或另备 wheelhouse。每产物验证的是完整性，不声称所有未来产物均已独立执行。T070、正式精度/性能、Windows ML、GPU/NPU、完整原生故障矩阵及全项目交付未验收。
+
+以下为历史检查点，旧的 P 未实现/未验收陈述仅适用于其对应版本。
+
+---
+
 # 当前增量 · T060 I 限定 accepted（2026-11-14 UTC）
 
 精确公开 SHA `bd8d554b6bc51d05d6c1b81119ea8e1416eed5b9` 在工作流 #30 的 checks、Windows、隔离 ML 三任务全部通过，十阶段含真实 PT/ONNX 图片 HTTP/probe/浏览器全部 passed。原生运行与审查源码 tree 均为 `c21a8d54ee8222d7f9402ca08aa0bdb01cd2e47e`。独立需求映射审查支持 I 在固定 Linux CPU/YOLO11n 范围限定 accepted，见[精确证据](evidence/T060-image-acceptance-2026-11-14.md)。

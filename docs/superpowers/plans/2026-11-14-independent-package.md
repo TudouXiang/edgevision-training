@@ -114,3 +114,11 @@ Coordinator reviews before implementation. No user-choice blocker. Engineering c
 - Added a dedicated package browser harness using the same verified fresh HTTP lineage/session. It requires current strict P proof and verifies the prior downloaded task/proof and historical package before starting services. Existing controlled service ownership, process-tree settlement, private diagnostics and cleanup gates are retained.
 - Dedicated UI scenario asserts eligible source provenance, capability, one new job under double click, actual ZIP download size/hash, per-artifact `not_run_for_this_artifact` scope, accepted identity after reload, offline/recovery and narrow viewport. It does not run an extra model inside the browser or seed a fake backend result.
 - Schema 5 adds mandatory twelfth stage `package_browser`. Schema 4 remains historical P HTTP-only evidence; no old receipt can satisfy the new current run. Execution bounds and isolation remain unchanged. Dedicated discovery found exactly one case and executed zero; full frontend 130 passed, build and E2E typecheck passed. Static independent review found no blocker. Full backend regression: 858 passed, 14 skipped, 42 subtests passed (392.57 s). Exact-SHA native browser validation remains pending.
+
+
+## 最终限定工程检查点（2026-11-14 UTC）
+
+- 公开 `685f2efa56165fb5bd45641c81a1539ad94759ea` 与本地 `3239da3aef4f63ae7af839305138cd3c90df13fc` tree 同为 `f3822aa07269b52407df203368b3ff7039802588`。
+- #44 / 43632501786 的 checks、windows-process、linux-training 全部 success；Linux schema5 十二阶段完整 passed，新增 package_browser 实际执行通过。
+- 最终本地后端 858 passed / 14 skipped / 42 subtests；前端 130 passed、build/typecheck 通过。
+- 独立需求映射审查无阻塞实现缺口。仅固定 Linux x86_64、CPython 3.12、CPU、可信 YOLO11n 源码部署包 P 工程验收，不扩张至 T070/整个毕设或任意产物执行证明。证据及限制见 `docs/evidence/T060-package-acceptance-2026-11-14.md`。
