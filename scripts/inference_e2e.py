@@ -30,6 +30,8 @@ DATA = ROOT / 'private/http'
 PRIVATE = ROOT / 'private/inference-browser'
 REPORT = ROOT / 'private/inference-browser-report'
 PYTHON = BACKEND / '.venv-delivery/bin/python'
+CURRENT_PHASE = 'boundary'
+PHASES = ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown')
 
 
 def boundary():
@@ -121,10 +123,14 @@ def environments(origin, api_port, web_port, pair, cookies, image):
 
 
 def run(diagnostic) -> int:
+    global CURRENT_PHASE
+    CURRENT_PHASE = 'settle'
     from app.delivery_infer import synthetic_png
     if not settle():
         raise RuntimeError('shared managed tree exit unconfirmed')
+    CURRENT_PHASE = 'inputs'
     pair, cookies = inputs()
+    CURRENT_PHASE = 'tools'
     node, npm = shutil.which('node'), shutil.which('npm')
     if not node or not npm:
         raise RuntimeError('locked browser tools unavailable')
@@ -138,25 +144,33 @@ def run(diagnostic) -> int:
     owned = []
     status = 2
     try:
+        CURRENT_PHASE = 'api'
         api = start_process([str(PYTHON), '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(api_port), '--no-access-log'], BACKEND, service)
         owned.append(api)
         wait_for(f'http://127.0.0.1:{api_port}/api/v1/health/ready', api)
+        CURRENT_PHASE = 'worker'
         worker = start_process([str(PYTHON), '-m', 'app.worker'], BACKEND, service)
         owned.append(worker)
+        CURRENT_PHASE = 'web'
         web = start_process([node, str(WEB / 'node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', str(web_port), '--strictPort'], WEB, service)
         owned.append(web)
         wait_for(origin + '/api/v1/health/ready', web)
         safe_summary(REPORT, 'browser', 'running')
+        CURRENT_PHASE = 'browser'
         child = subprocess.Popen([npm, 'run', 'test:e2e'], cwd=WEB, env=browser,
             stdin=subprocess.DEVNULL, stdout=diagnostic, stderr=diagnostic, start_new_session=True)
         owned.append(child)
         code = child.wait(timeout=150)
+        CURRENT_PHASE = 'browser' if code else 'receipt'
         status = browser_exit_code(REPORT, code, require_all_passed=True)
         if any(process.poll() is not None for process in (api, worker, web)):
+            CURRENT_PHASE = 'services'
             status = 2
     finally:
         # Stop every owned root even if another fails; then use the production
         # shared lock/recovery protocol, not PID guesses, for managed descendants.
+        failed_phase = CURRENT_PHASE
+        CURRENT_PHASE = 'cleanup'
         cleanup = stop_owned(tuple(reversed(owned)))
         try:
             cleanup = settle() and cleanup
@@ -166,7 +180,10 @@ def run(diagnostic) -> int:
         # A separate private cleanup receipt is not a browser pass.
         (PRIVATE / 'cleanup.json').write_text(json.dumps({'schema_version': 1, 'status': 'passed' if cleanup else 'failed'}))
         if not cleanup:
+            CURRENT_PHASE = 'cleanup'
             status = 4
+        else:
+            CURRENT_PHASE = failed_phase
     return status
 
 
@@ -175,6 +192,9 @@ def interrupted(_signum, _frame):
 
 
 def main(argv=None):
+    global CURRENT_PHASE
+    CURRENT_PHASE = 'boundary'
+    owned_private = False
     previous_mask = os.umask(0o077)
     previous_signal = signal.signal(signal.SIGTERM, interrupted)
     status = 2
@@ -185,6 +205,7 @@ def main(argv=None):
         sys.path.insert(0, str(BACKEND))
         sys.path.insert(0, str(BACKEND / 'tests'))
         PRIVATE.mkdir(mode=0o700)
+        owned_private = True
         with (PRIVATE / 'diagnostic.log').open('x') as diagnostic, contextlib.redirect_stdout(diagnostic), contextlib.redirect_stderr(diagnostic):
             try:
                 status = run(diagnostic)
@@ -194,6 +215,13 @@ def main(argv=None):
     except BaseException:
         status = 2
     finally:
+        if owned_private and status != 0:
+            try:
+                phase = CURRENT_PHASE if CURRENT_PHASE in PHASES else 'unknown'
+                with (PRIVATE / 'failure.json').open('x') as receipt:
+                    json.dump({'phase': phase}, receipt)
+            except Exception:
+                pass  # Diagnostic failure never changes acceptance or reveals details.
         os.umask(previous_mask)
         signal.signal(signal.SIGTERM, previous_signal)
     print('PASS real isolated image browser' if status == 0 else 'FAIL real isolated image browser; private diagnostics retained')

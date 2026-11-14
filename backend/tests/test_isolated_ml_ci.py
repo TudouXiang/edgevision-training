@@ -855,3 +855,57 @@ def test_current_stage_order_requires_real_image_browser_source():
     assert ci.STAGES[:7] == ci.LEGACY_STAGES
     assert entry.stage_commands()[-1][1][-1] == '/opt/edgevision/scripts/inference_e2e.py'
     assert {'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts'}.issubset(ci.REQUIRED_SOURCE)
+
+
+def test_closed_image_diagnostic_preserved_without_private_details():
+    value = full_summary()
+    value['status'] = 'failed'
+    value['stages'][-1]['status'] = 'failed'
+    value['inference_browser_failure'] = 'inputs'
+    assert ci.validate_summary(json.dumps(value)) == value
+    assert ci.public_summary('execution', False, value)['inference_browser_failure'] == 'inputs'
+    assert ci.failed_outer('cleanup', ci.public_summary('execution', False, value))['inference_browser_failure'] == 'inputs'
+
+
+@pytest.mark.parametrize('code', ['SECRET /home/user/token', '', 1, {}, 'passed'])
+def test_image_diagnostic_rejects_non_closed_values(code):
+    value = full_summary()
+    value['status'] = 'failed'
+    value['stages'][-1]['status'] = 'failed'
+    value['inference_browser_failure'] = code
+    with pytest.raises((ci.IsolationError, TypeError)):
+        ci.validate_summary(json.dumps(value))
+
+
+def test_image_diagnostic_cannot_accompany_success():
+    value = full_summary()
+    value['inference_browser_failure'] = 'inputs'
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize(('payload', 'expected'), [
+    ('{"phase":"inputs"}', 'inputs'),
+    ('{"phase":"SECRET/session"}', 'unknown'),
+    ('{"phase":"inputs","secret":"credential"}', 'unknown'),
+    ('x' * 300, 'unknown'),
+    ('{"phase":"inputs"}' + ' ' * 300, 'unknown'),
+])
+def test_private_image_diagnostic_is_sanitized_at_container_boundary(tmp_path, monkeypatch, capsys, payload, expected):
+    monkeypatch.setattr(entry, 'ROOT', tmp_path)
+    monkeypatch.setattr(entry, 'verify_boundary', lambda *a: None)
+    monkeypatch.setattr(entry, 'stage_commands', lambda: [(stage, [stage], tmp_path) for stage in ci.STAGES[1:]])
+    monkeypatch.setattr(entry, 'verify_policy_report', lambda *a: None)
+    def run(command, *args):
+        if command == ['inference_browser']:
+            directory = tmp_path / 'private/inference-browser'
+            directory.mkdir()
+            (directory / 'failure.json').write_text(payload)
+            raise RuntimeError('SECRET private error')
+    monkeypatch.setattr(entry, 'run_stage', run)
+    assert entry.main(['--host-netns', 'net:[123]']) == 1
+    output = capsys.readouterr()
+    assert 'SECRET' not in output.out + output.err
+    receipt = ci.validate_summary(output.out)
+    assert receipt['inference_browser_failure'] == expected
+    assert receipt['stages'][-1]['status'] == 'failed'

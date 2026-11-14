@@ -97,7 +97,7 @@ def decode_json(value: str):
 def validate_summary(value: str, *, expected_version: int | None = None) -> dict:
     require(len(value) <= 8192)
     result = decode_json(value)
-    require(isinstance(result, dict) and set(result) == {'schema_version', 'stage', 'status', 'stages'})
+    require(isinstance(result, dict) and set(result) in ({'schema_version', 'stage', 'status', 'stages'}, {'schema_version', 'stage', 'status', 'stages', 'inference_browser_failure'}))
     version = result['schema_version']
     require(type(version) is int and version in (2, SCHEMA_VERSION))
     require(expected_version is None or version == expected_version)
@@ -110,18 +110,28 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
         require(row['stage'] == name and row['status'] in ('passed', 'failed', 'NOT_RUN', 'unverified'))
     all_passed = all(row['status'] == 'passed' for row in rows)
     require((result['status'] == 'passed') == all_passed)
+    diagnostic = {}
+    if 'inference_browser_failure' in result:
+        code = result['inference_browser_failure']
+        require(version == SCHEMA_VERSION and rows[-1]['status'] == 'failed')
+        require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown'))
+        diagnostic = {'inference_browser_failure': code}
     # Return freshly built known fields; never relay arbitrary Docker output.
     return {'schema_version': version, 'stage': 'isolated_ml', 'status': result['status'],
-            'stages': [{'stage': name, 'status': row['status']} for name, row in zip(stages, rows, strict=True)]}
+            'stages': [{'stage': name, 'status': row['status']} for name, row in zip(stages, rows, strict=True)], **diagnostic}
 
 
 def public_summary(stage: str, passed: bool, result: dict | None = None) -> dict:
     require(stage in PUBLIC_STAGES)
     rows = [{'stage': name, 'status': 'NOT_RUN'} for name in STAGES]
+    diagnostic = {}
     if result is not None:
-        rows = validate_summary(json.dumps(result), expected_version=SCHEMA_VERSION)['stages']
+        checked = validate_summary(json.dumps(result), expected_version=SCHEMA_VERSION)
+        rows = checked['stages']
+        if 'inference_browser_failure' in checked:
+            diagnostic = {'inference_browser_failure': checked['inference_browser_failure']}
     require(not passed or (stage == 'complete' and all(row['status'] == 'passed' for row in rows)))
-    return {'schema_version': SCHEMA_VERSION, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows}
+    return {'schema_version': SCHEMA_VERSION, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows, **diagnostic}
 
 
 def failed_outer(stage: str, previous: dict) -> dict:
@@ -130,6 +140,8 @@ def failed_outer(stage: str, previous: dict) -> dict:
     evidence = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
                 'status': 'passed' if all(row['status'] == 'passed' for row in rows) else 'failed',
                 'stages': rows}
+    if 'inference_browser_failure' in previous:
+        evidence['inference_browser_failure'] = previous['inference_browser_failure']
     return public_summary(stage, False, evidence)
 
 

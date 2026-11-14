@@ -148,7 +148,7 @@ def test_default_workflow_and_dev_check_clear_all_image_opt_ins(monkeypatch):
     assert all(dev.os.environ[key] == 'must-not-reach-default-check' for key in dev.NATIVE_OPT_INS)
 
 
-@pytest.mark.parametrize('failure', ['none', 'web_start', 'browser_wait', 'tree_unconfirmed', 'receipt_rejected'])
+@pytest.mark.parametrize('failure', ['none', 'web_start', 'browser_wait', 'tree_unconfirmed', 'receipt_rejected', 'cleanup_write'])
 def test_browser_owns_cleanup_and_never_masks_unconfirmed_tree(browser, monkeypatch, tmp_path, failure):
     from io import StringIO
     from app import delivery_infer
@@ -182,9 +182,21 @@ def test_browser_owns_cleanup_and_never_masks_unconfirmed_tree(browser, monkeypa
         if failure == 'web_start' and len(waits) == 2: raise RuntimeError('private readiness')
     monkeypatch.setattr(browser, 'wait_for', wait_for)
     monkeypatch.setattr(browser.subprocess, 'Popen', lambda *a, **k: start())
+    if failure == 'cleanup_write':
+        original_write = browser.Path.write_text
+        def write(path, *args, **kwargs):
+            if path.name == 'cleanup.json':
+                raise OSError('SECRET cleanup path')
+            return original_write(path, *args, **kwargs)
+        monkeypatch.setattr(browser.Path, 'write_text', write)
     stopped = []
     monkeypatch.setattr(browser, 'stop_owned', lambda processes: stopped.extend(processes) or True)
     monkeypatch.setattr(browser, 'browser_exit_code', lambda *a, **kw: 2 if failure == 'receipt_rejected' else 0)
+    if failure == 'cleanup_write':
+        with pytest.raises(OSError):
+            browser.run(StringIO())
+        assert browser.CURRENT_PHASE == 'cleanup'
+        return
     if failure in {'web_start', 'browser_wait'}:
         with pytest.raises((RuntimeError, subprocess.TimeoutExpired)):
             browser.run(StringIO())
@@ -203,3 +215,17 @@ def test_browser_stale_or_undrained_input_stops_before_services(browser, monkeyp
     monkeypatch.setattr(browser, 'start_process', lambda *args: pytest.fail('must not start'))
     with pytest.raises(RuntimeError, match='unconfirmed'):
         browser.run(None)
+
+
+def test_browser_failure_receipt_is_closed_and_has_no_exception(browser, monkeypatch, tmp_path, capsys):
+    import json
+    monkeypatch.setattr(browser, 'PRIVATE', tmp_path / 'browser')
+    monkeypatch.setattr(browser, 'boundary', lambda: None)
+    def fail(_diagnostic):
+        browser.CURRENT_PHASE = 'inputs'
+        raise ValueError('SECRET cookie /home/user/input.png')
+    monkeypatch.setattr(browser, 'run', fail)
+    assert browser.main([]) == 2
+    receipt = json.loads((browser.PRIVATE / 'failure.json').read_text())
+    assert receipt == {'phase': 'inputs'}
+    assert 'SECRET' not in capsys.readouterr().out

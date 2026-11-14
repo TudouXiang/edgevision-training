@@ -181,6 +181,21 @@ def main(argv: list[str] | None = None) -> int:
         # No exception text or child output reaches Docker's public output stream.
         statuses[current] = 'failed'
     result = summary(statuses)
+    if current == 'inference_browser' and statuses[current] == 'failed':
+        code = 'unknown'
+        try:
+            path = ROOT / 'private/inference-browser/failure.json'
+            if not path.is_symlink() and path.is_file():
+                with path.open('rb') as receipt:
+                    raw = receipt.read(257)
+                if len(raw) > 256:
+                    raise ValueError('diagnostic too large')
+                value = json.loads(raw)
+                if set(value) == {'phase'} and isinstance(value['phase'], str) and value['phase'] in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup'):
+                    code = value['phase']
+        except Exception:
+            pass
+        result['inference_browser_failure'] = code
     os.umask(previous_mask)
     signal.signal(signal.SIGTERM, previous_signal)
     print(json.dumps(result, separators=(',', ':')), flush=True)
