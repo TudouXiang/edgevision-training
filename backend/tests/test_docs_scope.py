@@ -44,14 +44,14 @@ def test_export_acceptance_keeps_incremental_native_evidence_separate():
     assert 'T060 整体尚未 accepted' in text
 
 
-def test_current_image_source_status_does_not_claim_native_acceptance():
+def test_current_image_acceptance_stays_scoped_and_keeps_package_pending():
     readme = (ROOT / 'README.md').read_text()
     assert '真实图片推理与独立部署包尚未实现' not in readme
-    assert 'I 未验收' in readme and '真实图片模型执行与浏览器验证仍 **NOT_RUN**' in readme
+    assert '单图工程限定 accepted' in readme and 'bd8d554' in readme
     assert 'P：独立部署包尚未实现' in readme
     current = (ROOT / 'docs/status.md').read_text().split('以下保留各阶段原始状态')[0]
-    assert 'I 源码审查通过、原生待验收' in current and '真实I ML/ORT/probe/HTTP/浏览器全部NOT_RUN' in current
-    assert 'P仍501且blocked' in current
+    assert 'I 限定 accepted' in current and 'T060 整体与 T070 未验收' in current
+    assert 'P仍501' in current and '尚未验收' in current
 
 
 def test_current_api_and_export_text_does_not_restore_pre_inference_claims():
@@ -59,10 +59,10 @@ def test_current_api_and_export_text_does_not_restore_pre_inference_claims():
     api = (ROOT / 'docs/api.md').read_text()
     contracts = (ROOT / 'docs/contracts.md').read_text()
     assert '仍是静态审查方案，实际隔离/ML 未执行' not in readme
-    assert '新 I 十阶段入口仍未执行' in readme
+    assert 'I 十阶段已于' in readme and 'P 或全项目通过' in readme
     assert '目前 501，无图片解析' not in api
     assert '训练、模型和部署仍不可用' not in api
     assert '二者继续 501' not in contracts
-    assert 'I源码已实现' in api and '真实模型验收未执行' in api
+    assert 'I源码已实现' in api and '已限定验收' in api
     adr = (ROOT / 'docs/adr/0014-t060-image-inference.md').read_text()
-    assert '旧“尚未接通”只描述设计阶段' in adr and 'I业务未accepted，P仍blocked' in adr
+    assert '旧“尚未接通”只描述设计阶段' in adr and 'P 可进入独立设计实施，尚未验收' in adr

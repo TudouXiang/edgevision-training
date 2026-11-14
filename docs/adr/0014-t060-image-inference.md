@@ -1,6 +1,6 @@
 # ADR 0014：T060 I 可信 PT / ONNX 单图推理
 
-当前状态（2026-11-05 UTC）：设计在 `d2f9f5197b936a4b7812d916053d728f81e0bde9` 完成独立审查；I业务入口与验证入口源码已实现并通过限定源码审查。真实I模型/probe/HTTP/浏览器未执行，I业务未accepted，P仍blocked。精确版本、回归和剩余闸门见[I整合证据](../evidence/T060-image-integration-2026-11-05.md)。
+当前状态（2026-11-14 UTC）：I 在固定 Linux CPU/YOLO11n 范围限定 accepted。精确 SHA `bd8d554` 的原生十阶段、普通 checks 及 Windows 进程任务全部成功；独立审查需求映射通过。P 可进入独立设计实施，尚未验收。见[I精确验收](../evidence/T060-image-acceptance-2026-11-14.md)。
 
 以下保留设计冻结时的原始候选状态和约束，旧“尚未接通”只描述设计阶段，不覆盖上方源码进展。
 

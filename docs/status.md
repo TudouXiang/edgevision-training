@@ -1,3 +1,13 @@
+# 当前增量 · T060 I 限定 accepted（2026-11-14 UTC）
+
+精确公开 SHA `bd8d554b6bc51d05d6c1b81119ea8e1416eed5b9` 在工作流 #30 的 checks、Windows、隔离 ML 三任务全部通过，十阶段含真实 PT/ONNX 图片 HTTP/probe/浏览器全部 passed。原生运行与审查源码 tree 均为 `c21a8d54ee8222d7f9402ca08aa0bdb01cd2e47e`。独立需求映射审查支持 I 在固定 Linux CPU/YOLO11n 范围限定 accepted，见[精确证据](evidence/T060-image-acceptance-2026-11-14.md)。
+
+P仍501，可进入设计实施，尚未验收；T060 整体与 T070 未验收。Windows ML、GPU/NPU、正式精度/性能及完整原生故障矩阵不在本次通过范围。能力仍需各运行环境的当前源码 probe。
+
+以下保留各阶段原始状态，不覆盖上述最新证据。
+
+---
+
 # 当前增量 · T060 I 源码审查通过、原生待验收（2026-11-05 UTC）
 
 可信 PT/ONNX 单图推理的后端、前端和验证入口源码已分别通过独立审查。后端最终 d4e5f85：独立155项及8子测试通过；前端db38017：117候选测试及5项独立回归通过；隔离入口1dbb08b：198项通过、5原生跳过、34子测试，另30项准备链检查通过。各次审查范围见[I整合记录](evidence/T060-image-integration-2026-11-05.md)。

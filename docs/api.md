@@ -15,7 +15,7 @@
 | GET/POST /projects/{id}/jobs、GET /jobs/{id}、POST /jobs/{id}/cancel | Page[JobPublic]、判别式 JobCreate(kind,params)、JobAccepted、JobPublic | 已实现列表/详情/取消及dataset_check/train/export_onnx/infer创建；模型执行要求当前受管probe，package仍501 |
 | GET /jobs/{id}/logs、/metrics | Incremental[JobLog/Metric]；cursor、limit | T040 已实现有界查询；dataset_check 没有虚构 metrics |
 | GET /projects/{id}/artifacts、GET /artifacts/{id}、/download | Page[ArtifactPublic]、ArtifactPublic、鉴权文件流 | 已实现dataset_report/PT/ONNX及I结果列表、详情与受限下载；unverified原图片不提供下载 |
-| POST /projects/{id}/images、GET /inferences/{id}、GET /inferences/{id}/image | 单图multipart返回InferenceInputArtifactPublic；结果为InferenceResult与鉴权净化PNG | I源码已实现；上传只存unverified字节，解码在受管子进程，真实模型验收未执行 |
+| POST /projects/{id}/images、GET /inferences/{id}、GET /inferences/{id}/image | 单图multipart返回InferenceInputArtifactPublic；结果为InferenceResult与鉴权净化PNG | I源码已实现；上传只存unverified字节，解码在受管子进程，固定 Linux CPU 实际模型/HTTP/浏览器已限定验收，其他环境需本地probe |
 | GET/POST /admin/users、PATCH /admin/users/{id}、GET /admin/projects | UserCreate/Update/Public、项目分页 | T020 已实现，accepted（Linux CI）；最后一个启用管理员不能被禁用 |
 | GET /admin/jobs | Page[JobPublic] | T070；管理员身份校验后仍返回 501 |
 

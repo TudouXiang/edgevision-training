@@ -2,11 +2,11 @@
 
 下表定义通过条件，不是把所有现状重新标为未执行，也不是全表通过声明。每项具体结果必须引用精确版本、环境、命令/退出码或操作、日期和证据；设计说明不计通过。
 
-## 当前阶段边界（2026-11-05）
+## 当前阶段边界（2026-11-14）
 
 T010–T040 已按各自证据范围验收；T050 在固定 Linux CPU 小规模训练范围 accepted。
 T060 E 限定 accepted（固定 Linux CPU/YOLO11n 工程阶段）：76af48f有真实隔离ONNX/ORT、HTTP与浏览器证据；7e322689错误协议补丁通过独立增量复核，补丁版原生未重跑、旧能力probe不可复用。
-I 源码已通过独立审查，轻量/合成回归不等于真实模型或浏览器执行；真实 I 仍 NOT_RUN，未 accepted。P 尚未实现并保持501，T070 前置仍为 T060 accepted。不能由普通浏览器、进程夹具或 mock 图测试推断 A13/A14/A15 完整通过。
+I 在固定 Linux CPU/YOLO11n 工程范围限定 accepted，精确 `bd8d554` 十阶段与普通 CI 均通过，见[I验收](evidence/T060-image-acceptance-2026-11-14.md)。P 尚未实现并保持501，可进入设计实施；T070 前置仍为 T060 accepted。不能由普通浏览器、进程夹具或 mock 图测试推断 A13/A14/A15 完整通过。
 当前范围以 [状态](status.md)、[T050 证据](evidence/T050-ci-acceptance-2026-11-04.md)和
 [T060 E逐项验收](evidence/T060-export-acceptance-2026-11-05.md)及[I整合记录](evidence/T060-image-integration-2026-11-05.md)为准。
 

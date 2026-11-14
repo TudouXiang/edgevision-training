@@ -9,8 +9,8 @@ EdgeVision 面向单机计算机视觉场景，目标是把项目、数据集、
 - T020–T040：身份/账号与项目、受控数据集上传与版本、异步校验、真实日志、取消/恢复和报告下载已有实现及分范围验收；[Worker 跨平台证据](docs/evidence/T040-cross-platform-acceptance-2026-11-04.md)保留重启、掉电等未实测限制。
 - T050：固定 Linux CPU 小规模训练、真实指标、验证后的 best/last 产物及鉴权下载已在限定范围 accepted；见 [T050 验收](docs/evidence/T050-ci-acceptance-2026-11-04.md)。不代表 Windows ML、CUDA 或正式精度实验通过。
 - T060 E：固定 Linux CPU/YOLO11n 的可信 PT→ONNX 工程阶段 **E 限定 accepted**。`76af48f` 已完成真实隔离ONNX/ORT、HTTP与浏览器验证；后续错误协议补丁按未变正常路径与新增失败回归增量审查，未重跑原生ML。详见 [E逐项验收](docs/evidence/T060-export-acceptance-2026-11-05.md)。实际能力仍须当前代码绑定的受管probe。
-- T060 I：可信 PT/ONNX 单图推理的后端与前端源码已通过独立审查；冻结整合 `069ac5e` 的轻量回归为 646 项后端通过、14 项原生跳过，117 项前端通过，构建/契约通过。真实图片模型执行与浏览器验证仍 **NOT_RUN**，I 未验收，能力必须由当前代码绑定的双模式受管 probe 真实证明。见 [I 整合记录](docs/evidence/T060-image-integration-2026-11-05.md)。
-- T060 P：独立部署包尚未实现，接口仍为规范化 501；须等 I 验收再实施。T070 的完整管理员能力、全链路与正式实验仍受前置闸门约束。
+- T060 I：固定 Linux CPU / YOLO11n 单图工程限定 accepted。`bd8d554` 的 #30 全部 CI 成功，真实 PT/ONNX probe、HTTP、浏览器与原生策略测试通过；能力仍须当前运行环境的 probe。见 [精确 I 验收](docs/evidence/T060-image-acceptance-2026-11-14.md).
+- T060 P：独立部署包尚未实现，接口仍为规范化 501；I 已限定验收，P 可进入设计实施。T070 的完整管理员能力、全链路与正式实验仍受前置闸门约束。
 
 本轮文档/合成恢复测试修正前的普通 CI [41871285873](https://github.com/TudouXiang/edgevision-training/actions/runs/41871285873)对应源码 `b9cbc568`：371 项后端、47 项前端通过，9 项原生 opt-in 跳过；普通浏览器 4 项实际执行通过、1 项 ML 跳过；Windows 既有进程/API 检查通过，ML job 跳过。新增 27 项文档/合成恢复测试后的本地轻量回归为 398 后端通过、9 跳过、47 前端通过，见[限定恢复练习](docs/evidence/synthetic-backup-recovery-2026-11-04.md)。精确阶段状态见 [docs/status.md](docs/status.md)，验收条件与证据边界见 [验收矩阵](docs/acceptance.md)。这不是完整项目交付声明。
 
@@ -147,5 +147,5 @@ Ultralytics 8.4.202、Torch 2.15.0+cpu、torchvision 0.29.2+cpu；CUDA 和 Windo
 [重建依赖计划](docs/evidence/T060-rebuild-dependency-plan.md)；源码存在不等于实际工具链可用。
 普通 push/PR CI 不自动运行真实 ML。未来显式隔离验证还必须提供独立审查的完整提交 SHA，
 与运行和工作流源码一致；缺失或分支已移动即在容器准备前失败。
-[隔离计划](docs/evidence/T060-isolated-ci-plan-2026-11-04.md)保留早期静态方案；`76af48f` 的 E 实际隔离/ML 已按[精确运行记录](docs/evidence/T060-isolated-ml-2026-11-05.md)执行。新 I 十阶段入口仍未执行，不能沿用旧 E 结果代替 I 验收。
+[隔离计划](docs/evidence/T060-isolated-ci-plan-2026-11-04.md)保留早期静态方案；`76af48f` 的 E 实际隔离/ML 已按[精确运行记录](docs/evidence/T060-isolated-ml-2026-11-05.md)执行。I 十阶段已于 `bd8d554` 的 #30 实际通过，详见 [I 精确验收](docs/evidence/T060-image-acceptance-2026-11-14.md)；不能将其扩大为 P 或全项目通过。
 请勿用手写能力记录、测试替身或默认外连执行替代该验收。
