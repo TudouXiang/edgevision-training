@@ -36,3 +36,17 @@
 ## 2026-11-14 标注包预检（不是实验结果）
 
 官方下载 `https://thor.robots.ox.ac.uk/~vgg/data/pets/annotations.tar.gz` 成功，SHA256 `52425fb6de5c424942b7626b428656fcbd798db970a937df61750c0f1d358e91`。仅内存读取安全tar成员，无链接/越界/特殊成员、没有执行包内内容。trainval清单3680条，3671有XML（猫1181、狗2490）；test清单3669条，0有XML。README注明PASCAL VOC格式，并鼓励随机划分。保留原说明，但还没有验证实际图像尺寸/重复hash及坐标转换，样本manifest尚未冻结，训练/测试均NOT_RUN。
+
+## 2026-11-14 图像子集冻结（训练仍 NOT_RUN）
+
+两份归档均按固定大小与 SHA256 验证，使用匿名私有快照解析，未执行归档内容。图像包 `images.tar.gz` 为 791918971 字节，SHA256 `67195c5e1c01f1ab5f9b6a5d22b8c27a580d896ece458917e61d459337fa318d`；标注包为 19173078 字节，SHA256 如上。转换采用 [VOC 官方坐标约定](https://www.robots.ox.ac.uk/~vgg/projects/pascal/VOC/voc2012/htmldoc/index.html)：左上像素为 (1,1)，闭区间框转为 `[xmin-1,ymin-1,xmax,ymax]`，完整图像框恰好得到归一化中心 (0.5,0.5)、宽高 (1,1)。
+
+`scripts/real_cpu_dataset.py` 在两次独立新目录中得到完全一致的收据：
+
+- train/val/test = 60/20/20，每类分别 30/10/10；真实图片尺寸、RGB/JPEG、EXIF 方向、字节及解码像素去重验证通过。
+- manifest SHA256：`fea46ddb1fbe822acbc7cfaa79fdeea6b986f50f71c2cae85992fde0ad93d124`。
+- dataset ZIP SHA256：`16b58d944a2c414063409e7bb95a8007e1b117a672c249d28c2d4a9c51df3ee6`。
+- 图片、完整逐样本 manifest 和 ZIP 仅留在私有实验工作区，不纳入 Git。
+- 定向测试 18 passed，包含归档截断/链接/越界/重复、TOCTOU 路径替换、XML/坐标、尺寸/EXIF/重复像素以及写入失败无成功收据。
+
+这一步只证明数据准备，不证明训练、精度、推理性能或故障恢复；这些阶段仍为 NOT_RUN。后续实验必须核对以上冻结 hash，不按结果重新取样。
