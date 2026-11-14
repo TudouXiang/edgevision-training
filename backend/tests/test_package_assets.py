@@ -50,3 +50,16 @@ def test_i_success_or_arbitrary_record_cannot_enable_package(tmp_path,monkeypatc
     assert package_assets.capability()['available'] is False
     assert package_assets.capability()['reason_code']=='PACKAGE_SETUP_REQUIRED'
     with pytest.raises(ValueError):package_assets.validated_template()
+
+
+@pytest.mark.parametrize('proof', [None, {'schema_version': 1, 'available': False}, {'available': True}])
+def test_unproven_capability_does_not_hash_runtime(tmp_path, monkeypatch, proof):
+    import json
+    from app import package_assets
+    monkeypatch.setattr(package_assets, 'data_root', lambda: tmp_path)
+    if proof is not None:
+        (tmp_path/'package-capability.json').write_text(json.dumps(proof))
+    def forbidden():
+        pytest.fail('unproven capability performed expensive runtime validation')
+    monkeypatch.setattr(package_assets, 'runtime_identity', forbidden)
+    assert package_assets.capability()['available'] is False

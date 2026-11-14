@@ -22,8 +22,10 @@ def runtime_identity():
 
 
 def validated_template():
-    identity=runtime_identity()
+    # Reject absent/incomplete proof before expensive runtime hashing. A valid
+    # proof still requires every current environment and source check below.
     record=PackageProbeRecord.model_validate(read_json(data_root()/'package-capability.json',1024**2)).model_dump(mode='json')
+    identity=runtime_identity()
     expected={'runtime_binding':digest_json(identity),'code_version':digest_json(identity['adapter']),
         'template':identity['package_template'],'environment_sha256':digest_json(identity['package_environment']),
         'reference_runtime_binding':identity['reference_runtime_binding'],'reference_code_version':identity['reference_code_version']}

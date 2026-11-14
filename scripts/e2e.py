@@ -281,6 +281,13 @@ def main(argv: list[str]) -> int:
     report_dir = options.report_dir.expanduser().resolve()
     safe_summary(report_dir, "bootstrap", "running")
 
+    def delivery_phase(phase):
+        if phase not in ('bootstrap','training_probe','export_probe','api','web','browser','receipt','cleanup'):
+            raise ValueError('unknown delivery phase')
+        if options.delivery:
+            (report_dir/'harness-phase.json').write_text(json.dumps({'phase':phase}))
+    delivery_phase('bootstrap')
+
     # Discovery is read-only: no Python environment, services, dataset or credentials.
     if options.list:
         npm = shutil.which("npm")
@@ -390,11 +397,13 @@ def main(argv: list[str]) -> int:
             if options.delivery:
                 probes.append([str(python), "-m", "app.export_probe"])
             for probe in probes:
+                delivery_phase('export_probe' if probe[-1]=='app.export_probe' else 'training_probe')
                 managed_probe_started = True
                 result = subprocess.run(probe, cwd=BACKEND, env=service_environment, check=False,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=360)
                 if result.returncode:
                     raise RuntimeError("managed capability probe failed; browser was not started")
+        delivery_phase('api')
         api_process = start_process(
             [
                 str(python), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1",
@@ -407,6 +416,7 @@ def main(argv: list[str]) -> int:
 
         worker_process = start_process([str(python), "-m", "app.worker"], BACKEND, service_environment)
 
+        delivery_phase('web')
         web_process = start_process(
             [node, str(WEB / "node_modules" / "vite" / "bin" / "vite.js"), "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"],
             WEB,
@@ -430,6 +440,9 @@ def main(argv: list[str]) -> int:
             "EDGEVISION_E2E_TRAINING_ZIP": str(training_fixture),
             "EDGEVISION_E2E_INVALID_DATASET_ZIP": str(invalid_fixture),
         }
+        if options.delivery:
+            browser_environment['EDGEVISION_E2E_DELIVERY_PHASE_FILE']=str(report_dir/'ui-phase.json')
+        delivery_phase('browser')
         safe_summary(report_dir, run_stage, "running")
         result = subprocess.run(
             [npm, "run", "test:e2e", "--", *playwright_args],
@@ -437,7 +450,9 @@ def main(argv: list[str]) -> int:
             env=browser_environment,
             check=False,
         )
-        return browser_exit_code(report_dir, result.returncode, require_all_passed=training)
+        code=browser_exit_code(report_dir, result.returncode, require_all_passed=training)
+        if code==0:delivery_phase('receipt')
+        return code
     except KeyboardInterrupt:
         safe_summary(report_dir, run_stage, "interrupted")
         return 130
@@ -460,6 +475,7 @@ def main(argv: list[str]) -> int:
             except Exception:
                 cleanup_safe = False
         if not cleanup_safe:
+            delivery_phase('cleanup')
             print("browser_e2e cleanup_blocked: service or task exit is unconfirmed; isolated runtime retained", file=sys.stderr)
             record_cleanup(report_dir, "failed")
             return 4

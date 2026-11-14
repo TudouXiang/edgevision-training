@@ -957,3 +957,24 @@ def test_package_private_phase_never_relays_arbitrary_text(tmp_path,http,probe,e
     (root/'package-http-phase.json').write_text(json.dumps({'phase':http}))
     (root/'package-probe-phase.json').write_text(json.dumps({'phase':probe}))
     assert entry.package_failure(tmp_path)==expected
+
+
+@pytest.mark.parametrize('phase',['bootstrap','training_probe','export_probe','api','web','browser','receipt','cleanup','ui_export_submit'])
+def test_delivery_diagnostic_is_closed_and_failure_only(tmp_path,phase):
+    report=tmp_path/'private/browser-report';report.mkdir(parents=True)
+    (report/'harness-phase.json').write_text(json.dumps({'phase':'browser' if phase.startswith('ui_') else phase}))
+    (report/'ui-phase.json').write_text(json.dumps({'phase':phase}))
+    assert entry.delivery_failure(tmp_path)==phase
+    value=full_summary();value['status']='failed';value['stages'][6]['status']='failed'
+    value['browser_delivery_failure']=phase
+    assert ci.validate_summary(json.dumps(value))==value
+    assert ci.failed_outer('cleanup',ci.public_summary('execution',False,value))['browser_delivery_failure']==phase
+    value['stages'][6]['status']='passed';value['status']='passed'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize('raw',['{"phase":"secret/path"}', '{"phase":"browser","secret":"x"}', 'x'*257])
+def test_delivery_diagnostic_rejects_untrusted_phase(tmp_path,raw):
+    report=tmp_path/'private/browser-report';report.mkdir(parents=True)
+    (report/'harness-phase.json').write_text(raw)
+    assert entry.delivery_failure(tmp_path)=='unknown'

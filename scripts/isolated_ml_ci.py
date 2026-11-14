@@ -34,6 +34,7 @@ LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http'
 INFERENCE_STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
 STAGES = (*INFERENCE_STAGES, 'package_http')
 SCHEMA_VERSION = 4
+DELIVERY_PHASES = ('bootstrap', 'training_probe', 'export_probe', 'api', 'web', 'browser', 'receipt', 'cleanup', 'unknown', 'ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_responsive', 'ui_complete')
 PUBLIC_STAGES = ('preparation', 'build', 'create', 'inspect', 'execution', 'cleanup', 'cleanup_unknown', 'complete')
 IMAGE_ID = re.compile(r'sha256:[a-f0-9]{64}')
 CONTAINER_ID = re.compile(r'[a-f0-9]{64}')
@@ -99,7 +100,7 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
     require(len(value) <= 8192)
     result = decode_json(value)
     base={'schema_version','stage','status','stages'}
-    require(isinstance(result, dict) and base.issubset(result) and set(result).issubset(base | {'inference_browser_failure','package_http_failure'}))
+    require(isinstance(result, dict) and base.issubset(result) and set(result).issubset(base | {'inference_browser_failure','package_http_failure','browser_delivery_failure'}))
     version = result['schema_version']
     require(type(version) is int and version in (2, 3, SCHEMA_VERSION))
     require(expected_version is None or version == expected_version)
@@ -118,6 +119,11 @@ def validate_summary(value: str, *, expected_version: int | None = None) -> dict
         require(version in (3, SCHEMA_VERSION) and rows[stages.index('inference_browser')]['status'] == 'failed')
         require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_submit_inventory', 'ui_pt_submit_model', 'ui_pt_submit_thresholds', 'ui_pt_submit_ready', 'ui_pt_submit_request', 'ui_pt_submit_response', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_submit_inventory', 'ui_onnx_submit_model', 'ui_onnx_submit_thresholds', 'ui_onnx_submit_ready', 'ui_onnx_submit_request', 'ui_onnx_submit_response', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_responsive', 'ui_complete'))
         diagnostic = {'inference_browser_failure': code}
+    if 'browser_delivery_failure' in result:
+        code=result['browser_delivery_failure']
+        require(version == SCHEMA_VERSION and rows[stages.index('browser_delivery')]['status']=='failed')
+        require(isinstance(code,str) and code in DELIVERY_PHASES)
+        diagnostic['browser_delivery_failure']=code
     if 'package_http_failure' in result:
         code=result['package_http_failure']
         require(version == SCHEMA_VERSION and rows[stages.index('package_http')]['status']=='failed')
@@ -136,7 +142,7 @@ def public_summary(stage: str, passed: bool, result: dict | None = None) -> dict
     if result is not None:
         checked = validate_summary(json.dumps(result), expected_version=SCHEMA_VERSION)
         rows = checked['stages']
-        diagnostic = {key:checked[key] for key in ('inference_browser_failure','package_http_failure') if key in checked}
+        diagnostic = {key:checked[key] for key in ('inference_browser_failure','package_http_failure','browser_delivery_failure') if key in checked}
     require(not passed or (stage == 'complete' and all(row['status'] == 'passed' for row in rows)))
     return {'schema_version': SCHEMA_VERSION, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows, **diagnostic}
 
@@ -147,7 +153,7 @@ def failed_outer(stage: str, previous: dict) -> dict:
     evidence = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
                 'status': 'passed' if all(row['status'] == 'passed' for row in rows) else 'failed',
                 'stages': rows}
-    for key in ('inference_browser_failure','package_http_failure'):
+    for key in ('inference_browser_failure','package_http_failure','browser_delivery_failure'):
         if key in previous:evidence[key]=previous[key]
     return public_summary(stage, False, evidence)
 

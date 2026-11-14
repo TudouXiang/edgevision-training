@@ -25,6 +25,7 @@ LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http'
 INFERENCE_STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
 STAGES = (*INFERENCE_STAGES, 'package_http')
 SCHEMA_VERSION = 4
+DELIVERY_PHASES = ('bootstrap', 'training_probe', 'export_probe', 'api', 'web', 'browser', 'receipt', 'cleanup', 'unknown', 'ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_responsive', 'ui_complete')
 STAGE_BUDGET = 450
 
 
@@ -116,6 +117,26 @@ def stage_commands(root: Path = ROOT) -> list[tuple[str, list[str], Path]]:
 
 PACKAGE_HTTP_PHASES = ('inputs','probe','api','submit','worker','download','standalone','receipt','complete')
 PACKAGE_PROBE_PHASES = ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')
+
+
+def delivery_failure(root):
+    def read_phase(name):
+        path=root/'private/browser-report'/name
+        if path.is_symlink() or not path.is_file():raise ValueError('phase file')
+        with path.open('rb') as source:raw=source.read(257)
+        if len(raw)>256:raise ValueError('phase size')
+        value=json.loads(raw)
+        if not isinstance(value,dict) or set(value)!={'phase'} or not isinstance(value['phase'],str) or value['phase'] not in DELIVERY_PHASES:raise ValueError('phase value')
+        return value['phase']
+    try:
+        phase=read_phase('harness-phase.json')
+        if phase=='browser':
+            try:
+                ui=read_phase('ui-phase.json')
+                if ui.startswith('ui_'):return ui
+            except Exception:pass
+        return phase
+    except Exception:return 'unknown'
 
 
 def package_failure(root):
@@ -218,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
         result['inference_browser_failure'] = code
+    if current == 'browser_delivery' and statuses[current] == 'failed':
+        result['browser_delivery_failure'] = delivery_failure(ROOT)
     if current == 'package_http' and statuses[current] == 'failed':
         result['package_http_failure'] = package_failure(ROOT)
     os.umask(previous_mask)
