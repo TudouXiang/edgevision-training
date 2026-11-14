@@ -72,3 +72,5 @@
 同一提交的[真实 CPU #59](https://github.com/TudouXiang/edgevision-training/actions/runs/43648780095) 明确通过 isolation、dataset、dependency_check、training，随后 export failed。evaluation、timings、cancel、worker_recovery、backup_restore 为 NOT_RUN，cleanup 为 unverified；没有精度或时延结果。训练通过不代表整体验收完成，不改冻结数据或阈值以追求通过。
 
 下一诊断仅增加可选 `export_failure={phase,error}` 闭集，且仅在 export failed / 总状态 failed 允许。分辨导出探测、提交、Worker、结果、下载、血缘，以及末尾的推理能力探测。`inference_probe` 失败不等于模型导出本身失败。`contract` 仅是值/结构检查类异常，不宣称一定为 HTTP 错误。异常文本、命令、路径、ID 和返回码均不公开；原断言、超时和清理门禁不变。
+
+普通 [CI #60](https://github.com/TudouXiang/edgevision-training/actions/runs/43650280419) 成功。诊断提交 `f204cf0390fc36ac2c0373631cd470467c58098f` 的[原生 #61](https://github.com/TudouXiang/edgevision-training/actions/runs/43651174024) 再次训练通过，错误为 `export_result / assertion`：前置探测、提交及 Worker 命令返回正常，但任务并非 succeeded；下载/血缘/推理探测尚未执行。下一闭集增量仅在该断言失败时映射现有 API 的 task_state/task_code，未知值归 unknown，不复制 error_message 或 ID。它只保留失败事实，不让任何非 succeeded 任务通过。

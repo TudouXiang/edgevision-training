@@ -76,3 +76,16 @@ def test_export_process_failures_never_expose_command_or_output():
         with pytest.raises(type(error)):
             with m.export_step(result,'export_probe'):raise error
         assert result=={'export_failure':{'phase':'export_probe','error':expected}}
+
+
+def test_export_task_diagnostic_drops_private_payload():
+    m=probe();result={}
+    with pytest.raises(AssertionError):
+        with m.export_step(result,'export_result'):
+            m.require_export_success(result,{'state':'failed','error_code':'ONNX_MODEL_INVALID','error_message':'secret','id':'secret'})
+    assert result=={'export_failure':{'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID'}}
+    result={}
+    with pytest.raises(AssertionError):
+        with m.export_step(result,'export_result'):
+            m.require_export_success(result,{'state':'secret','error_code':'secret'})
+    assert result['export_failure']['task_state']==result['export_failure']['task_code']=='unknown'

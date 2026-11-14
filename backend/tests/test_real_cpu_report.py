@@ -123,3 +123,27 @@ def test_all_export_codes_and_phases_and_nonfailed_stages():
     for bad in (None,[],42,{}, {'phase':[], 'error':'unknown'}, {'phase':'export_probe','error':42}):
         v['export_failure']=bad
         with pytest.raises(ValueError):m.validate(json.dumps(v))
+
+
+def test_export_task_code_is_closed_and_result_only():
+    m=load();v=m.initial();v['stages'][m.STAGES.index('export')]['status']='failed'
+    v['export_failure']={'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID'}
+    assert m.validate(json.dumps(v))==v
+    for key,bad in (('task_code','private'),('task_state','private'),('phase','export_probe')):
+        w=json.loads(json.dumps(v));w['export_failure'][key]=bad
+        with pytest.raises(ValueError):m.validate(json.dumps(w))
+
+
+def test_export_task_enums_and_partial_keys():
+    m=load();v=m.initial();v['stages'][m.STAGES.index('export')]['status']='failed'
+    for state in m.EXPORT_TASK_STATES:
+        for code in m.EXPORT_TASK_CODES:
+            v['export_failure']={'phase':'export_result','error':'assertion','task_state':state,'task_code':code}
+            assert m.validate(json.dumps(v))==v
+    for key in ('task_state','task_code'):
+        w=json.loads(json.dumps(v));del w['export_failure'][key]
+        with pytest.raises(ValueError):m.validate(json.dumps(w))
+    for key in ('task_state','task_code'):
+        for bad in (None,[],{},True,42):
+            w=json.loads(json.dumps(v));w['export_failure'][key]=bad
+            with pytest.raises(ValueError):m.validate(json.dumps(w))

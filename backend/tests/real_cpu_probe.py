@@ -37,6 +37,18 @@ def command(args,log,timeout=120):
     subprocess.run([sys.executable,*args],cwd=ROOT/'backend',check=True,stdout=log,stderr=log,timeout=timeout)
 
 
+class ExportTaskFailure(AssertionError):
+    def __init__(self,state,code):
+        report=load('real_cpu_report')
+        self.state=state if type(state) is str and state in report.EXPORT_TASK_STATES else 'unknown'
+        self.code=code if type(code) is str and code in report.EXPORT_TASK_CODES else 'unknown'
+        super().__init__('export task did not succeed')
+
+
+def require_export_success(result,task):
+    if task['state']!='succeeded':raise ExportTaskFailure(task['state'],task.get('error_code'))
+
+
 @contextmanager
 def export_step(result,phase):
     report=load('real_cpu_report')
@@ -49,6 +61,8 @@ def export_step(result,phase):
         elif isinstance(error,AssertionError):category='assertion'
         elif isinstance(error,(ValueError,KeyError,TypeError,StopIteration)):category='contract'
         result['export_failure']={'phase':phase,'error':category}
+        if phase=='export_result' and isinstance(error,ExportTaskFailure):
+            result['export_failure'].update(task_state=error.state,task_code=error.code)
         raise
 
 
@@ -187,7 +201,7 @@ def run(result,save,log):
             with export_step(result,'export_worker'):
                 once(180)
             with export_step(result,'export_result'):
-                assert job(export)['state']=='succeeded'
+                require_export_success(result,job(export))
                 onnx=next(a for a in artifacts() if a['kind']=='onnx' and a['job_id']==export)
             with export_step(result,'export_download'):
                 download(onnx,PRIVATE/'trained.onnx')

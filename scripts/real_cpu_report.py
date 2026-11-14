@@ -11,6 +11,8 @@ PROFILE='real_cpu_v1'
 MANIFEST_SHA='fea46ddb1fbe822acbc7cfaa79fdeea6b986f50f71c2cae85992fde0ad93d124'
 DATASET_SHA='16b58d944a2c414063409e7bb95a8007e1b117a672c249d28c2d4a9c51df3ee6'
 EXPORT_PHASES=('export_probe','export_submit','export_worker','export_result','export_download','export_lineage','inference_probe')
+EXPORT_TASK_STATES=('queued','running','cancelling','cancelled','failed','interrupted','unknown')
+EXPORT_TASK_CODES=('ONNX_DEPENDENCY_UNAVAILABLE','ONNX_MODEL_INVALID','ONNX_OPERATOR_UNSUPPORTED','ONNX_RUNTIME_FAILED','INPUT_INVALID','INPUT_CHANGED','STORAGE_UNAVAILABLE','OUTPUT_CAPACITY_LIMIT','RUNTIME_CHANGED','TRAINING_POLICY_FAILED','RUNNER_FAILED','CANCELLED','unknown')
 EXPORT_ERRORS=('timeout','process_failed','assertion','contract','unknown')
 STAGES=('isolation','dataset','dependency_check','training','export','evaluation','timings','cancel','worker_recovery','backup_restore','cleanup')
 SERIES=tuple(f'{backend}_{part}' for backend in ('pt','onnx') for part in ('preprocess','model','postprocess','total','http'))
@@ -65,8 +67,11 @@ def validate(raw):
         require(item['stage']==name and item['status'] in ('passed','failed','NOT_RUN','unverified'))
     if 'export_failure' in value:
         failure=value['export_failure']
-        require(type(failure) is dict and set(failure)=={'phase','error'})
+        require(type(failure) is dict and set(failure) in ({'phase','error'},{'phase','error','task_state','task_code'}))
         require(failure['phase'] in EXPORT_PHASES and failure['error'] in EXPORT_ERRORS)
+        if 'task_code' in failure:
+            require(failure['phase']=='export_result' and failure['error']=='assertion')
+            require(failure['task_state'] in EXPORT_TASK_STATES and failure['task_code'] in EXPORT_TASK_CODES)
         require(value['status']=='failed' and stages[STAGES.index('export')]['status']=='failed')
     measured=value['measurements']
     if measured is not None:
