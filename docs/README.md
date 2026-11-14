@@ -39,7 +39,7 @@
 | 地基契约与跨平台开发 | [0005](adr/0005-foundation-alignment.md)、[0006](adr/0006-portable-development.md) |
 | 会话身份、受控数据集、受管 Worker | [0007](adr/0007-t020-session-auth.md)、[0008](adr/0008-t030-controlled-datasets.md)、[0009](adr/0009-t040-managed-worker.md) |
 | 许可与固定训练适配器 | [0010](adr/0010-project-licensing.md)、[0011](adr/0011-t050-fixed-training-adapter.md) |
-| T060 重建安全与导出契约 | [0012](adr/0012-t060-rebuild-safety.md)、[0013](adr/0013-t060-export-rebuild.md) |
+| T060 重建安全、导出与单图推理契约 | [0012](adr/0012-t060-rebuild-safety.md)、[0013](adr/0013-t060-export-rebuild.md)、[0014](adr/0014-t060-image-inference.md) |
 
 ## 历史与来源
 

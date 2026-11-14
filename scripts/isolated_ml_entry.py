@@ -20,7 +20,14 @@ from xml.etree import ElementTree
 
 ROOT = Path('/opt/edgevision')
 PYTHON = ROOT / 'backend/.venv-delivery/bin/python'
-STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+# Historical E receipts retain the exact seven-stage v2 meaning.
+LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+INFERENCE_STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+PACKAGE_HTTP_STAGES = (*INFERENCE_STAGES, 'package_http')
+STAGES = (*PACKAGE_HTTP_STAGES, 'package_browser')
+SCHEMA_VERSION = 5
+PACKAGE_BROWSER_PHASES = ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_submit', 'ui_result', 'ui_download', 'ui_reload', 'ui_offline', 'ui_recovery', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete')
+DELIVERY_PHASES = ('bootstrap', 'training_probe', 'export_probe', 'api', 'web', 'browser', 'receipt', 'cleanup', 'unknown', 'ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete')
 STAGE_BUDGET = 450
 
 
@@ -34,7 +41,7 @@ def interrupt_for_cleanup(_signal, _frame):
 
 
 def summary(statuses: dict[str, str]) -> dict:
-    return {'schema_version': 2, 'stage': 'isolated_ml',
+    return {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
             'status': 'passed' if all(statuses.get(s) == 'passed' for s in STAGES) else 'failed',
             'stages': [{'stage': s, 'status': statuses.get(s, 'NOT_RUN')} for s in STAGES]}
 
@@ -102,7 +109,64 @@ def stage_commands(root: Path = ROOT) -> list[tuple[str, list[str], Path]]:
         ('browser_delivery', [python, str(root / 'scripts/e2e.py'), '--delivery', '--ml-asset',
                               str(root / 'asset/yolo11n.pt'), '--report-dir',
                               str(root / 'private/browser-report')], root),
+        ('inference_http', [python, 'tests/inference_http_probe.py'], backend),
+        ('inference_policy', [python, '-m', 'pytest', 'tests/test_inference_runtime_policy.py', '-q',
+                              '--junitxml=' + str(root / 'private/inference_policy.xml')], backend),
+        ('inference_browser', [python, str(root / 'scripts/inference_e2e.py')], root),
+        ('package_http', [python, 'tests/package_http_probe.py'], backend),
+        ('package_browser', [python, str(root/'scripts/package_e2e.py')], root),
     ]
+
+
+PACKAGE_HTTP_PHASES = ('inputs','probe','api','submit','worker','download','standalone','receipt','complete')
+PACKAGE_PROBE_PHASES = ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')
+
+
+def package_browser_failure(root):
+    try:
+        path=root/'private/package-browser/failure.json'
+        if path.is_symlink() or not path.is_file():raise ValueError('phase file')
+        with path.open('rb') as source:raw=source.read(257)
+        if len(raw)>256:raise ValueError('phase size')
+        value=json.loads(raw)
+        if not isinstance(value,dict) or set(value)!={'phase'} or not isinstance(value['phase'],str) or value['phase'] not in PACKAGE_BROWSER_PHASES:raise ValueError('phase value')
+        return value['phase']
+    except Exception:return 'unknown'
+
+
+def delivery_failure(root):
+    def read_phase(name):
+        path=root/'private/browser-report'/name
+        if path.is_symlink() or not path.is_file():raise ValueError('phase file')
+        with path.open('rb') as source:raw=source.read(257)
+        if len(raw)>256:raise ValueError('phase size')
+        value=json.loads(raw)
+        if not isinstance(value,dict) or set(value)!={'phase'} or not isinstance(value['phase'],str) or value['phase'] not in DELIVERY_PHASES:raise ValueError('phase value')
+        return value['phase']
+    try:
+        phase=read_phase('harness-phase.json')
+        if phase=='browser':
+            try:
+                ui=read_phase('ui-phase.json')
+                if ui.startswith('ui_'):return ui
+            except Exception:pass
+        return phase
+    except Exception:return 'unknown'
+
+
+def package_failure(root):
+    def read_phase(name, allowed):
+        path=root/'private/http'/name
+        if path.is_symlink() or not path.is_file():raise ValueError('phase file')
+        with path.open('rb') as source:raw=source.read(257)
+        if len(raw)>256:raise ValueError('phase size')
+        value=json.loads(raw)
+        if not isinstance(value,dict) or set(value)!={'phase'} or not isinstance(value['phase'],str) or value['phase'] not in allowed:raise ValueError('phase value')
+        return value['phase']
+    try:
+        value=read_phase('package-http-phase.json',PACKAGE_HTTP_PHASES)
+        return 'probe_'+read_phase('package-probe-phase.json',PACKAGE_PROBE_PHASES) if value=='probe' else value
+    except Exception:return 'unknown'
 
 
 def verify_policy_report(path: Path) -> None:
@@ -154,23 +218,48 @@ def main(argv: list[str] | None = None) -> int:
         private = ROOT / 'private'
         private.mkdir(mode=0o700)
         data = private / 'http'
-        # Fresh shared HTTP evidence is used by both policy suites and export.
+        # All stages consume the same fresh private lineage; no capability copying.
         environment = {**os.environ, 'ORT_DISABLE_TELEMETRY': '1',
                        'PLATFORM_DATA_ROOT': str(data),
                        'EDGEVISION_SMOKE_ASSET': str(ROOT / 'asset/yolo11n.pt'),
                        'EDGEVISION_ML_POLICY_ROOT': str(data),
                        'EDGEVISION_ONNX_POLICY_ROOT': str(data),
+                       'EDGEVISION_INFERENCE_HTTP_ROOT': str(data),
+                       'EDGEVISION_INFERENCE_POLICY_ROOT': str(data),
+                       'EDGEVISION_PACKAGE_HTTP_ROOT': str(data),
+                       'EDGEVISION_ISOLATED_HOST_NETNS': args.host_netns,
                        'PYTHONPATH': str(ROOT / 'backend')}
         deadline = time.monotonic() + STAGE_BUDGET
         for current, command, cwd in stage_commands():
             run_stage(command, cwd, environment, private / f'{current}.log', deadline - time.monotonic())
-            if current in {'onnx_policy', 'training_policy'}:
+            if current in {'onnx_policy', 'training_policy', 'inference_policy'}:
                 verify_policy_report(private / f'{current}.xml')
             statuses[current] = 'passed'
     except BaseException:
         # No exception text or child output reaches Docker's public output stream.
         statuses[current] = 'failed'
     result = summary(statuses)
+    if current == 'inference_browser' and statuses[current] == 'failed':
+        code = 'unknown'
+        try:
+            path = ROOT / 'private/inference-browser/failure.json'
+            if not path.is_symlink() and path.is_file():
+                with path.open('rb') as receipt:
+                    raw = receipt.read(257)
+                if len(raw) > 256:
+                    raise ValueError('diagnostic too large')
+                value = json.loads(raw)
+                if set(value) == {'phase'} and isinstance(value['phase'], str) and value['phase'] in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_submit_inventory', 'ui_pt_submit_model', 'ui_pt_submit_thresholds', 'ui_pt_submit_ready', 'ui_pt_submit_request', 'ui_pt_submit_response', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_submit_inventory', 'ui_onnx_submit_model', 'ui_onnx_submit_thresholds', 'ui_onnx_submit_ready', 'ui_onnx_submit_request', 'ui_onnx_submit_response', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete'):
+                    code = value['phase']
+        except Exception:
+            pass
+        result['inference_browser_failure'] = code
+    if current == 'browser_delivery' and statuses[current] == 'failed':
+        result['browser_delivery_failure'] = delivery_failure(ROOT)
+    if current == 'package_browser' and statuses[current] == 'failed':
+        result['package_browser_failure'] = package_browser_failure(ROOT)
+    if current == 'package_http' and statuses[current] == 'failed':
+        result['package_http_failure'] = package_failure(ROOT)
     os.umask(previous_mask)
     signal.signal(signal.SIGTERM, previous_signal)
     print(json.dumps(result, separators=(',', ':')), flush=True)

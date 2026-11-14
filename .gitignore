@@ -16,3 +16,6 @@ data/
 .env
 
 backend/.venv-ml/
+
+# Local execution ledgers, never product artifacts
+.superpowers/

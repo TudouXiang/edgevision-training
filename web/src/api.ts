@@ -12,6 +12,10 @@ export type Metric = components['schemas']['Metric']
 export type Artifact = components['schemas']['ArtifactPublic']
 export type TrainParams = components['schemas']['TrainParams']
 export type ExportOnnxParams = components['schemas']['ExportOnnxParams']
+export type PackageParams = components['schemas']['PackageParams']
+export type InferenceParams = components['schemas']['InferenceParams']
+export type InferenceResult = components['schemas']['InferenceResult']
+export type InferenceInput = components['schemas']['InferenceInputArtifactPublic']
 export type JobAccepted = components['schemas']['JobAccepted']
 type JobPage = components['schemas']['Page_JobPublic_']
 type JobLogs = components['schemas']['Incremental_JobLog_']
@@ -37,7 +41,7 @@ function cookie(name: string): string | null {
   return item ? decodeURIComponent(item.slice(prefix.length)) : null
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function response(path: string, options: RequestInit = {}): Promise<Response> {
   const method = (options.method ?? 'GET').toUpperCase()
   const headers = new Headers(options.headers)
   if (options.body !== undefined && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
@@ -50,8 +54,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const body = await response.json().catch(() => ({})) as ErrorEnvelope
     throw new ApiClientError(response.status, body.error?.code ?? 'HTTP_ERROR', body.error?.message ?? `HTTP ${response.status}`)
   }
-  if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  return response
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const result = await response(path, options)
+  if (result.status === 204) return undefined as T
+  return result.json() as Promise<T>
 }
 
 export async function checkSystem(signal: AbortSignal): Promise<{ live: LiveResponse; ready: ReadyResponse | null; capabilities: Capabilities | null }> {
@@ -80,6 +89,8 @@ export const projectApi = {
 }
 
 export const jobApi = {
+  package: (projectId: string, params: PackageParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${encodeURIComponent(projectId)}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'package', params, source_job_id}), headers: {'Idempotency-Key': key}, signal }),
+  infer: (projectId: string, params: InferenceParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${encodeURIComponent(projectId)}/jobs`, { method: 'POST', body: JSON.stringify({ kind: 'infer', params, source_job_id }), headers: { 'Idempotency-Key': key }, signal }),
   exportOnnx: (projectId: string, params: ExportOnnxParams, key: string, signal?: AbortSignal) => request<JobAccepted>(`/projects/${projectId}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'export_onnx', params}), headers: {'Idempotency-Key': key}, signal }),
   train: (projectId: string, params: TrainParams, key: string, signal?: AbortSignal, source_job_id?: string) => request<JobAccepted>(`/projects/${projectId}/jobs`, { method: 'POST', body: JSON.stringify({kind: 'train', params, source_job_id}), headers: {'Idempotency-Key': key}, signal }),
   metrics: (id: string, cursor: string | null, signal?: AbortSignal) => request<components['schemas']['Incremental_Metric_']>(`/jobs/${id}/metrics?limit=500${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { signal }),
@@ -103,9 +114,24 @@ export const datasetApi = {
 }
 
 export const adminApi = {
+  jobs: (page = 1, pageSize = 20, signal?: AbortSignal) => request<JobPage>(`/admin/jobs?page=${page}&page_size=${pageSize}`, { signal }),
   users: (page = 1, pageSize = 20, signal?: AbortSignal) => request<UserPage>(`/admin/users?page=${page}&page_size=${pageSize}`, { signal }),
   createUser: (body: UserCreateBody, signal?: AbortSignal) => request<User>('/admin/users', { method: 'POST', body: JSON.stringify(body), signal }),
   setUserActive: (id: string, is_active: boolean, signal?: AbortSignal) => request<User>(`/admin/users/${id}`, {
     method: 'PATCH', body: JSON.stringify({ is_active }), signal,
   }),
+}
+
+export const inferenceApi = {
+  upload: (projectId: string, file: File, signal?: AbortSignal) => {
+    const body = new FormData()
+    body.append('file', file, file.name)
+    return request<InferenceInput>(`/projects/${encodeURIComponent(projectId)}/images`, { method: 'POST', body, signal })
+  },
+  result: (artifactId: string, signal?: AbortSignal) => request<InferenceResult>(`/inferences/${encodeURIComponent(artifactId)}`, { signal }),
+  preview: async (artifactId: string, signal?: AbortSignal) => {
+    const result = await response(`/inferences/${encodeURIComponent(artifactId)}/image`, { signal })
+    if (result.headers.get('Content-Type')?.split(';')[0] !== 'image/png') throw new Error('Unexpected preview format')
+    return result.blob()
+  },
 }

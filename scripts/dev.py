@@ -9,6 +9,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 WEB = ROOT / "web"
+NATIVE_OPT_INS = ('EDGEVISION_PACKAGE_HTTP_ROOT', 'EDGEVISION_E2E_PACKAGE', 'EDGEVISION_ML_POLICY_ROOT', 'EDGEVISION_ONNX_POLICY_ROOT',
+                  'EDGEVISION_INFERENCE_HTTP_ROOT', 'EDGEVISION_INFERENCE_POLICY_ROOT',
+                  'EDGEVISION_E2E_ML', 'EDGEVISION_E2E_DELIVERY', 'EDGEVISION_E2E_INFERENCE',
+                  'EDGEVISION_RUN_ISOLATED_ML', 'EDGEVISION_SMOKE_ASSET')
+
+
+def lightweight_environment() -> dict[str, str]:
+    return {**{key: value for key, value in os.environ.items() if key not in NATIVE_OPT_INS},
+            'PYTHONPATH': str(BACKEND)}
+
+
 COMMANDS = ("doctor", "migrate", "init-admin", "api", "worker", "web", "contract-generate", "contract-check", "check")
 
 
@@ -57,7 +68,7 @@ def main(argv: list[str]) -> int:
     if not python:
         return 127
     if action == "check":
-        env = {**os.environ, "PYTHONPATH": str(BACKEND)}
+        env = lightweight_environment()
         for pattern in ("test_contracts_unit.py", "test_dev_scripts_unit.py"):
             result = run(ROOT, python, "-m", "unittest", "discover", "-s", "backend/tests", "-p", pattern, env=env)
             if result:
@@ -79,10 +90,10 @@ def main(argv: list[str]) -> int:
         args = ("--check",) if action == "contract-check" else ()
         return run(BACKEND, python, "../scripts/export_contract.py", *args)
     return (
-        run(BACKEND, python, "-m", "pytest")
-        or run(WEB, "npm", "test")
-        or run(WEB, "npm", "run", "build")
-        or main(["contract-check"])
+        run(BACKEND, python, "-m", "pytest", env=env)
+        or run(WEB, "npm", "test", env=env)
+        or run(WEB, "npm", "run", "build", env=env)
+        or run(BACKEND, python, "../scripts/export_contract.py", "--check", env=env)
     )
 
 

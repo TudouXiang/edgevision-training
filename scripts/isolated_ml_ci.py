@@ -29,7 +29,14 @@ OWNER_LABEL = 'org.edgevision.isolated-ml-owner'
 BUILD_TIMEOUT = 600
 EXECUTION_TIMEOUT = 480
 CLEANUP_TIMEOUT = 30
-STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+# Historical E receipts retain the exact seven-stage v2 meaning.
+LEGACY_STAGES = ('isolation', 'dependency_check', 'training_http', 'export_http', 'onnx_policy', 'training_policy', 'browser_delivery')
+INFERENCE_STAGES = (*LEGACY_STAGES, 'inference_http', 'inference_policy', 'inference_browser')
+PACKAGE_HTTP_STAGES = (*INFERENCE_STAGES, 'package_http')
+STAGES = (*PACKAGE_HTTP_STAGES, 'package_browser')
+SCHEMA_VERSION = 5
+PACKAGE_BROWSER_PHASES = ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_submit', 'ui_result', 'ui_download', 'ui_reload', 'ui_offline', 'ui_recovery', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete')
+DELIVERY_PHASES = ('bootstrap', 'training_probe', 'export_probe', 'api', 'web', 'browser', 'receipt', 'cleanup', 'unknown', 'ui_setup', 'ui_login', 'ui_project', 'ui_dataset', 'ui_training_submit', 'ui_training_result', 'ui_training_download', 'ui_training_reload', 'ui_export_capabilities', 'ui_export_inventory', 'ui_export_submit', 'ui_export_result', 'ui_export_download', 'ui_export_offline', 'ui_export_reload', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete')
 PUBLIC_STAGES = ('preparation', 'build', 'create', 'inspect', 'execution', 'cleanup', 'cleanup_unknown', 'complete')
 IMAGE_ID = re.compile(r'sha256:[a-f0-9]{64}')
 CONTAINER_ID = re.compile(r'[a-f0-9]{64}')
@@ -91,39 +98,70 @@ def decode_json(value: str):
     return json.loads(value, object_pairs_hook=unique_object)
 
 
-def validate_summary(value: str) -> dict:
+def validate_summary(value: str, *, expected_version: int | None = None) -> dict:
     require(len(value) <= 8192)
     result = decode_json(value)
-    require(isinstance(result, dict) and set(result) == {'schema_version', 'stage', 'status', 'stages'})
-    require(type(result['schema_version']) is int and result['schema_version'] == 2)
+    base={'schema_version','stage','status','stages'}
+    require(isinstance(result, dict) and base.issubset(result) and set(result).issubset(base | {'inference_browser_failure','package_http_failure','browser_delivery_failure','package_browser_failure'}))
+    version = result['schema_version']
+    require(type(version) is int and version in (2, 3, 4, SCHEMA_VERSION))
+    require(expected_version is None or version == expected_version)
+    stages = LEGACY_STAGES if version == 2 else INFERENCE_STAGES if version == 3 else PACKAGE_HTTP_STAGES if version == 4 else STAGES
     require(result['stage'] == 'isolated_ml' and result['status'] in ('passed', 'failed'))
     rows = result['stages']
-    require(isinstance(rows, list) and len(rows) == len(STAGES))
-    for name, row in zip(STAGES, rows, strict=True):
+    require(isinstance(rows, list) and len(rows) == len(stages))
+    for name, row in zip(stages, rows, strict=True):
         require(isinstance(row, dict) and set(row) == {'stage', 'status'})
         require(row['stage'] == name and row['status'] in ('passed', 'failed', 'NOT_RUN', 'unverified'))
     all_passed = all(row['status'] == 'passed' for row in rows)
     require((result['status'] == 'passed') == all_passed)
+    diagnostic = {}
+    if 'inference_browser_failure' in result:
+        code = result['inference_browser_failure']
+        require(version in (3, 4, SCHEMA_VERSION) and rows[stages.index('inference_browser')]['status'] == 'failed')
+        require(isinstance(code, str) and code in ('boundary', 'settle', 'inputs', 'tools', 'api', 'worker', 'web', 'browser', 'receipt', 'services', 'cleanup', 'unknown', 'ui_setup', 'ui_capabilities', 'ui_inventory', 'ui_upload', 'ui_pt_submit', 'ui_pt_submit_inventory', 'ui_pt_submit_model', 'ui_pt_submit_thresholds', 'ui_pt_submit_ready', 'ui_pt_submit_request', 'ui_pt_submit_response', 'ui_pt_result', 'ui_pt_preview', 'ui_pt_download', 'ui_pt_reload', 'ui_onnx_submit', 'ui_onnx_submit_inventory', 'ui_onnx_submit_model', 'ui_onnx_submit_thresholds', 'ui_onnx_submit_ready', 'ui_onnx_submit_request', 'ui_onnx_submit_response', 'ui_onnx_result', 'ui_onnx_preview', 'ui_onnx_download', 'ui_onnx_reload', 'ui_offline', 'ui_recovery', 'ui_comparison_submit', 'ui_comparison_selected', 'ui_comparison_result', 'ui_comparison_inventory', 'ui_comparison_metrics', 'ui_responsive', 'ui_complete'))
+        diagnostic = {'inference_browser_failure': code}
+    if 'browser_delivery_failure' in result:
+        code=result['browser_delivery_failure']
+        require(version in (4, SCHEMA_VERSION) and rows[stages.index('browser_delivery')]['status']=='failed')
+        require(isinstance(code,str) and code in DELIVERY_PHASES)
+        diagnostic['browser_delivery_failure']=code
+    if 'package_browser_failure' in result:
+        code=result['package_browser_failure']
+        require(version == SCHEMA_VERSION and rows[stages.index('package_browser')]['status']=='failed')
+        require(isinstance(code,str) and code in PACKAGE_BROWSER_PHASES)
+        diagnostic['package_browser_failure']=code
+    if 'package_http_failure' in result:
+        code=result['package_http_failure']
+        require(version in (4, SCHEMA_VERSION) and rows[stages.index('package_http')]['status']=='failed')
+        allowed={*('inputs','probe','api','submit','worker','download','standalone','receipt','complete'), *('probe_'+phase for phase in ('reference_capability','recover','source','identity','reference','bundle','raw','cli','comparison','record','complete')), 'unknown'}
+        require(isinstance(code,str) and code in allowed)
+        diagnostic['package_http_failure']=code
     # Return freshly built known fields; never relay arbitrary Docker output.
-    return {'schema_version': 2, 'stage': 'isolated_ml', 'status': result['status'],
-            'stages': [{'stage': name, 'status': row['status']} for name, row in zip(STAGES, rows, strict=True)]}
+    return {'schema_version': version, 'stage': 'isolated_ml', 'status': result['status'],
+            'stages': [{'stage': name, 'status': row['status']} for name, row in zip(stages, rows, strict=True)], **diagnostic}
 
 
 def public_summary(stage: str, passed: bool, result: dict | None = None) -> dict:
     require(stage in PUBLIC_STAGES)
     rows = [{'stage': name, 'status': 'NOT_RUN'} for name in STAGES]
+    diagnostic = {}
     if result is not None:
-        rows = validate_summary(json.dumps(result))['stages']
+        checked = validate_summary(json.dumps(result), expected_version=SCHEMA_VERSION)
+        rows = checked['stages']
+        diagnostic = {key:checked[key] for key in ('inference_browser_failure','package_http_failure','browser_delivery_failure','package_browser_failure') if key in checked}
     require(not passed or (stage == 'complete' and all(row['status'] == 'passed' for row in rows)))
-    return {'schema_version': 2, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows}
+    return {'schema_version': SCHEMA_VERSION, 'stage': stage, 'status': 'passed' if passed else 'failed', 'stages': rows, **diagnostic}
 
 
 def failed_outer(stage: str, previous: dict) -> dict:
     # Cleanup/reporting faults cannot erase already verified child outcomes.
     rows = previous['stages']
-    evidence = {'schema_version': 2, 'stage': 'isolated_ml',
+    evidence = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml',
                 'status': 'passed' if all(row['status'] == 'passed' for row in rows) else 'failed',
                 'stages': rows}
+    for key in ('inference_browser_failure','package_http_failure','browser_delivery_failure','package_browser_failure'):
+        if key in previous:evidence[key]=previous[key]
     return public_summary(stage, False, evidence)
 
 
@@ -198,6 +236,8 @@ BLOCKED_PARTS = {'data', 'private', 'logs', 'artifacts', 'evidence', 'reports', 
 
 
 def source_allowed(relative: str) -> bool:
+    if relative in {'LICENSE','LICENSE_SCOPE.md'}:
+        return True
     path = PurePosixPath(relative)
     if path.is_absolute() or not path.parts or path.parts[0] not in {'backend', 'web', 'scripts', 'contracts'}:
         return False
@@ -213,10 +253,15 @@ def source_allowed(relative: str) -> bool:
 
 
 REQUIRED_SOURCE = (
+    'LICENSE', 'LICENSE_SCOPE.md', 'scripts/install_package.py', 'scripts/package_standalone.py',
+    'backend/requirements-package-linux-cpu.lock', 'backend/tests/package_http_probe.py',
     'scripts/isolated_ml_entry.py', 'scripts/install_ml.py', 'scripts/e2e.py',
     'scripts/fetch_training_asset.py', 'backend/requirements-delivery-linux-cpu.lock',
     'web/package-lock.json', 'backend/tests/export_http_probe.py',
-    'backend/tests/test_onnx_runtime_policy.py',
+    'backend/tests/test_onnx_runtime_policy.py', 'backend/tests/inference_http_probe.py',
+    'backend/tests/test_inference_runtime_policy.py', 'backend/tests/inference_policy_probe.py',
+    'scripts/package_e2e.py', 'web/e2e/t060-package.browser.ts',
+    'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts',
 )
 RECIPE = 'ci/isolated-ml.Dockerfile'
 
@@ -251,7 +296,7 @@ def freeze_source(root: Path, context: Path, commands: PrivateCommands, expected
     def git(*args):
         return commands.command(['git', '-c', 'core.fsmonitor=false', *args], cwd=root, timeout=15)
     require(git('rev-parse', '--verify', 'HEAD').strip() == expected_commit)
-    paths = ('backend', 'web', 'scripts', 'contracts', 'ci')
+    paths = ('backend', 'web', 'scripts', 'contracts', 'ci', 'LICENSE', 'LICENSE_SCOPE.md')
     require(git('status', '--porcelain=v1', '-z', '--untracked-files=all', '--', *paths) == '')
     tree = git('ls-tree', '-r', '-z', expected_commit, '--', *paths)
     copy_source(context, tree, lambda object_id: git('cat-file', 'blob', object_id).encode('utf-8'))
@@ -419,15 +464,15 @@ class IsolatedRun:
         self.stage = 'execution'
         # If the client disappears or output is malformed, actual child outcomes
         # are unknown, not falsely reported as never run.
-        self.result = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'failed',
+        self.result = {'schema_version': SCHEMA_VERSION, 'stage': 'isolated_ml', 'status': 'failed',
                        'stages': [{'stage': name, 'status': 'unverified'} for name in STAGES]}
         try:
             output = self.commands.docker(['start', '--attach', container['Id']], timeout=remaining())
         except PrivateCommandError as failure:
             if failure.output.stat().st_size <= 8192:
-                self.result = validate_summary(failure.output.read_text())
+                self.result = validate_summary(failure.output.read_text(), expected_version=SCHEMA_VERSION)
             raise
-        self.result = validate_summary(output)
+        self.result = validate_summary(output, expected_version=SCHEMA_VERSION)
         require(self.result['status'] == 'passed')
         # Exit code alone or a forged/missing stage summary cannot mean success.
         self.stage = 'inspect'

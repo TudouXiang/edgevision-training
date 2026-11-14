@@ -44,6 +44,7 @@ describe('authenticated workspace state', () => {
     let projectPageTwoReads = 0
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -87,6 +88,7 @@ describe('authenticated workspace state', () => {
     let projectReads = 0
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -140,6 +142,7 @@ describe('authenticated workspace state', () => {
     const logoutResponse = deferred<Response>()
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -165,6 +168,7 @@ describe('authenticated workspace state', () => {
   it('clears the workspace when password change reports an invalid session', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -221,6 +225,7 @@ describe('dataset upload client', () => {
     const lateUpload = deferred<Response>()
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
       if (/\/projects\/[^/]+\/jobs\?/.test(url)) return Promise.resolve(json(emptyPage))
       if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
       if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
@@ -261,7 +266,7 @@ describe('dataset upload client', () => {
   })
 })
 
-it('remounts task panels on stage navigation and ignores the old route request', async () => {
+it.each(['export', 'inference', 'package'])('remounts the %s panel on stage navigation and ignores the old route request', async panel => {
   const { createRouter, createMemoryHistory } = await import('vue-router')
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:stage?', component: App }] })
   await router.push('/training'); await router.isReady()
@@ -270,6 +275,7 @@ it('remounts task panels on stage navigation and ignores the old route request',
   let oldSignal: AbortSignal | undefined, jobReads = 0
   vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
     if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
     if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
     if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
@@ -283,11 +289,96 @@ it('remounts task panels on stage navigation and ignores the old route request',
     if (url.includes('/datasets?') || url.includes('/artifacts?') || url.includes('/admin/users?')) return Promise.resolve(json(emptyPage))
     throw new Error(`unhandled ${url}`)
   }))
-  const wrapper = mount(App, { global: { plugins: [router], stubs: { TrainingPanel: true, JobPanel: true } } })
+  const wrapper = mount(App, { global: { plugins: [router], stubs: { ExperimentComparisonPanel: true, TrainingPanel: true, JobPanel: true, ...Object.fromEntries(['export', 'inference', 'package'].filter(name => name !== panel).map(name => [name[0].toUpperCase() + name.slice(1) + 'Panel', true])) } } })
   await settle(); await wrapper.find('.project-picker select').setValue('route-project'); await settle()
   await router.push('/onnx'); await settle()
   expect(oldSignal?.aborted).toBe(true); expect(jobReads).toBe(2)
   staleJobs.resolve(json({ ...emptyPage, total: 1, items: [{ id: 'old-route-export', project_id: project.id, kind: 'export_onnx', state: 'running' }] })); await settle()
-  expect(wrapper.text()).not.toContain('old-route-export'); expect(wrapper.find('.export-panel').exists()).toBe(true)
+  expect(wrapper.text()).not.toContain('old-route-export'); expect(wrapper.find(`.${panel}-panel`).exists()).toBe(true)
   wrapper.unmount()
+})
+
+it('invalidates the entire session when an active inference request receives 401', async () => {
+  const project = { id: 'inference-project', owner_id: admin.id, name: 'Inference project', description: '', archived_at: null, created_at: admin.created_at, updated_at: admin.created_at }
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
+    if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
+    if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
+    if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
+    if (url.endsWith('/auth/me')) return Promise.resolve(json(admin))
+    if (url.includes('/projects?page=')) return Promise.resolve(json({ ...emptyPage, items: [project], total: 1 }))
+    if (url.includes('/jobs?')) return Promise.resolve(error(401, 'SESSION_EXPIRED', '推理会话已失效'))
+    if (url.includes('/datasets?') || url.includes('/admin/users?')) return Promise.resolve(json(emptyPage))
+    throw new Error(`unhandled ${url}`)
+  }))
+  const wrapper = mount(App, { global: { stubs: { ExperimentComparisonPanel: true, TrainingPanel: true, ExportPanel: true, JobPanel: true } } })
+  await settle(); await wrapper.find('.project-picker select').setValue(project.id); await settle()
+  expect(wrapper.find('.login-card').exists()).toBe(true); expect(wrapper.text()).toContain('推理会话已失效'); expect(wrapper.find('.inference-panel').exists()).toBe(false)
+  wrapper.unmount()
+})
+
+it.each(['same-user', 'different-user'])('scopes inference recovery to the authenticated account after %s login', async mode => {
+  const { inferenceRequests } = await import('./components/inferenceRequests')
+  const { inferParams, imageInput, onnx, pt, sourceJob } = await import('./components/InferencePanel.fixtures')
+  const first = { ...admin, id: 'owner', role: 'user' }, second = mode === 'same-user' ? first : admin
+  const project = { id: 'p', owner_id: first.id, name: 'Shared authorized project', description: '', archived_at: null, created_at: admin.created_at, updated_at: admin.created_at }
+  const saved = inferenceRequests(first.id, project.id, () => {}).get(inferParams, 'failed-owner')
+  let current = first
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/admin/jobs?')) return Promise.resolve(json(emptyPage))
+    if (url.endsWith('/health/live')) return Promise.resolve(json({ status: 'ok', service: 'api' }))
+    if (url.endsWith('/health/ready')) return Promise.resolve(json({ status: 'ready', database: 'migrated', storage: 'available' }))
+    if (url.endsWith('/capabilities')) return Promise.resolve(json({ schema_version: 1, features }))
+    if (url.endsWith('/auth/me')) return Promise.resolve(json(current))
+    if (url.endsWith('/auth/logout')) return Promise.resolve(json(null, 204))
+    if (url.endsWith('/auth/login')) { current = second; return Promise.resolve(json(current)) }
+    if (url.includes('/projects?page=')) return Promise.resolve(json({ ...emptyPage, items: [project], total: 1 }))
+    if (url.includes('/artifacts?')) return Promise.resolve(json({ ...emptyPage, items: [pt(), onnx(), imageInput()], total: 3 }))
+    if (url.endsWith('/jobs/train-a')) return Promise.resolve(json(sourceJob('train-a', 'succeeded', 'p', 'train')))
+    if (url.endsWith('/jobs/export-a')) return Promise.resolve(json(sourceJob('export-a', 'succeeded')))
+    if (url.includes('/jobs?') || url.includes('/datasets?') || url.includes('/admin/users?')) return Promise.resolve(json(emptyPage))
+    throw new Error(`unhandled ${url} ${init?.method}`)
+  }))
+  const wrapper = mount(App, { global: { stubs: { ExperimentComparisonPanel: true, TrainingPanel: true, ExportPanel: true, JobPanel: true } } })
+  await settle(); await wrapper.find('.project-picker select').setValue('p'); await settle(); expect(wrapper.find('.pending-recovery').exists()).toBe(true)
+  await wrapper.findAll('button').find(button => button.text().includes('退出'))!.trigger('click'); await settle()
+  const fields = wrapper.findAll('.login-card input'); await fields[0].setValue('account'); await fields[1].setValue('synthetic-password'); await wrapper.find('.login-card form').trigger('submit'); await settle()
+  await wrapper.find('.project-picker select').setValue('p'); await settle()
+  expect(wrapper.find('.pending-recovery').exists()).toBe(mode === 'same-user')
+  if (mode === 'same-user') expect(inferenceRequests(first.id, project.id, () => {}).last()?.key).toBe(saved.key)
+  wrapper.unmount(); sessionStorage.clear()
+})
+
+it.each(['admin', 'user'] as const)('only renders global task administration for %s session', async role => {
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+    const url=String(input)
+    if (url.endsWith('/auth/me')) return Promise.resolve(json({...admin,role}))
+    if (url.endsWith('/health/live')) return Promise.resolve(json({status:'ok'}))
+    if (url.endsWith('/health/ready')) return Promise.resolve(json({status:'ready'}))
+    if (url.endsWith('/capabilities')) return Promise.resolve(json({features}))
+    if (url.includes('?')) return Promise.resolve(json(emptyPage))
+    throw new Error(`unhandled ${url}`)
+  }))
+  const w=mount(App); await settle()
+  expect(w.find('[aria-label="管理员全局任务"]').exists()).toBe(role === 'admin')
+  w.unmount()
+})
+
+it('mounts experiment comparison only for the selected project',async()=>{
+ const project={id:'compare-project',owner_id:admin.id,name:'Compare project',description:'',archived_at:null,created_at:admin.created_at,updated_at:admin.created_at}
+ vi.stubGlobal('fetch',vi.fn((input:RequestInfo|URL)=>{const url=String(input)
+  if(url.endsWith('/auth/me'))return Promise.resolve(json(admin))
+  if(url.endsWith('/health/live'))return Promise.resolve(json({status:'ok'}))
+  if(url.endsWith('/health/ready'))return Promise.resolve(json({status:'ready'}))
+  if(url.endsWith('/capabilities'))return Promise.resolve(json({features}))
+  if(url.includes('/projects?page='))return Promise.resolve(json({...emptyPage,items:[project],total:1}))
+  if(url.includes('?'))return Promise.resolve(json(emptyPage))
+  throw new Error(`unhandled ${url}`)
+ }))
+ const w=mount(App,{global:{stubs:{TrainingPanel:true,JobPanel:true,InferencePanel:true,PackagePanel:true,ExportPanel:true}}});await settle()
+ expect(w.find('[aria-label="基础实验对比"]').exists()).toBe(false)
+ await w.find('.project-picker select').setValue(project.id);await settle();expect(w.find('[aria-label="基础实验对比"]').exists()).toBe(true)
+ await w.find('.project-picker select').setValue('');await settle();expect(w.find('[aria-label="基础实验对比"]').exists()).toBe(false);w.unmount()
 })

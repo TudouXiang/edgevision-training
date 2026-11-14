@@ -112,7 +112,7 @@ def test_reject_source_corruption(export_ready, fault):
     assert response.json()['error']['code'] == 'EXPORT_INPUT_UNAVAILABLE'
 
 
-def test_auth_cross_project_archive_capability_and_501(export_ready, monkeypatch):
+def test_auth_cross_project_archive_capability_and_downstream_guards(export_ready, monkeypatch):
     ready, artifact = export_ready
     client, project, _, _ = ready
     other = create_user(client, 'export-other')
@@ -123,7 +123,7 @@ def test_auth_cross_project_archive_capability_and_501(export_ready, monkeypatch
     monkeypatch.setattr(export_service, 'capability', lambda: {'available': False})
     assert post(export_ready).json()['error']['code'] == 'DELIVERY_SETUP_REQUIRED'
     for kind, params in [('infer', {'model_artifact_id': artifact['id'], 'image_artifact_id': str(uuid4()), 'backend': 'onnx'}), ('package', {'onnx_artifact_id': artifact['id']})]:
-        assert client.post(f'/api/v1/projects/{project}/jobs', headers={**headers(client), 'Idempotency-Key': kind}, json={'kind': kind, 'params': params}).status_code == 501
+        assert client.post(f'/api/v1/projects/{project}/jobs', headers={**headers(client), 'Idempotency-Key': kind}, json={'kind': kind, 'params': params}).status_code == (404 if kind == 'infer' else 409)
     client.post(f'/api/v1/projects/{project}/archive', headers=headers(client))
     assert post(export_ready).status_code == 409
 

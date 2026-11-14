@@ -198,7 +198,7 @@ def send_control(stream, command: bytes) -> bool:
 
 def process(job_id: str, run_id: str) -> None:
     job = get_job(job_id)
-    if job["kind"] not in {"dataset_check", "train", "export_onnx"}:
+    if job["kind"] not in {"dataset_check", "train", "export_onnx", "infer", "package"}:
         finish(job_id, run_id, "UNSUPPORTED_JOB")
         return
     # A claimed-only task cannot have launched a guardian. Prelaunch input errors
@@ -210,6 +210,12 @@ def process(job_id: str, run_id: str) -> None:
                 raise ValueError("archive fingerprint changed")
         elif job["kind"] == "train":
             from .training_inputs import verify_input
+            verify_input(frozen)
+        elif job["kind"] == "package":
+            from .package_inputs import verify_input
+            verify_input(frozen)
+        elif job["kind"] == "infer":
+            from .inference_inputs import verify_input
             verify_input(frozen)
         else:
             from .export_inputs import verify_input
@@ -306,6 +312,12 @@ def process(job_id: str, run_id: str) -> None:
     elif receipt["exit_code"] not in ({0, 2} if job["kind"] == "dataset_check" else {0}):
         reason = {65: "INPUT_INVALID", 66: "INPUT_CHANGED", 70: "STORAGE_UNAVAILABLE", 71: "OUTPUT_CAPACITY_LIMIT", 67: "RUNTIME_CHANGED", 68: "TRAINING_POLICY_FAILED"}.get(receipt["exit_code"], "RUNNER_FAILED")
         if receipt["exit_code"] == 68 and job["kind"] == "export_onnx": reason = "EXPORT_POLICY_FAILED"
+        if job["kind"] == "export_onnx":
+            from .export_errors import EXPORT_EXIT_ERRORS
+            reason = EXPORT_EXIT_ERRORS.get(receipt["exit_code"], reason)
+        if job["kind"] == "infer":
+            from .inference_errors import INFERENCE_EXIT_ERRORS
+            reason = INFERENCE_EXIT_ERRORS.get(receipt["exit_code"], reason)
         finish(job_id, run_id, reason)
     else:
         from .publication import publish
@@ -316,6 +328,12 @@ def process(job_id: str, run_id: str) -> None:
             elif job["kind"] == "export_onnx":
                 from .export_publication import publish as publish_export
                 published = publish_export(job)
+            elif job["kind"] == "package":
+                from .package_publication import publish as publish_package
+                published = publish_package(job)
+            elif job["kind"] == "infer":
+                from .inference_publication import publish as publish_inference
+                published = publish_inference(job)
             else:
                 published = publish(job, receipt["exit_code"])
             if not published:

@@ -75,6 +75,16 @@ def dataset_name_from_filename(filename: str) -> str:
 
 
 async def stage_multipart_zip(request: Request, destination: Path) -> StagedUpload:
+    return await stage_multipart_upload(request, destination, max_bytes=MAX_DATASET_ZIP_BYTES,
+        filename_check=_dataset_name, media_check=lambda filename, media: media in {
+            b"application/zip", b"application/x-zip-compressed", b"application/octet-stream"},
+        too_large_code="DATASET_TOO_LARGE", type_code="UPLOAD_FILE_TYPE",
+        type_message="Dataset file part must be a ZIP media type", empty_message="Dataset ZIP cannot be empty")
+
+
+async def stage_multipart_upload(request: Request, destination: Path, *, max_bytes: int,
+                                 filename_check, media_check, too_large_code: str,
+                                 type_code: str, type_message: str, empty_message: str) -> StagedUpload:
     """Consume raw ASGI bytes into exactly one bounded ``file`` part.
 
     This intentionally does not use ``request.form()``/``UploadFile`` because
@@ -88,12 +98,12 @@ async def stage_multipart_zip(request: Request, destination: Path) -> StagedUplo
     if not boundary or len(boundary) > 200:
         _reject("MULTIPART_BOUNDARY_INVALID", "Multipart boundary is invalid")
     content_length = request.headers.get("content-length")
-    body_limit = MAX_DATASET_ZIP_BYTES + MAX_MULTIPART_OVERHEAD_BYTES
+    body_limit = max_bytes + MAX_MULTIPART_OVERHEAD_BYTES
     if content_length is not None:
         if len(content_length) > 20 or not content_length.isdecimal():
             _reject("CONTENT_LENGTH_INVALID", "Content-Length must be a non-negative integer")
         if int(content_length) > body_limit:
-            _reject("DATASET_TOO_LARGE", f"Multipart body exceeds {body_limit} bytes", 413)
+            _reject(too_large_code, f"Multipart body exceeds {body_limit} bytes", 413)
 
     destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     hasher = sha256()
@@ -143,10 +153,10 @@ async def stage_multipart_zip(request: Request, destination: Path) -> StagedUplo
             filename = params[b"filename"].decode("utf-8")
         except UnicodeDecodeError:
             _reject("UPLOAD_FILENAME_INVALID", "Upload filename must be UTF-8")
-        _dataset_name(filename)
+        filename_check(filename)
         part_type, _ = parse_options_header(one_header(b"content-type"))
-        if part_type not in {b"application/zip", b"application/x-zip-compressed", b"application/octet-stream"}:
-            _reject("UPLOAD_FILE_TYPE", "Dataset file part must be a ZIP media type", 415)
+        if not media_check(filename, part_type):
+            _reject(type_code, type_message, 415)
         try:
             file_handle = destination.open("xb")
         except FileExistsError:
@@ -159,8 +169,8 @@ async def stage_multipart_zip(request: Request, destination: Path) -> StagedUplo
             _reject("MULTIPART_INVALID", "Multipart file data appeared before valid headers")
         chunk = data[start:end]
         file_bytes += len(chunk)
-        if file_bytes > MAX_DATASET_ZIP_BYTES:
-            _reject("DATASET_TOO_LARGE", f"Dataset ZIP exceeds {MAX_DATASET_ZIP_BYTES} bytes", 413)
+        if file_bytes > max_bytes:
+            _reject(too_large_code, f"Uploaded file exceeds {max_bytes} bytes", 413)
         file_handle.write(chunk)
         hasher.update(chunk)
 
@@ -188,13 +198,13 @@ async def stage_multipart_zip(request: Request, destination: Path) -> StagedUplo
         async for chunk in request.stream():
             body_bytes += len(chunk)
             if body_bytes > body_limit:
-                _reject("DATASET_TOO_LARGE", f"Multipart body exceeds {body_limit} bytes", 413)
+                _reject(too_large_code, f"Multipart body exceeds {body_limit} bytes", 413)
             parser.write(chunk)
         parser.finalize()
         if not (part_seen and part_finished and parser_finished and filename is not None and file_handle is not None):
             _reject("MULTIPART_INCOMPLETE", "Multipart upload ended before the file part completed")
         if file_bytes == 0:
-            _reject("UPLOAD_EMPTY", "Dataset ZIP cannot be empty")
+            _reject("UPLOAD_EMPTY", empty_message)
         file_handle.flush()
         os.fsync(file_handle.fileno())
         file_handle.close()

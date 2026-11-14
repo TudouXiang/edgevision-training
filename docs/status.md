@@ -1,3 +1,53 @@
+# 当前增量 · T070 管理员任务切片通过（2026-11-14 UTC）
+
+精确 `a45421849c4b888be4ee01137c75de113b05d746` 的 #46 checks/Windows 均 success；后端 861 passed（14 原生 skipped）、前端 139 passed、契约一致；普通浏览器 5 实际通过、1 预期 ML 跳过。已补齐全局任务 API/分页/详情/日志/单任务取消，保留服务器鉴权与会话隔离。见 [精确检查点与限制](evidence/T070-admin-checkpoint-2026-11-14.md)。
+
+T070 整体未验收：下一项为基础实验对比，另有正式实验、干净部署、演示/论文材料、main 集成与用户机验收。原生 ML 本次未重跑，每个实际环境须新鲜 probe。下方保留 P 及更早检查点。
+
+---
+
+# 当前增量 · T060 P 限定工程 accepted（2026-11-14 UTC）
+
+公开 SHA `685f2efa56165fb5bd45641c81a1539ad94759ea`、tree `f3822aa07269b52407df203368b3ff7039802588` 的 #44 三个 CI 任务全部成功，schema 5 十二阶段全部 passed，含 E/I 重验、独立九依赖模型执行、HTTP 下载 ZIP 再执行及 P 专属浏览器闭环。独立审查支持固定 Linux x86_64 / CPython 3.12 / CPU / 可信 YOLO11n 的源码部署包工程验收。见 [P 精确证据](evidence/T060-package-acceptance-2026-11-14.md)和 [T060 分阶段报告](evidence/T060-report.md)。
+
+本地普通回归 858 passed、14 原生 opt-in skipped、42 subtests passed；前端 130 passed，build/typecheck 通过。每个部署环境仍须当前源码绑定的 probe；源码 ZIP 不含解释器/wheels，初次安装需网络或另备 wheelhouse。每产物验证的是完整性，不声称所有未来产物均已独立执行。T070、正式精度/性能、Windows ML、GPU/NPU、完整原生故障矩阵及全项目交付未验收。
+
+以下为历史检查点，旧的 P 未实现/未验收陈述仅适用于其对应版本。
+
+---
+
+# 当前增量 · T060 I 限定 accepted（2026-11-14 UTC）
+
+精确公开 SHA `bd8d554b6bc51d05d6c1b81119ea8e1416eed5b9` 在工作流 #30 的 checks、Windows、隔离 ML 三任务全部通过，十阶段含真实 PT/ONNX 图片 HTTP/probe/浏览器全部 passed。原生运行与审查源码 tree 均为 `c21a8d54ee8222d7f9402ca08aa0bdb01cd2e47e`。独立需求映射审查支持 I 在固定 Linux CPU/YOLO11n 范围限定 accepted，见[精确证据](evidence/T060-image-acceptance-2026-11-14.md)。
+
+P已实现固定源码ZIP、独立CLI及受管API/发布/下载接线，合成与受管进程测试不等于独立模型验收。生产P能力强制关闭（PACKAGE_SETUP_REQUIRED），probe/UI/原生验收待完成；T060 整体与 T070 未验收。Windows ML、GPU/NPU、正式精度/性能及完整原生故障矩阵不在本次通过范围。能力仍需各运行环境的当前源码 probe。
+
+以下保留各阶段原始状态，不覆盖上述最新证据。
+
+---
+
+# 当前增量 · T060 I 源码审查通过、原生待验收（2026-11-05 UTC）
+
+可信 PT/ONNX 单图推理的后端、前端和验证入口源码已分别通过独立审查。后端最终 d4e5f85：独立155项及8子测试通过；前端db38017：117候选测试及5项独立回归通过；隔离入口1dbb08b：198项通过、5原生跳过、34子测试，另30项准备链检查通过。各次审查范围见[I整合记录](evidence/T060-image-integration-2026-11-05.md)。
+
+冻结整合 `069ac5efd50a1907bd29b48efae4d94ac4b8be78` 的完整 `scripts/dev.py check` 退出0：**646项后端通过、14项原生opt-in跳过，117项前端通过**，构建与契约漂移检查通过。14项跳过分别为原有E6项、训练3项、新I5项，均没有执行。普通API重启/Worker/整树退出在450b50f通过。首次整合及失败修复历史保留在下方对应报告，不覆盖旧结果。
+
+I业务仍未accepted：真实I ML/ORT/probe/HTTP/浏览器全部NOT_RUN。新隔离验证源码固定v3十阶段，保持450秒共享模型预算、480秒外层执行和20分钟job；只有未来精确版本获准后才可执行。普通测试发现只证明默认5例、I专用1例可发现，实际执行均0。P仍501且blocked，T060整体及T070未accepted；E此前的限定验收保持原范围。没有新模型、用户图片、数据库或原始私有记录发布。
+
+以下保留各阶段原始状态；旧文中 I 尚未实现只适用于对应版本，不覆盖本节源码状态。
+
+---
+
+# 当前增量 · T060 E 限定 accepted / I 待实施（2026-11-05 UTC）
+
+固定 Linux CPU / YOLO11n 的可信 PT→ONNX 工程阶段已限定 accepted。证据严格区分：公开 `76af48f` 的真实七阶段隔离运行，以及 `7e322689` 的错误分类补丁与33项新增轻量/普通受管失败回归。独立审查确认正常模型执行路径没有改变；补丁版原生 ML 没有重跑。详见 [E逐项验收](evidence/T060-export-acceptance-2026-11-05.md)和[精确隔离运行](evidence/T060-isolated-ml-2026-11-05.md)。
+
+I（PT/ONNX 真实图片推理）可进入设计与实施，P在I验收后实施；当前两者仍501，T060整体与T070未验收。新代码会使旧能力探针失效，实际运行能力仍须当前绑定的受管probe，不复制旧记录。Windows ML、CUDA、NPU与正式精度/性能仍未执行。
+
+以下是对应旧版本和旧时间点的原始状态，不覆盖本节的新证据。
+
+---
+
 # 当前增量 · T060 隔离准备修正（2026-11-05 UTC）
 
 复核识别并修正联网构建中 `pip check` 子解释器会执行安装后启动钩子的缺口。将依赖检查移到内核边界核验后的首个子阶段，保持 fresh venv、hash 锁与固定预算；见[修正验证](evidence/T060-preparation-bootstrap-2026-11-05.md)。当前源码检查点已持久备份，独立复核 accept（174 项聚焦测试通过）；最终本地整合回归为429后端通过/9原生跳过、47前端通过，构建/契约及HTTP重启通过；精确远端 CI 单独绑定发布 SHA 留档。真实 Docker/模型/ORT/ML 浏览器仍 NOT_RUN，E 未 accepted，I/P 仍 501。

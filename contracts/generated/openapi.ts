@@ -311,6 +311,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inferences/{inference_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inference Image */
+        get: operations["inference_image_api_v1_inferences__inference_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -528,9 +545,9 @@ export interface components {
         };
         /**
          * ArtifactPublic
-         * @description Kind-discriminated public schema: malformed ONNX never falls back to dict.
+         * @description Malformed typed image/ONNX metadata never falls back to arbitrary dict.
          */
-        ArtifactPublic: components["schemas"]["TrainingArtifactPublic"] | components["schemas"]["OnnxArtifactPublic"] | components["schemas"]["OtherArtifactPublic"];
+        ArtifactPublic: components["schemas"]["TrainingArtifactPublic"] | components["schemas"]["OnnxArtifactPublic"] | components["schemas"]["InferenceInputArtifactPublic"] | components["schemas"]["InferenceResultArtifactPublic"] | components["schemas"]["PackageArtifactPublic"] | components["schemas"]["OtherArtifactPublic"];
         /** CapabilitiesResponse */
         CapabilitiesResponse: {
             /** Features */
@@ -647,6 +664,26 @@ export interface components {
          * @enum {string}
          */
         DatasetState: "pending" | "validating" | "ready" | "invalid";
+        /** DecodedImageRecord */
+        DecodedImageRecord: {
+            /** Encoded Height */
+            encoded_height: number;
+            /** Encoded Width */
+            encoded_width: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "jpeg" | "png";
+            /** Image Height */
+            image_height: number;
+            /** Image Width */
+            image_width: number;
+            /** Orientation */
+            orientation: number;
+            /** Rgb Sha256 */
+            rgb_sha256: string;
+        };
         /** Detection */
         Detection: {
             /** Class Id */
@@ -1015,6 +1052,69 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** InferenceInputArtifactPublic */
+        InferenceInputArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "jpeg" | "png";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Id */
+            job_id: null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "inference_input";
+            metadata: components["schemas"]["InferenceInputMetadata"];
+            /**
+             * Metadata Schema Version
+             * @constant
+             */
+            metadata_schema_version: 1;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Validation State
+             * @constant
+             */
+            validation_state: "unverified";
+        };
+        /** InferenceInputMetadata */
+        InferenceInputMetadata: {
+            /**
+             * Declared Format
+             * @enum {string}
+             */
+            declared_format: "jpeg" | "png";
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Validation Scope
+             * @constant
+             */
+            validation_scope: "bounded_upload_bytes";
+        };
         /** InferenceJobCreate */
         InferenceJobCreate: {
             /**
@@ -1023,6 +1123,40 @@ export interface components {
              */
             kind: "infer";
             params: components["schemas"]["InferenceParams"];
+            /** Source Job Id */
+            source_job_id?: string | null;
+        };
+        /** InferenceJobSource */
+        InferenceJobSource: {
+            /** Code Version */
+            code_version: string;
+            /**
+             * Image Artifact Id
+             * Format: uuid
+             */
+            image_artifact_id: string;
+            /** Image Sha256 */
+            image_sha256: string;
+            /**
+             * Model Artifact Id
+             * Format: uuid
+             */
+            model_artifact_id: string;
+            /**
+             * Model Job Id
+             * Format: uuid
+             */
+            model_job_id: string;
+            /** Model Sha256 */
+            model_sha256: string;
+            params: components["schemas"]["InferenceParams"];
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "detection-image-v1";
+            /** Runtime Binding */
+            runtime_binding: string;
         };
         /** InferenceParams */
         InferenceParams: {
@@ -1052,6 +1186,60 @@ export interface components {
              */
             model_artifact_id: string;
         };
+        /** InferenceProvenance */
+        InferenceProvenance: {
+            /** Code Version */
+            code_version: string;
+            /** Frozen Input Sha256 */
+            frozen_input_sha256: string;
+            /**
+             * Image Artifact Id
+             * Format: uuid
+             */
+            image_artifact_id: string;
+            /** Image Sha256 */
+            image_sha256: string;
+            /** Image Size Bytes */
+            image_size_bytes: number;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * Model Artifact Id
+             * Format: uuid
+             */
+            model_artifact_id: string;
+            /**
+             * Model Job Id
+             * Format: uuid
+             */
+            model_job_id: string;
+            /** Model Metadata Sha256 */
+            model_metadata_sha256: string;
+            /** Model Sha256 */
+            model_sha256: string;
+            /** Model Size Bytes */
+            model_size_bytes: number;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Runtime Binding */
+            runtime_binding: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+        };
         /** InferenceResult */
         InferenceResult: {
             /**
@@ -1064,14 +1252,192 @@ export interface components {
              * @enum {string}
              */
             backend: "pt" | "onnx";
+            /** Classes */
+            classes: string[];
+            counts: components["schemas"]["PostprocessCounts"];
             /** Detections */
             detections: components["schemas"]["Detection"][];
+            image: components["schemas"]["DecodedImageRecord"];
             /** Image Height */
             image_height: number;
+            /** Image Url */
+            image_url: string;
             /** Image Width */
             image_width: number;
-            /** Provider */
-            provider: string;
+            params: components["schemas"]["InferenceParams"];
+            preprocess: components["schemas"]["PreprocessRecord"];
+            preview: components["schemas"]["PreviewRecord"];
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "detection-image-v1";
+            provenance: components["schemas"]["InferenceProvenance"];
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "pytorch_cpu" | "CPUExecutionProvider";
+            runtime: components["schemas"]["InferenceRuntime"];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            timings: components["schemas"]["InferenceTimings"];
+        };
+        /** InferenceResultArtifactPublic */
+        InferenceResultArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Format
+             * @constant
+             */
+            format: "json";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "inference_result";
+            metadata: components["schemas"]["InferenceResultMetadata"];
+            /**
+             * Metadata Schema Version
+             * @constant
+             */
+            metadata_schema_version: 1;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Validation State
+             * @constant
+             */
+            validation_state: "passed";
+        };
+        /** InferenceResultMetadata */
+        InferenceResultMetadata: {
+            preview: components["schemas"]["PreviewRecord"];
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "detection-image-v1";
+            provenance: components["schemas"]["InferenceProvenance"];
+            /** Result Sha256 */
+            result_sha256: string;
+            /** Result Size Bytes */
+            result_size_bytes: number;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Validation Scope
+             * @constant
+             */
+            validation_scope: "real_single_image_inference";
+        };
+        /** InferenceRuntime */
+        InferenceRuntime: {
+            /**
+             * Backend
+             * @enum {string}
+             */
+            backend: "pt" | "onnx";
+            /**
+             * Device
+             * @constant
+             */
+            device: "cpu";
+            /**
+             * Interop Threads
+             * @constant
+             */
+            interop_threads: 1;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "pytorch_cpu" | "CPUExecutionProvider";
+            /** Raw Elements */
+            raw_elements: number;
+            /** Raw Sha256 */
+            raw_sha256: string;
+            /**
+             * Threads
+             * @constant
+             */
+            threads: 2;
+            versions: components["schemas"]["InferenceVersions"];
+            /**
+             * Warmup Runs
+             * @constant
+             */
+            warmup_runs: 0;
+        };
+        /** InferenceTimings */
+        InferenceTimings: {
+            /** Decode */
+            decode: number;
+            /** Infer */
+            infer: number;
+            /** Load */
+            load: number;
+            /** Postprocess */
+            postprocess: number;
+            /** Preprocess */
+            preprocess: number;
+            /** Total */
+            total: number;
+            /**
+             * Unit
+             * @constant
+             */
+            unit: "ms";
+        };
+        /** InferenceVersions */
+        InferenceVersions: {
+            /**
+             * Numpy
+             * @constant
+             */
+            numpy: "2.5.4";
+            /** Onnx */
+            onnx: "1.23.2" | null;
+            /** Onnxruntime */
+            onnxruntime: "1.31.1" | null;
+            /**
+             * Pillow
+             * @constant
+             */
+            pillow: "12.3.0";
+            /** Torch */
+            torch: "2.15.0+cpu" | null;
+            /** Torchvision */
+            torchvision: "0.29.2+cpu" | null;
+            /** Ultralytics */
+            ultralytics: "8.4.202" | null;
         };
         /** JobAccepted */
         JobAccepted: {
@@ -1126,7 +1492,9 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            inference?: components["schemas"]["InferenceJobSource"] | null;
             kind: components["schemas"]["JobKind"];
+            package?: components["schemas"]["PackageJobSource"] | null;
             /** Params Schema Version */
             params_schema_version: number;
             /**
@@ -1276,7 +1644,7 @@ export interface components {
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            kind: "dataset_report" | "deployment_zip" | "inference_input" | "inference_result";
+            kind: "dataset_report";
             /** Metadata */
             metadata: {
                 [key: string]: unknown;
@@ -1294,6 +1662,89 @@ export interface components {
             size_bytes: number;
             validation_state: components["schemas"]["ValidationState"];
         };
+        /** PackageArtifactMetadata */
+        PackageArtifactMetadata: {
+            /** Manifest Sha256 */
+            manifest_sha256: string;
+            /** Manifest Size Bytes */
+            manifest_size_bytes: number;
+            /** Package Sha256 */
+            package_sha256: string;
+            /** Package Size Bytes */
+            package_size_bytes: number;
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "edgevision-python-onnx-v1";
+            provenance: components["schemas"]["PackageProvenance"];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Standalone Execution
+             * @constant
+             */
+            standalone_execution: "not_run_for_this_artifact";
+            template: components["schemas"]["PackageTemplate"];
+            /** Template Validation Sha256 */
+            template_validation_sha256: string;
+            /**
+             * Validation Scope
+             * @constant
+             */
+            validation_scope: "trusted_model_fixed_package_integrity";
+        };
+        /** PackageArtifactPublic */
+        PackageArtifactPublic: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Format
+             * @constant
+             */
+            format: "zip";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "deployment_zip";
+            metadata: components["schemas"]["PackageArtifactMetadata"];
+            /**
+             * Metadata Schema Version
+             * @constant
+             */
+            metadata_schema_version: 1;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Validation State
+             * @constant
+             */
+            validation_state: "passed";
+        };
         /** PackageJobCreate */
         PackageJobCreate: {
             /**
@@ -1302,6 +1753,30 @@ export interface components {
              */
             kind: "package";
             params: components["schemas"]["PackageParams"];
+            /** Source Job Id */
+            source_job_id?: string | null;
+        };
+        /** PackageJobSource */
+        PackageJobSource: {
+            /** Code Version */
+            code_version: string;
+            /**
+             * Export Job Id
+             * Format: uuid
+             */
+            export_job_id: string;
+            /**
+             * Onnx Artifact Id
+             * Format: uuid
+             */
+            onnx_artifact_id: string;
+            params: components["schemas"]["PackageParams"];
+            /** Runtime Binding */
+            runtime_binding: string;
+            /** Source Sha256 */
+            source_sha256: string;
+            /** Template Sha256 */
+            template_sha256: string;
         };
         /** PackageParams */
         PackageParams: {
@@ -1310,6 +1785,75 @@ export interface components {
              * Format: uuid
              */
             onnx_artifact_id: string;
+        };
+        /** PackageProvenance */
+        PackageProvenance: {
+            /** Code Version */
+            code_version: string;
+            /**
+             * Export Job Id
+             * Format: uuid
+             */
+            export_job_id: string;
+            /** Frozen Input Sha256 */
+            frozen_input_sha256: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Model Metadata Sha256 */
+            model_metadata_sha256: string;
+            /** Model Sha256 */
+            model_sha256: string;
+            /** Model Size Bytes */
+            model_size_bytes: number;
+            /**
+             * Onnx Artifact Id
+             * Format: uuid
+             */
+            onnx_artifact_id: string;
+            /**
+             * Parent Artifact Id
+             * Format: uuid
+             */
+            parent_artifact_id: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Runtime Binding */
+            runtime_binding: string;
+        };
+        /** PackageTemplate */
+        PackageTemplate: {
+            /** Core Sha256 */
+            core_sha256: string;
+            /**
+             * Image Protocol
+             * @constant
+             */
+            image_protocol: "detection-image-v1";
+            /** Lock Sha256 */
+            lock_sha256: string;
+            /**
+             * Protocol
+             * @constant
+             */
+            protocol: "edgevision-python-onnx-v1";
+            /**
+             * Target
+             * @constant
+             */
+            target: "linux-x86_64-cpython312-cpu";
+            /** Template Sha256 */
+            template_sha256: string;
         };
         /** Page[ArtifactPublic] */
         Page_ArtifactPublic_: {
@@ -1376,6 +1920,100 @@ export interface components {
             page_size: number;
             /** Total */
             total: number;
+        };
+        /** PostprocessCounts */
+        PostprocessCounts: {
+            /** Candidate Truncated */
+            candidate_truncated: number;
+            /** Candidates */
+            candidates: number;
+            /** Clip Removed */
+            clip_removed: number;
+            /** Nms Kept */
+            nms_kept: number;
+            /** Result Truncated */
+            result_truncated: number;
+        };
+        /** PreprocessRecord */
+        PreprocessRecord: {
+            /** Bottom */
+            bottom: number;
+            /**
+             * Color
+             * @constant
+             */
+            color: "RGB";
+            /**
+             * Dtype
+             * @constant
+             */
+            dtype: "float32";
+            /** Image Height */
+            image_height: number;
+            /** Image Width */
+            image_width: number;
+            /**
+             * Layout
+             * @constant
+             */
+            layout: "NCHW";
+            /** Left */
+            left: number;
+            /**
+             * Normalization
+             * @constant
+             */
+            normalization: "divide_255";
+            /**
+             * Padding
+             * @constant
+             */
+            padding: 114;
+            /**
+             * Resampling
+             * @constant
+             */
+            resampling: "pillow_bilinear";
+            /** Resized Height */
+            resized_height: number;
+            /** Resized Width */
+            resized_width: number;
+            /** Right */
+            right: number;
+            /** Scale X */
+            scale_x: number;
+            /** Scale Y */
+            scale_y: number;
+            /**
+             * Target Height
+             * @constant
+             */
+            target_height: 640;
+            /**
+             * Target Width
+             * @constant
+             */
+            target_width: 640;
+            /** Tensor Sha256 */
+            tensor_sha256: string;
+            /** Top */
+            top: number;
+        };
+        /** PreviewRecord */
+        PreviewRecord: {
+            /**
+             * Format
+             * @constant
+             */
+            format: "png";
+            /** Height */
+            height: number;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Width */
+            width: number;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -2792,8 +3430,75 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description Not implemented in the production shell */
-            501: {
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    inference_image_api_v1_inferences__inference_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inference_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                };
+            };
+            /** @description Authentication required or session invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Origin, CSRF, role or access denied */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3702,7 +4407,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ArtifactPublic"];
+                    "application/json": components["schemas"]["InferenceInputArtifactPublic"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
                 };
             };
             /** @description Authentication required or session invalid */
@@ -3741,8 +4455,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description Unprocessable Entity */
-            422: {
+            /** @description Request Entity Too Large */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3750,8 +4464,17 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description Not implemented in the production shell */
-            501: {
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

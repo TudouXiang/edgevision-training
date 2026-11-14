@@ -60,6 +60,18 @@ def invalidate_dataset(connection: sqlite3.Connection, job_id: str) -> None:
 def job_public(row) -> dict:
     training = None
     export = None
+    inference = None
+    package = None
+    if row["kind"] == "package":
+        from .package_contract import FrozenPackage
+        frozen = FrozenPackage.model_validate_json(row["input_snapshot_json"]).model_dump(mode="json")
+        package = {"onnx_artifact_id": frozen["model"]["source_artifact_id"], "export_job_id": frozen["model"]["source_job_id"],
+            "source_sha256": frozen["model"]["source_sha256"], "template_sha256": frozen["template"]["template_sha256"],
+            **{key: frozen[key] for key in ("params", "runtime_binding", "code_version")}}
+    if row["kind"] == "infer":
+        from .inference_contract import FrozenInference
+        from .inference_service import job_source
+        inference = job_source(FrozenInference.model_validate_json(row["input_snapshot_json"]).model_dump(mode="json"))
     if row["kind"] == "export_onnx":
         from .export_contract import FrozenExport
         frozen = FrozenExport.model_validate_json(row["input_snapshot_json"]).model_dump(mode="json")
@@ -71,7 +83,7 @@ def job_public(row) -> dict:
             training = provenance(frozen)
     return {"id": row["id"], "project_id": row["project_id"], "created_by": row["owner_id"], "kind": row["kind"],
             "state": row["status"], "params_schema_version": row["params_schema_version"], "created_at": row["created_at"],
-            "started_at": row["started_at"], "finished_at": row["finished_at"], "error_code": row["error_code"], "source_job_id": row["retry_of_id"], "training": training, "export": export}
+            "started_at": row["started_at"], "finished_at": row["finished_at"], "error_code": row["error_code"], "source_job_id": row["retry_of_id"], "training": training, "export": export, "inference": inference, "package": package}
 
 
 def artifact_public(row) -> dict:

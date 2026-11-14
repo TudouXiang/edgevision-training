@@ -61,8 +61,34 @@ def runner(behavior: str, job_id: str, run_id: str) -> int:
             marker(directory, "flood-ready.json")
             wait_file(directory / "release-runner")
         return 0
+    if behavior.startswith("inference_code_"):
+        from app import inference_runner
+        from app.inference_errors import INFERENCE_EXIT_ERRORS, ImageInferenceError
+        code = int(behavior[len("inference_code_"):])
+        def fail_inference(*_):
+            assert not {"torch", "onnx", "onnxruntime", "numpy"}.intersection(sys.modules)
+            raise ImageInferenceError(INFERENCE_EXIT_ERRORS[code])
+        inference_runner.run = fail_inference
+        from app.task_process import execute
+        return execute(job_id, run_id)
     if behavior == "exit_zero":
         return 0
+    if behavior in {"onnx_dependency", "onnx_invalid", "onnx_operator", "onnx_runtime"}:
+        # Only this explicit test fixture can inject an export fault. The real
+        # Worker, guardian, task bootstrap, drain and error publication still run.
+        from app import export_runner
+        from app.export_errors import export_boundary, unsupported_operator
+        from importlib.metadata import PackageNotFoundError
+        def fail_export(*_):
+            assert not {"torch", "onnx", "onnxruntime", "ultralytics"}.intersection(sys.modules)
+            if behavior == "onnx_dependency":
+                raise PackageNotFoundError("private-test-marker")
+            with export_boundary("graph" if behavior == "onnx_invalid" else "runtime"):
+                if behavior == "onnx_operator": raise unsupported_operator()
+                raise ValueError("private-test-marker")
+        export_runner.run = fail_export
+        from app.task_process import execute
+        return execute(job_id, run_id)
     if behavior == "storage_error":
         import errno
         from app import dataset_validation
@@ -97,6 +123,16 @@ def guardian(behavior: str, job_id: str, run_id: str) -> int:
 
 def worker(behavior: str) -> int:
     from app import worker as module
+    is_package = behavior.startswith("package_")
+    if is_package:
+        from app import package_inputs
+        package_inputs.verify_input = lambda value: value
+        behavior = behavior[len("package_"):]
+    is_inference = behavior.startswith("infer_")
+    if is_inference:
+        from app import inference_inputs
+        inference_inputs.verify_input = lambda value: value
+        behavior = behavior[len("infer_"):]
     is_export = behavior.startswith("export_")
     if is_export:
         from app import export_inputs
@@ -109,7 +145,7 @@ def worker(behavior: str) -> int:
         behavior = behavior[len("training_"):]
 
     if behavior.startswith("kill_") or behavior in {"pre_go", "go_commit_failure"}:
-        runner_behavior = "wait" if is_export else "valid_then_wait"
+        runner_behavior = "wait" if (is_export or is_inference or is_package) else "valid_then_wait"
     else:
         runner_behavior = behavior
     module.guardian_command = lambda job, run: [sys.executable, HERE, "guardian", runner_behavior, job, run]

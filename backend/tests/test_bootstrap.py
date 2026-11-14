@@ -50,7 +50,7 @@ def test_live_is_not_readiness_or_a_business_result(tmp_path, monkeypatch):
         assert client.get("/api/v1/jobs/" + str(uuid4()) + "/logs").status_code == 401
 
 
-def test_unimplemented_worker_cannot_report_success(tmp_path, monkeypatch):
+def test_invalid_package_input_cannot_report_success(tmp_path, monkeypatch):
     monkeypatch.setenv("PLATFORM_DATA_ROOT", str(tmp_path))
     path = migrate(tmp_path)
     first_job, second_job = str(uuid4()), str(uuid4())
@@ -64,7 +64,7 @@ def test_unimplemented_worker_cannot_report_success(tmp_path, monkeypatch):
     result = subprocess.run([sys.executable, "-m", "app.worker", "--once"], cwd=BACKEND, env=env, capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stderr
     with closing(sqlite3.connect(path)) as db, db:
-        assert db.execute("SELECT status,error_code FROM jobs WHERE id=?", (first_job,)).fetchone() == ("failed", "UNSUPPORTED_JOB")
+        assert db.execute("SELECT status,error_code FROM jobs WHERE id=?", (first_job,)).fetchone() == ("failed", "INPUT_UNAVAILABLE")
         assert db.execute("SELECT status FROM jobs WHERE id=?", (second_job,)).fetchone() == ("queued",)
         assert db.execute("SELECT count(*) FROM artifacts").fetchone()[0] == 0
         assert db.execute("SELECT count(*) FROM job_events WHERE job_id=?", (first_job,)).fetchone()[0] == 2

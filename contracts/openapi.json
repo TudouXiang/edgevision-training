@@ -54,13 +54,13 @@
         "type": "object"
       },
       "ArtifactPublic": {
-        "description": "Kind-discriminated public schema: malformed ONNX never falls back to dict.",
+        "description": "Malformed typed image/ONNX metadata never falls back to arbitrary dict.",
         "discriminator": {
           "mapping": {
             "dataset_report": "#/components/schemas/OtherArtifactPublic",
-            "deployment_zip": "#/components/schemas/OtherArtifactPublic",
-            "inference_input": "#/components/schemas/OtherArtifactPublic",
-            "inference_result": "#/components/schemas/OtherArtifactPublic",
+            "deployment_zip": "#/components/schemas/PackageArtifactPublic",
+            "inference_input": "#/components/schemas/InferenceInputArtifactPublic",
+            "inference_result": "#/components/schemas/InferenceResultArtifactPublic",
             "onnx": "#/components/schemas/OnnxArtifactPublic",
             "pt_best": "#/components/schemas/TrainingArtifactPublic",
             "pt_last": "#/components/schemas/TrainingArtifactPublic"
@@ -73,6 +73,15 @@
           },
           {
             "$ref": "#/components/schemas/OnnxArtifactPublic"
+          },
+          {
+            "$ref": "#/components/schemas/InferenceInputArtifactPublic"
+          },
+          {
+            "$ref": "#/components/schemas/InferenceResultArtifactPublic"
+          },
+          {
+            "$ref": "#/components/schemas/PackageArtifactPublic"
           },
           {
             "$ref": "#/components/schemas/OtherArtifactPublic"
@@ -387,10 +396,70 @@
         "title": "DatasetState",
         "type": "string"
       },
+      "DecodedImageRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "encoded_height": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
+            "title": "Encoded Height",
+            "type": "integer"
+          },
+          "encoded_width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
+            "title": "Encoded Width",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "jpeg",
+              "png"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "image_height": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
+            "title": "Image Height",
+            "type": "integer"
+          },
+          "image_width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
+            "title": "Image Width",
+            "type": "integer"
+          },
+          "orientation": {
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Orientation",
+            "type": "integer"
+          },
+          "rgb_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Rgb Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encoded_width",
+          "encoded_height",
+          "image_width",
+          "image_height",
+          "orientation",
+          "format",
+          "rgb_sha256"
+        ],
+        "title": "DecodedImageRecord",
+        "type": "object"
+      },
       "Detection": {
         "additionalProperties": false,
         "properties": {
           "class_id": {
+            "maximum": 999.0,
             "minimum": 0.0,
             "title": "Class Id",
             "type": "integer"
@@ -1136,6 +1205,112 @@
         "title": "Incremental[Metric]",
         "type": "object"
       },
+      "InferenceInputArtifactPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "jpeg",
+              "png"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "null"
+          },
+          "kind": {
+            "const": "inference_input",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/InferenceInputMetadata"
+          },
+          "metadata_schema_version": {
+            "const": 1,
+            "title": "Metadata Schema Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 52428800.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "validation_state": {
+            "const": "unverified",
+            "title": "Validation State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
+        ],
+        "title": "InferenceInputArtifactPublic",
+        "type": "object"
+      },
+      "InferenceInputMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "declared_format": {
+            "enum": [
+              "jpeg",
+              "png"
+            ],
+            "title": "Declared Format",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "validation_scope": {
+            "const": "bounded_upload_bytes",
+            "title": "Validation Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "declared_format",
+          "validation_scope"
+        ],
+        "title": "InferenceInputMetadata",
+        "type": "object"
+      },
       "InferenceJobCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1146,6 +1321,18 @@
           },
           "params": {
             "$ref": "#/components/schemas/InferenceParams"
+          },
+          "source_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Job Id"
           }
         },
         "required": [
@@ -1153,6 +1340,67 @@
           "params"
         ],
         "title": "InferenceJobCreate",
+        "type": "object"
+      },
+      "InferenceJobSource": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "image_artifact_id": {
+            "format": "uuid",
+            "title": "Image Artifact Id",
+            "type": "string"
+          },
+          "image_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Image Sha256",
+            "type": "string"
+          },
+          "model_artifact_id": {
+            "format": "uuid",
+            "title": "Model Artifact Id",
+            "type": "string"
+          },
+          "model_job_id": {
+            "format": "uuid",
+            "title": "Model Job Id",
+            "type": "string"
+          },
+          "model_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Sha256",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/InferenceParams"
+          },
+          "protocol": {
+            "const": "detection-image-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_artifact_id",
+          "model_job_id",
+          "model_sha256",
+          "image_artifact_id",
+          "image_sha256",
+          "params",
+          "protocol",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "InferenceJobSource",
         "type": "object"
       },
       "InferenceParams": {
@@ -1199,6 +1447,107 @@
         "title": "InferenceParams",
         "type": "object"
       },
+      "InferenceProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "frozen_input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Frozen Input Sha256",
+            "type": "string"
+          },
+          "image_artifact_id": {
+            "format": "uuid",
+            "title": "Image Artifact Id",
+            "type": "string"
+          },
+          "image_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Image Sha256",
+            "type": "string"
+          },
+          "image_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 52428800.0,
+            "title": "Image Size Bytes",
+            "type": "integer"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "model_artifact_id": {
+            "format": "uuid",
+            "title": "Model Artifact Id",
+            "type": "string"
+          },
+          "model_job_id": {
+            "format": "uuid",
+            "title": "Model Job Id",
+            "type": "string"
+          },
+          "model_metadata_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Metadata Sha256",
+            "type": "string"
+          },
+          "model_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Sha256",
+            "type": "string"
+          },
+          "model_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 134217728.0,
+            "title": "Model Size Bytes",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schema_version",
+          "job_id",
+          "run_id",
+          "project_id",
+          "frozen_input_sha256",
+          "model_artifact_id",
+          "model_job_id",
+          "model_sha256",
+          "model_size_bytes",
+          "model_metadata_sha256",
+          "image_artifact_id",
+          "image_sha256",
+          "image_size_bytes",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "InferenceProvenance",
+        "type": "object"
+      },
       "InferenceResult": {
         "additionalProperties": false,
         "properties": {
@@ -1215,37 +1564,433 @@
             "title": "Backend",
             "type": "string"
           },
+          "classes": {
+            "items": {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Classes",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PostprocessCounts"
+          },
           "detections": {
             "items": {
               "$ref": "#/components/schemas/Detection"
             },
+            "maxItems": 300,
             "title": "Detections",
             "type": "array"
           },
+          "image": {
+            "$ref": "#/components/schemas/DecodedImageRecord"
+          },
           "image_height": {
             "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
             "title": "Image Height",
             "type": "integer"
           },
+          "image_url": {
+            "pattern": "^/api/v1/inferences/[0-9a-f-]{36}/image$",
+            "title": "Image Url",
+            "type": "string"
+          },
           "image_width": {
             "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
             "title": "Image Width",
             "type": "integer"
           },
+          "params": {
+            "$ref": "#/components/schemas/InferenceParams"
+          },
+          "preprocess": {
+            "$ref": "#/components/schemas/PreprocessRecord"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/PreviewRecord"
+          },
+          "protocol": {
+            "const": "detection-image-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/InferenceProvenance"
+          },
           "provider": {
+            "enum": [
+              "pytorch_cpu",
+              "CPUExecutionProvider"
+            ],
             "title": "Provider",
             "type": "string"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/InferenceRuntime"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/InferenceTimings"
           }
         },
         "required": [
-          "artifact_id",
           "image_width",
           "image_height",
           "backend",
           "provider",
-          "detections"
+          "classes",
+          "image",
+          "preprocess",
+          "runtime",
+          "preview",
+          "counts",
+          "timings",
+          "detections",
+          "schema_version",
+          "protocol",
+          "provenance",
+          "params",
+          "artifact_id",
+          "image_url"
         ],
         "title": "InferenceResult",
+        "type": "object"
+      },
+      "InferenceResultArtifactPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "const": "json",
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "inference_result",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/InferenceResultMetadata"
+          },
+          "metadata_schema_version": {
+            "const": 1,
+            "title": "Metadata Schema Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1048576.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "validation_state": {
+            "const": "passed",
+            "title": "Validation State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
+        ],
+        "title": "InferenceResultArtifactPublic",
+        "type": "object"
+      },
+      "InferenceResultMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "preview": {
+            "$ref": "#/components/schemas/PreviewRecord"
+          },
+          "protocol": {
+            "const": "detection-image-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/InferenceProvenance"
+          },
+          "result_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Result Sha256",
+            "type": "string"
+          },
+          "result_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1048576.0,
+            "title": "Result Size Bytes",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "validation_scope": {
+            "const": "real_single_image_inference",
+            "title": "Validation Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "protocol",
+          "provenance",
+          "result_sha256",
+          "result_size_bytes",
+          "preview",
+          "validation_scope"
+        ],
+        "title": "InferenceResultMetadata",
+        "type": "object"
+      },
+      "InferenceRuntime": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "enum": [
+              "pt",
+              "onnx"
+            ],
+            "title": "Backend",
+            "type": "string"
+          },
+          "device": {
+            "const": "cpu",
+            "title": "Device",
+            "type": "string"
+          },
+          "interop_threads": {
+            "const": 1,
+            "title": "Interop Threads",
+            "type": "integer"
+          },
+          "provider": {
+            "enum": [
+              "pytorch_cpu",
+              "CPUExecutionProvider"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "raw_elements": {
+            "maximum": 8433600.0,
+            "minimum": 42000.0,
+            "title": "Raw Elements",
+            "type": "integer"
+          },
+          "raw_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Raw Sha256",
+            "type": "string"
+          },
+          "threads": {
+            "const": 2,
+            "title": "Threads",
+            "type": "integer"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/InferenceVersions"
+          },
+          "warmup_runs": {
+            "const": 0,
+            "title": "Warmup Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backend",
+          "provider",
+          "device",
+          "threads",
+          "interop_threads",
+          "warmup_runs",
+          "versions",
+          "raw_sha256",
+          "raw_elements"
+        ],
+        "title": "InferenceRuntime",
+        "type": "object"
+      },
+      "InferenceTimings": {
+        "additionalProperties": false,
+        "properties": {
+          "decode": {
+            "minimum": 0.0,
+            "title": "Decode",
+            "type": "number"
+          },
+          "infer": {
+            "minimum": 0.0,
+            "title": "Infer",
+            "type": "number"
+          },
+          "load": {
+            "minimum": 0.0,
+            "title": "Load",
+            "type": "number"
+          },
+          "postprocess": {
+            "minimum": 0.0,
+            "title": "Postprocess",
+            "type": "number"
+          },
+          "preprocess": {
+            "minimum": 0.0,
+            "title": "Preprocess",
+            "type": "number"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "number"
+          },
+          "unit": {
+            "const": "ms",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "decode",
+          "preprocess",
+          "load",
+          "infer",
+          "postprocess",
+          "total"
+        ],
+        "title": "InferenceTimings",
+        "type": "object"
+      },
+      "InferenceVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "numpy": {
+            "const": "2.5.4",
+            "title": "Numpy",
+            "type": "string"
+          },
+          "onnx": {
+            "anyOf": [
+              {
+                "const": "1.23.2",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onnx"
+          },
+          "onnxruntime": {
+            "anyOf": [
+              {
+                "const": "1.31.1",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onnxruntime"
+          },
+          "pillow": {
+            "const": "12.3.0",
+            "title": "Pillow",
+            "type": "string"
+          },
+          "torch": {
+            "anyOf": [
+              {
+                "const": "2.15.0+cpu",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torch"
+          },
+          "torchvision": {
+            "anyOf": [
+              {
+                "const": "0.29.2+cpu",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torchvision"
+          },
+          "ultralytics": {
+            "anyOf": [
+              {
+                "const": "8.4.202",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultralytics"
+          }
+        },
+        "required": [
+          "pillow",
+          "numpy",
+          "torch",
+          "torchvision",
+          "ultralytics",
+          "onnx",
+          "onnxruntime"
+        ],
+        "title": "InferenceVersions",
         "type": "object"
       },
       "JobAccepted": {
@@ -1366,8 +2111,28 @@
             "title": "Id",
             "type": "string"
           },
+          "inference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InferenceJobSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kind": {
             "$ref": "#/components/schemas/JobKind"
+          },
+          "package": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackageJobSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "params_schema_version": {
             "title": "Params Schema Version",
@@ -1695,12 +2460,7 @@
             "title": "Job Id"
           },
           "kind": {
-            "enum": [
-              "dataset_report",
-              "inference_input",
-              "inference_result",
-              "deployment_zip"
-            ],
+            "const": "dataset_report",
             "title": "Kind",
             "type": "string"
           },
@@ -1748,6 +2508,153 @@
         "title": "OtherArtifactPublic",
         "type": "object"
       },
+      "PackageArtifactMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "manifest_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "manifest_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1048576.0,
+            "title": "Manifest Size Bytes",
+            "type": "integer"
+          },
+          "package_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Sha256",
+            "type": "string"
+          },
+          "package_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 150994944.0,
+            "title": "Package Size Bytes",
+            "type": "integer"
+          },
+          "protocol": {
+            "const": "edgevision-python-onnx-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/PackageProvenance"
+          },
+          "schema_version": {
+            "const": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "standalone_execution": {
+            "const": "not_run_for_this_artifact",
+            "title": "Standalone Execution",
+            "type": "string"
+          },
+          "template": {
+            "$ref": "#/components/schemas/PackageTemplate"
+          },
+          "template_validation_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Template Validation Sha256",
+            "type": "string"
+          },
+          "validation_scope": {
+            "const": "trusted_model_fixed_package_integrity",
+            "title": "Validation Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "protocol",
+          "provenance",
+          "template",
+          "package_sha256",
+          "package_size_bytes",
+          "manifest_sha256",
+          "manifest_size_bytes",
+          "template_validation_sha256",
+          "validation_scope",
+          "standalone_execution"
+        ],
+        "title": "PackageArtifactMetadata",
+        "type": "object"
+      },
+      "PackageArtifactPublic": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "const": "zip",
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "deployment_zip",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/PackageArtifactMetadata"
+          },
+          "metadata_schema_version": {
+            "const": 1,
+            "title": "Metadata Schema Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 150994944.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "validation_state": {
+            "const": "passed",
+            "title": "Validation State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project_id",
+          "job_id",
+          "format",
+          "sha256",
+          "size_bytes",
+          "metadata_schema_version",
+          "validation_state",
+          "created_at",
+          "kind",
+          "metadata"
+        ],
+        "title": "PackageArtifactPublic",
+        "type": "object"
+      },
       "PackageJobCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1758,6 +2665,18 @@
           },
           "params": {
             "$ref": "#/components/schemas/PackageParams"
+          },
+          "source_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Job Id"
           }
         },
         "required": [
@@ -1765,6 +2684,55 @@
           "params"
         ],
         "title": "PackageJobCreate",
+        "type": "object"
+      },
+      "PackageJobSource": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "export_job_id": {
+            "format": "uuid",
+            "title": "Export Job Id",
+            "type": "string"
+          },
+          "onnx_artifact_id": {
+            "format": "uuid",
+            "title": "Onnx Artifact Id",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/PackageParams"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          },
+          "source_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256",
+            "type": "string"
+          },
+          "template_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Template Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "onnx_artifact_id",
+          "export_job_id",
+          "source_sha256",
+          "template_sha256",
+          "params",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "PackageJobSource",
         "type": "object"
       },
       "PackageParams": {
@@ -1780,6 +2748,133 @@
           "onnx_artifact_id"
         ],
         "title": "PackageParams",
+        "type": "object"
+      },
+      "PackageProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "code_version": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Code Version",
+            "type": "string"
+          },
+          "export_job_id": {
+            "format": "uuid",
+            "title": "Export Job Id",
+            "type": "string"
+          },
+          "frozen_input_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Frozen Input Sha256",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "model_metadata_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Metadata Sha256",
+            "type": "string"
+          },
+          "model_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Model Sha256",
+            "type": "string"
+          },
+          "model_size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 134217728.0,
+            "title": "Model Size Bytes",
+            "type": "integer"
+          },
+          "onnx_artifact_id": {
+            "format": "uuid",
+            "title": "Onnx Artifact Id",
+            "type": "string"
+          },
+          "parent_artifact_id": {
+            "format": "uuid",
+            "title": "Parent Artifact Id",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "runtime_binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Runtime Binding",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "run_id",
+          "project_id",
+          "onnx_artifact_id",
+          "export_job_id",
+          "parent_artifact_id",
+          "frozen_input_sha256",
+          "model_sha256",
+          "model_size_bytes",
+          "model_metadata_sha256",
+          "runtime_binding",
+          "code_version"
+        ],
+        "title": "PackageProvenance",
+        "type": "object"
+      },
+      "PackageTemplate": {
+        "additionalProperties": false,
+        "properties": {
+          "core_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Core Sha256",
+            "type": "string"
+          },
+          "image_protocol": {
+            "const": "detection-image-v1",
+            "title": "Image Protocol",
+            "type": "string"
+          },
+          "lock_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Lock Sha256",
+            "type": "string"
+          },
+          "protocol": {
+            "const": "edgevision-python-onnx-v1",
+            "title": "Protocol",
+            "type": "string"
+          },
+          "target": {
+            "const": "linux-x86_64-cpython312-cpu",
+            "title": "Target",
+            "type": "string"
+          },
+          "template_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Template Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "protocol",
+          "image_protocol",
+          "target",
+          "template_sha256",
+          "core_sha256",
+          "lock_sha256"
+        ],
+        "title": "PackageTemplate",
         "type": "object"
       },
       "Page_ArtifactPublic_": {
@@ -1996,6 +3091,223 @@
           "page_size"
         ],
         "title": "Page[UserPublic]",
+        "type": "object"
+      },
+      "PostprocessCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_truncated": {
+            "maximum": 5400.0,
+            "minimum": 0.0,
+            "title": "Candidate Truncated",
+            "type": "integer"
+          },
+          "candidates": {
+            "maximum": 8400.0,
+            "minimum": 0.0,
+            "title": "Candidates",
+            "type": "integer"
+          },
+          "clip_removed": {
+            "maximum": 300.0,
+            "minimum": 0.0,
+            "title": "Clip Removed",
+            "type": "integer"
+          },
+          "nms_kept": {
+            "maximum": 3000.0,
+            "minimum": 0.0,
+            "title": "Nms Kept",
+            "type": "integer"
+          },
+          "result_truncated": {
+            "maximum": 2700.0,
+            "minimum": 0.0,
+            "title": "Result Truncated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidates",
+          "candidate_truncated",
+          "nms_kept",
+          "result_truncated",
+          "clip_removed"
+        ],
+        "title": "PostprocessCounts",
+        "type": "object"
+      },
+      "PreprocessRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "bottom": {
+            "maximum": 639.0,
+            "minimum": 0.0,
+            "title": "Bottom",
+            "type": "integer"
+          },
+          "color": {
+            "const": "RGB",
+            "title": "Color",
+            "type": "string"
+          },
+          "dtype": {
+            "const": "float32",
+            "title": "Dtype",
+            "type": "string"
+          },
+          "image_height": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
+            "title": "Image Height",
+            "type": "integer"
+          },
+          "image_width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 30000000.0,
+            "title": "Image Width",
+            "type": "integer"
+          },
+          "layout": {
+            "const": "NCHW",
+            "title": "Layout",
+            "type": "string"
+          },
+          "left": {
+            "maximum": 639.0,
+            "minimum": 0.0,
+            "title": "Left",
+            "type": "integer"
+          },
+          "normalization": {
+            "const": "divide_255",
+            "title": "Normalization",
+            "type": "string"
+          },
+          "padding": {
+            "const": 114,
+            "title": "Padding",
+            "type": "integer"
+          },
+          "resampling": {
+            "const": "pillow_bilinear",
+            "title": "Resampling",
+            "type": "string"
+          },
+          "resized_height": {
+            "maximum": 640.0,
+            "minimum": 1.0,
+            "title": "Resized Height",
+            "type": "integer"
+          },
+          "resized_width": {
+            "maximum": 640.0,
+            "minimum": 1.0,
+            "title": "Resized Width",
+            "type": "integer"
+          },
+          "right": {
+            "maximum": 639.0,
+            "minimum": 0.0,
+            "title": "Right",
+            "type": "integer"
+          },
+          "scale_x": {
+            "exclusiveMinimum": 0.0,
+            "title": "Scale X",
+            "type": "number"
+          },
+          "scale_y": {
+            "exclusiveMinimum": 0.0,
+            "title": "Scale Y",
+            "type": "number"
+          },
+          "target_height": {
+            "const": 640,
+            "title": "Target Height",
+            "type": "integer"
+          },
+          "target_width": {
+            "const": 640,
+            "title": "Target Width",
+            "type": "integer"
+          },
+          "tensor_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Tensor Sha256",
+            "type": "string"
+          },
+          "top": {
+            "maximum": 639.0,
+            "minimum": 0.0,
+            "title": "Top",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "image_width",
+          "image_height",
+          "resized_width",
+          "resized_height",
+          "left",
+          "right",
+          "top",
+          "bottom",
+          "scale_x",
+          "scale_y",
+          "target_width",
+          "target_height",
+          "padding",
+          "resampling",
+          "layout",
+          "dtype",
+          "color",
+          "normalization",
+          "tensor_sha256"
+        ],
+        "title": "PreprocessRecord",
+        "type": "object"
+      },
+      "PreviewRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "const": "png",
+            "title": "Format",
+            "type": "string"
+          },
+          "height": {
+            "maximum": 1280.0,
+            "minimum": 1.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 8388608.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "width": {
+            "maximum": 1280.0,
+            "minimum": 1.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height",
+          "size_bytes",
+          "sha256",
+          "format"
+        ],
+        "title": "PreviewRecord",
         "type": "object"
       },
       "ProjectCreate": {
@@ -4033,16 +5345,6 @@
             },
             "description": "Unprocessable Entity"
           },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Not implemented in the production shell"
-          },
           "503": {
             "content": {
               "application/json": {
@@ -4055,6 +5357,97 @@
           }
         },
         "summary": "Inference Result"
+      }
+    },
+    "/api/v1/inferences/{inference_id}/image": {
+      "get": {
+        "operationId": "inference_image_api_v1_inferences__inference_id__image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inference_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Inference Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required or session invalid"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, role or access denied"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Inference Image"
       }
     },
     "/api/v1/jobs/{job_id}": {
@@ -5232,11 +6625,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ArtifactPublic"
+                  "$ref": "#/components/schemas/InferenceInputArtifactPublic"
                 }
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "401": {
             "content": {
@@ -5278,6 +6681,26 @@
             },
             "description": "Conflict"
           },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -5287,16 +6710,6 @@
               }
             },
             "description": "Unprocessable Entity"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Not implemented in the production shell"
           },
           "503": {
             "content": {

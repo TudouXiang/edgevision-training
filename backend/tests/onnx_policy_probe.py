@@ -38,7 +38,10 @@ def main(case, source_root):
         try:
             export_and_validate(directory, source_path, artifact['metadata']['classes'], job_id=job, run_id=run,
                 input_sha256='a' * 64, source_sha256=artifact['metadata']['provenance']['source_sha256'])
-        except InjectedOrtFailure: return
+        except Exception as exc:
+            from app.export_errors import ExportFailure
+            if isinstance(exc, ExportFailure) and exc.exit_code == 76 and isinstance(exc.__cause__, InjectedOrtFailure): return
+            raise
         raise AssertionError('ORT failure silently fell back')
     prepare_environment(directory)
     load_ort()

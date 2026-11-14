@@ -17,6 +17,12 @@ def execute(job_id: str, run_id: str) -> int:
         from .training_runner import run
     elif kind == "export_onnx":
         from .export_runner import run
+    elif kind == "package":
+        from .package_runner import run
+    elif kind == "infer":
+        from .inference_runner import run
+    elif kind == "inference_probe":
+        from .inference_probe import probe_child as run
     elif kind == "export_probe":
         from .export_probe import probe_child as run
     elif kind == "ml_probe":
@@ -32,7 +38,22 @@ def execute(job_id: str, run_id: str) -> int:
     except OSError:
         log("Runner storage is unavailable", "error")
         return 70
-    except Exception:
+    except Exception as exc:
+        if kind in {"infer", "inference_probe"}:
+            from .inference_errors import ImageInferenceError, error_exit, INFERENCE_EXIT_ERRORS
+            if isinstance(exc, ImageInferenceError):
+                code = error_exit(exc)
+                log(INFERENCE_EXIT_ERRORS.get(code, "Inference failed"), "error")
+                return code
+        if kind in {"export_onnx", "export_probe"}:
+            from .export_errors import ExportFailure, EXPORT_EXIT_ERRORS
+            from importlib.metadata import PackageNotFoundError
+            if isinstance(exc, ExportFailure):
+                log(EXPORT_EXIT_ERRORS[exc.exit_code], "error")
+                return exc.exit_code
+            if isinstance(exc, (PackageNotFoundError, ImportError)):
+                log(EXPORT_EXIT_ERRORS[73], "error")
+                return 73
         log("Runner infrastructure failed", "error")
         return 72
 

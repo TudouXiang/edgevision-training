@@ -1,6 +1,6 @@
 # T060：ONNX导出、推理与部署包
 
-执行者：实现Agent。前置：T050 已在固定 Linux CPU 范围 accepted；状态 E reconstruction / review_required（ADR 0012/0013 已冻结新候选；源码与轻量回归推进中，真实联合工具链、隔离运行和业务验收仍未执行）。可在同一契约内拆成三个顺序子任务。
+执行者：实现Agent。前置：T050、E 保持既有限定验收；I 在固定 Linux CPU/YOLO11n 范围限定 accepted，见[I验收](../evidence/T060-image-acceptance-2026-11-14.md)。P 在固定 Linux x86_64 / CPython 3.12 / CPU / 可信 YOLO11n 范围工程限定 accepted，见 [P 验收](../evidence/T060-package-acceptance-2026-11-14.md)及 [T060 分阶段报告](../evidence/T060-report.md)。E/I/P 已有上述限定工程证据；T070、正式实验与完整项目交付仍未验收。每个实际环境须当前源码绑定的probe。
 
 目标：export_onnx、infer、package接入同一Worker；只处理平台可信模型。固定导出参数，生成完整模型元数据；按实际格式执行PT/ORT；固定模板产生独立Python部署包。
 

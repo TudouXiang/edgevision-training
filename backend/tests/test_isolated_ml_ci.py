@@ -28,7 +28,7 @@ CID = 'c' * 64
 
 
 def full_summary():
-    return {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
+    return {'schema_version': ci.SCHEMA_VERSION, 'stage': 'isolated_ml', 'status': 'passed',
             'stages': [{'stage': stage, 'status': 'passed'} for stage in ci.STAGES]}
 
 
@@ -299,13 +299,13 @@ def test_stage_order_shared_deadline_and_private_logs(tmp_path, monkeypatch, cap
     monkeypatch.setattr(entry, 'ROOT', tmp_path)
     monkeypatch.setattr(entry, 'verify_boundary', lambda *a: None)
     monkeypatch.setattr(entry, 'stage_commands', lambda: [(stage, ['never-run'], tmp_path) for stage in ci.STAGES[1:]])
-    times = iter([0, 10, 20, 30, 40, 50, 60])
+    times = iter(range(0, 10 * len(ci.STAGES), 10))
     monkeypatch.setattr(entry.time, 'monotonic', lambda: next(times))
     calls = []
     monkeypatch.setattr(entry, 'run_stage', lambda *args: calls.append(args))
     monkeypatch.setattr(entry, 'verify_policy_report', lambda *args: None)
     assert entry.main(['--host-netns', 'net:[123]']) == 0
-    assert [call[-1] for call in calls] == [440, 430, 420, 410, 400, 390]
+    assert [call[-1] for call in calls] == [450 - 10 * i for i in range(1, len(ci.STAGES))]
     assert all(call[3].parent == tmp_path / 'private' for call in calls)
     assert all(call[2]['EDGEVISION_ONNX_POLICY_ROOT'] == str(tmp_path / 'private/http') for call in calls)
     assert ci.validate_summary(capsys.readouterr().out) == full_summary()
@@ -768,7 +768,7 @@ def test_dependency_failure_prevents_every_ml_stage(tmp_path, monkeypatch, capsy
     output = capsys.readouterr()
     assert 'private dependency conflict' not in output.out + output.err
     result = ci.validate_summary(output.out)
-    assert [row['status'] for row in result['stages']] == ['passed', 'failed'] + ['NOT_RUN'] * 5
+    assert [row['status'] for row in result['stages']] == ['passed', 'failed'] + ['NOT_RUN'] * (len(ci.STAGES) - 2)
 
 
 def test_tool_python_path_override_rejected_before_copy(tmp_path):
@@ -778,3 +778,232 @@ def test_tool_python_path_override_rejected_before_copy(tmp_path):
     destination = tmp_path / 'destination'
     with pytest.raises(ci.IsolationError): ci.copy_tool_prefix(source, destination, python=True)
     assert not destination.exists()
+
+
+def test_image_stages_have_new_schema_without_relabelling_historical_e():
+    assert ci.SCHEMA_VERSION == entry.SCHEMA_VERSION == 5
+    assert ci.STAGES == entry.STAGES == (*ci.INFERENCE_STAGES, 'package_http', 'package_browser')
+    historic = {'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
+                'stages': [{'stage': name, 'status': 'passed'} for name in ci.LEGACY_STAGES]}
+    assert ci.validate_summary(json.dumps(historic)) == historic
+    # Archive decoding does not authorize upgrading seven-stage evidence into I.
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(historic), expected_version=3)
+    with pytest.raises(ci.IsolationError):
+        ci.public_summary('complete', True, historic)
+    historic['schema_version'] = 3
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(historic))
+
+
+def test_image_stages_keep_budget_and_original_boundary(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(entry, 'ROOT', tmp_path)
+    monkeypatch.setattr(entry, 'verify_boundary', lambda *args: None)
+    calls = []
+    reports = []
+    monkeypatch.setattr(entry, 'run_stage', lambda *args: calls.append(args))
+    monkeypatch.setattr(entry, 'verify_policy_report', lambda path: reports.append(path.name))
+    assert entry.main(['--host-netns', 'net:[123]']) == 0
+    assert entry.STAGE_BUDGET == 450 and ci.EXECUTION_TIMEOUT == 480
+    assert reports == ['onnx_policy.xml', 'training_policy.xml', 'inference_policy.xml']
+    for _, _, environment, _, remaining in calls:
+        assert environment['EDGEVISION_INFERENCE_HTTP_ROOT'] == environment['PLATFORM_DATA_ROOT']
+        assert environment['EDGEVISION_INFERENCE_POLICY_ROOT'] == environment['PLATFORM_DATA_ROOT']
+        assert environment['ORT_DISABLE_TELEMETRY'] == '1' and 0 < remaining <= 450
+    assert ci.validate_summary(capsys.readouterr().out)['schema_version'] == 5
+
+
+def test_old_receipt_cannot_pass_new_container_execution(tmp_path):
+    class OldReceiptDocker(FakeDocker):
+        def docker(self, args, **kwargs):
+            if args[0] == 'start':
+                return json.dumps({'schema_version': 2, 'stage': 'isolated_ml', 'status': 'passed',
+                    'stages': [{'stage': name, 'status': 'passed'} for name in ci.LEGACY_STAGES]})
+            return super().docker(args, **kwargs)
+    docker = OldReceiptDocker(tmp_path)
+    result = ci.IsolatedRun(docker, tmp_path, token=TOKEN).run(tmp_path)
+    assert result['status'] == 'failed' and result['schema_version'] == 5
+    assert all(row['status'] == 'unverified' for row in result['stages'])
+    assert docker.current is None
+
+
+@pytest.mark.parametrize('missing', ['inference_http_probe.py', 'test_inference_runtime_policy.py', 'inference_policy_probe.py'])
+def test_image_inputs_must_be_present_in_frozen_source(tmp_path, missing):
+    git = FakeGit()
+    git.tree = ''.join(record + '\0' for record in git.tree.split('\0') if record and missing not in record)
+    with pytest.raises(ci.IsolationError):
+        ci.freeze_source(tmp_path, tmp_path / 'context', git, git.commit)
+
+
+@pytest.mark.parametrize('fault', ['missing', 'duplicate', 'order', 'old_version'])
+def test_current_summary_requires_exact_current_stage_schema(fault):
+    payload = full_summary()
+    if fault == 'missing':
+        payload['stages'].pop()
+    elif fault == 'duplicate':
+        payload['stages'][-1] = payload['stages'][-2].copy()
+    elif fault == 'order':
+        payload['stages'][-1], payload['stages'][-2] = payload['stages'][-2], payload['stages'][-1]
+    else:
+        payload['schema_version'] = 2
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(payload), expected_version=ci.SCHEMA_VERSION)
+
+
+def test_current_stage_order_requires_real_image_browser_source():
+    assert len(ci.STAGES) == 12
+    assert ci.STAGES[:7] == ci.LEGACY_STAGES
+    assert dict((name,command) for name,command,_ in entry.stage_commands())['inference_browser'][-1] == '/opt/edgevision/scripts/inference_e2e.py'
+    assert {'scripts/inference_e2e.py', 'web/e2e/t060-inference.browser.ts'}.issubset(ci.REQUIRED_SOURCE)
+
+
+def test_closed_image_diagnostic_preserved_without_private_details():
+    value = full_summary()
+    value['status'] = 'failed'
+    value['stages'][ci.STAGES.index('inference_browser')]['status'] = 'failed'
+    value['inference_browser_failure'] = 'inputs'
+    assert ci.validate_summary(json.dumps(value)) == value
+    assert ci.public_summary('execution', False, value)['inference_browser_failure'] == 'inputs'
+    assert ci.failed_outer('cleanup', ci.public_summary('execution', False, value))['inference_browser_failure'] == 'inputs'
+
+
+@pytest.mark.parametrize('code', ['SECRET /home/user/token', '', 1, {}, 'passed'])
+def test_image_diagnostic_rejects_non_closed_values(code):
+    value = full_summary()
+    value['status'] = 'failed'
+    value['stages'][ci.STAGES.index('inference_browser')]['status'] = 'failed'
+    value['inference_browser_failure'] = code
+    with pytest.raises((ci.IsolationError, TypeError)):
+        ci.validate_summary(json.dumps(value))
+
+
+def test_image_diagnostic_cannot_accompany_success():
+    value = full_summary()
+    value['inference_browser_failure'] = 'inputs'
+    with pytest.raises(ci.IsolationError):
+        ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize(('payload', 'expected'), [
+    ('{"phase":"inputs"}', 'inputs'),
+    ('{"phase":"SECRET/session"}', 'unknown'),
+    ('{"phase":"inputs","secret":"credential"}', 'unknown'),
+    ('x' * 300, 'unknown'),
+    ('{"phase":"inputs"}' + ' ' * 300, 'unknown'),
+])
+def test_private_image_diagnostic_is_sanitized_at_container_boundary(tmp_path, monkeypatch, capsys, payload, expected):
+    monkeypatch.setattr(entry, 'ROOT', tmp_path)
+    monkeypatch.setattr(entry, 'verify_boundary', lambda *a: None)
+    monkeypatch.setattr(entry, 'stage_commands', lambda: [(stage, [stage], tmp_path) for stage in ci.STAGES[1:]])
+    monkeypatch.setattr(entry, 'verify_policy_report', lambda *a: None)
+    def run(command, *args):
+        if command == ['inference_browser']:
+            directory = tmp_path / 'private/inference-browser'
+            directory.mkdir()
+            (directory / 'failure.json').write_text(payload)
+            raise RuntimeError('SECRET private error')
+    monkeypatch.setattr(entry, 'run_stage', run)
+    assert entry.main(['--host-netns', 'net:[123]']) == 1
+    output = capsys.readouterr()
+    assert 'SECRET' not in output.out + output.err
+    receipt = ci.validate_summary(output.out)
+    assert receipt['inference_browser_failure'] == expected
+    assert receipt['stages'][ci.STAGES.index('inference_browser')]['status'] == 'failed'
+
+
+@pytest.mark.parametrize('phase', ['ui_setup', 'ui_upload', 'ui_pt_result', 'ui_onnx_download', 'ui_responsive'])
+def test_closed_ui_phases_survive_public_boundary(phase):
+    value = full_summary()
+    value['status'] = 'failed'
+    value['stages'][ci.STAGES.index('inference_browser')]['status'] = 'failed'
+    value['inference_browser_failure'] = phase
+    assert ci.public_summary('execution', False, value)['inference_browser_failure'] == phase
+
+
+def test_package_runtime_build_has_separate_fixed_environment_and_exact_licenses():
+    assert ci.source_allowed('LICENSE') and ci.source_allowed('LICENSE_SCOPE.md')
+    assert not ci.source_allowed('private.md') and not ci.source_allowed('docs/LICENSE_SCOPE.md')
+    assert {'LICENSE','LICENSE_SCOPE.md','scripts/install_package.py','scripts/package_standalone.py',
+        'backend/requirements-package-linux-cpu.lock'}.issubset(ci.REQUIRED_SOURCE)
+    recipe=(ROOT/'ci/isolated-ml.Dockerfile').read_text()
+    assert 'python3 -I -S scripts/install_package.py' in recipe
+
+
+def test_package_stage_requires_new_schema_and_cannot_relabel_i_receipt():
+    assert ci.SCHEMA_VERSION==entry.SCHEMA_VERSION==5
+    assert ci.PACKAGE_HTTP_STAGES[-1]=='package_http'
+    assert dict((name,command) for name,command,_ in entry.stage_commands())['package_http'][-1]=='tests/package_http_probe.py'
+    historic={'schema_version':3,'stage':'isolated_ml','status':'passed',
+        'stages':[{'stage':name,'status':'passed'} for name in ci.INFERENCE_STAGES]}
+    assert ci.validate_summary(json.dumps(historic))==historic
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(historic),expected_version=4)
+
+
+def test_package_diagnostic_is_closed_and_not_attached_to_success():
+    value=full_summary();value['status']='failed';value['stages'][ci.STAGES.index('package_http')]['status']='failed'
+    value['package_http_failure']='probe_identity'
+    assert ci.validate_summary(json.dumps(value))==value
+    assert ci.public_summary('execution',False,value)['package_http_failure']=='probe_identity'
+    assert ci.failed_outer('cleanup',ci.public_summary('execution',False,value))['package_http_failure']=='probe_identity'
+    value['package_http_failure']='private /home/user/model'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+    value=full_summary();value['package_http_failure']='probe_identity'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize(('http','probe','expected'),[('probe','identity','probe_identity'),('worker','secret','worker'),('secret','identity','unknown'),('probe','secret','unknown')])
+def test_package_private_phase_never_relays_arbitrary_text(tmp_path,http,probe,expected):
+    root=tmp_path/'private/http';root.mkdir(parents=True)
+    (root/'package-http-phase.json').write_text(json.dumps({'phase':http}))
+    (root/'package-probe-phase.json').write_text(json.dumps({'phase':probe}))
+    assert entry.package_failure(tmp_path)==expected
+
+
+@pytest.mark.parametrize('phase',['bootstrap','training_probe','export_probe','api','web','browser','receipt','cleanup','ui_export_submit','ui_comparison_submit','ui_comparison_selected','ui_comparison_result','ui_comparison_inventory','ui_comparison_metrics'])
+def test_delivery_diagnostic_is_closed_and_failure_only(tmp_path,phase):
+    report=tmp_path/'private/browser-report';report.mkdir(parents=True)
+    (report/'harness-phase.json').write_text(json.dumps({'phase':'browser' if phase.startswith('ui_') else phase}))
+    (report/'ui-phase.json').write_text(json.dumps({'phase':phase}))
+    assert entry.delivery_failure(tmp_path)==phase
+    value=full_summary();value['status']='failed';value['stages'][6]['status']='failed'
+    value['browser_delivery_failure']=phase
+    assert ci.validate_summary(json.dumps(value))==value
+    assert ci.failed_outer('cleanup',ci.public_summary('execution',False,value))['browser_delivery_failure']==phase
+    value['stages'][6]['status']='passed';value['status']='passed'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize('raw',['{"phase":"secret/path"}', '{"phase":"browser","secret":"x"}', 'x'*257])
+def test_delivery_diagnostic_rejects_untrusted_phase(tmp_path,raw):
+    report=tmp_path/'private/browser-report';report.mkdir(parents=True)
+    (report/'harness-phase.json').write_text(raw)
+    assert entry.delivery_failure(tmp_path)=='unknown'
+
+
+def test_package_browser_requires_new_schema_and_fixed_source():
+    assert ci.SCHEMA_VERSION==entry.SCHEMA_VERSION==5
+    assert ci.STAGES[-1]=='package_browser'
+    assert entry.stage_commands()[-1][1][-1]=='/opt/edgevision/scripts/package_e2e.py'
+    assert {'scripts/package_e2e.py','web/e2e/t060-package.browser.ts'}.issubset(ci.REQUIRED_SOURCE)
+    old={'schema_version':4,'stage':'isolated_ml','status':'passed','stages':[{'stage':name,'status':'passed'} for name in ci.STAGES[:-1]]}
+    assert ci.validate_summary(json.dumps(old))==old
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(old),expected_version=5)
+    with pytest.raises(ci.IsolationError):ci.public_summary('complete',True,old)
+
+
+def test_package_browser_diagnostic_cannot_leak_or_report_success():
+    value=full_summary();value['status']='failed';value['stages'][-1]['status']='failed'
+    value['package_browser_failure']='ui_download'
+    assert ci.validate_summary(json.dumps(value))==value
+    assert ci.failed_outer('cleanup',ci.public_summary('execution',False,value))['package_browser_failure']=='ui_download'
+    value['package_browser_failure']='SECRET private/path'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+    value=full_summary();value['package_browser_failure']='ui_download'
+    with pytest.raises(ci.IsolationError):ci.validate_summary(json.dumps(value))
+
+
+@pytest.mark.parametrize('raw,expected',[("{\"phase\":\"ui_submit\"}",'ui_submit'),("{\"phase\":\"SECRET/path\"}",'unknown'),('x'*257,'unknown'),('{"phase":"inputs","extra":"secret"}','unknown')])
+def test_package_browser_private_diagnostic_is_bounded(tmp_path,raw,expected):
+    directory=tmp_path/'private/package-browser';directory.mkdir(parents=True)
+    (directory/'failure.json').write_text(raw)
+    assert entry.package_browser_failure(tmp_path)==expected

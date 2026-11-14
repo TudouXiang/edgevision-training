@@ -10,6 +10,7 @@ import stat
 from .export_contract import MAX_ONNX_BYTES, INPUT_SHAPE, TENSOR_NAMES, tensor_bytes
 from .run_files import fingerprint
 from .schemas import ExportValidation
+from .export_errors import export_boundary, unsupported_operator
 
 
 def read_model_bytes(path):
@@ -50,7 +51,7 @@ def guard_graph(model, onnx, classes):
             raise ValueError('external tensor rejected')
         if kind == 'NodeProto':
             if message.domain or not onnx.defs.has(message.op_type, 18, ''):
-                raise ValueError('custom or unknown operator rejected')
+                raise unsupported_operator()
         if kind == 'GraphProto' and message.sparse_initializer:
             raise ValueError('sparse graph rejected')
         for field, value in message.ListFields():
@@ -77,15 +78,16 @@ def compare_arrays(np, reference, actual, name):
 
 
 def export_and_validate(root, source, classes, *, job_id, run_id, input_sha256, source_sha256):
-    from .training_runtime import prepare_environment, initialize
+    from .training_runtime import prepare_environment, initialize, TrainingPolicyError
     prepare_environment(root)
-    torch, torchvision, YOLO, DetectionModel, fail, fatal, loads = initialize(root, {source})
-    # ORT must only enter through this pre-import privacy gate, before any exporter.
-    from .ml_privacy import load_ort
-    ort = load_ort()
-    import onnx
-    import numpy as np
-    import ultralytics
+    with export_boundary('dependency', passthrough=(TrainingPolicyError,)):
+        torch, torchvision, YOLO, DetectionModel, fail, fatal, loads = initialize(root, {source})
+        # ORT must only enter through this pre-import privacy gate, before any exporter.
+        from .ml_privacy import load_ort
+        ort = load_ort()
+        import onnx
+        import numpy as np
+        import ultralytics
     if onnx.__version__ != '1.23.2' or ort.__version__ != '1.31.1':
         fail('DELIVERY_VERSION_MISMATCH')
     before = fingerprint(source)
@@ -117,31 +119,37 @@ def export_and_validate(root, source, classes, *, job_id, run_id, input_sha256, 
     candidate = root / 'model.onnx'
     # Legacy exporter emits the original graph; no upstream metadata, simplifier,
     # IR rewrite, external-data conversion, auto-install, or fallback is invoked.
-    torch.onnx.export(network, torch.from_numpy(inputs['zeros']), str(candidate),
-        export_params=True, opset_version=18, do_constant_folding=True,
-        input_names=['images'], output_names=['output0'], dynamic_axes=None,
-        dynamo=False, external_data=False, verbose=False)
-    raw = read_model_bytes(candidate)  # Bound BEFORE any protobuf parsing.
-    model_proto = onnx.load_model_from_string(raw)
-    guard_graph(model_proto, onnx, classes)
-    onnx.checker.check_model(raw, full_check=True)
-    options = ort.SessionOptions()
-    options.intra_op_num_threads = 2
-    options.inter_op_num_threads = 1
-    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
-    session = ort.InferenceSession(raw, sess_options=options, providers=['CPUExecutionProvider'])
-    session.disable_fallback()
-    if session.get_providers() != ['CPUExecutionProvider']: fail('ORT_PROVIDER_MISMATCH')
-    ins, outs = session.get_inputs(), session.get_outputs()
-    if len(ins) != 1 or len(outs) != 1 or (ins[0].name, ins[0].type, ins[0].shape) != ('images', 'tensor(float)', list(INPUT_SHAPE)) or (outs[0].name, outs[0].type, outs[0].shape) != ('output0', 'tensor(float)', [1, 4 + len(classes), 8400]):
-        fail('ORT_INTERFACE_MISMATCH')
+    with export_boundary('runtime', passthrough=(TrainingPolicyError,)):
+        torch.onnx.export(network, torch.from_numpy(inputs['zeros']), str(candidate),
+            export_params=True, opset_version=18, do_constant_folding=True,
+            input_names=['images'], output_names=['output0'], dynamic_axes=None,
+            dynamo=False, external_data=False, verbose=False)
+    with export_boundary('graph', passthrough=(TrainingPolicyError,)):
+        raw = read_model_bytes(candidate)  # Bound BEFORE any protobuf parsing.
+        model_proto = onnx.load_model_from_string(raw)
+        guard_graph(model_proto, onnx, classes)
+        onnx.checker.check_model(raw, full_check=True)
+    with export_boundary('runtime', passthrough=(TrainingPolicyError,)):
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 2
+        options.inter_op_num_threads = 1
+        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+        session = ort.InferenceSession(raw, sess_options=options, providers=['CPUExecutionProvider'])
+        session.disable_fallback()
+        if session.get_providers() != ['CPUExecutionProvider']: fail('ORT_PROVIDER_MISMATCH')
+        ins, outs = session.get_inputs(), session.get_outputs()
+        if len(ins) != 1 or len(outs) != 1 or (ins[0].name, ins[0].type, ins[0].shape) != ('images', 'tensor(float)', list(INPUT_SHAPE)) or (outs[0].name, outs[0].type, outs[0].shape) != ('output0', 'tensor(float)', [1, 4 + len(classes), 8400]):
+            fail('ORT_INTERFACE_MISMATCH')
     samples = []
     for name in TENSOR_NAMES:
-        outputs = session.run(['output0'], {'images': inputs[name]})
+        with export_boundary('runtime', passthrough=(TrainingPolicyError,)):
+            outputs = session.run(['output0'], {'images': inputs[name]})
         if len(outputs) != 1: fail('ORT_OUTPUT_SCHEMA_INVALID')
-        samples.append(compare_arrays(np, references[name], outputs[0], name))
-    if fatal or fingerprint(source) != before or read_model_bytes(candidate) != raw: fail('EXPORT_INPUT_OR_GRAPH_CHANGED')
+        with export_boundary('graph', passthrough=(TrainingPolicyError,)):
+            samples.append(compare_arrays(np, references[name], outputs[0], name))
+    with export_boundary('graph', passthrough=(TrainingPolicyError,)):
+        if fatal or fingerprint(source) != before or read_model_bytes(candidate) != raw: fail('EXPORT_INPUT_OR_GRAPH_CHANGED')
     runtime = {'versions': {'torch': torch.__version__, 'torchvision': torchvision.__version__, 'ultralytics': ultralytics.__version__, 'onnx': onnx.__version__, 'onnxruntime': ort.__version__},
         'provider': 'CPUExecutionProvider', 'device': 'cpu', 'threads': 2, 'opset': 18, 'ir_version': 8,
         'precision': 'fp32', 'dynamic': False, 'simplify': False, 'nms': False}

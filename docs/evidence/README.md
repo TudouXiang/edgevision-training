@@ -12,7 +12,9 @@
 | T030 数据集核心 | [Linux 核心浏览器验收](T030-browser-acceptance-2026-11-04.md) | [实现报告](T030-report.md)、[独立审查](T030-change-review-2026-11-04.md) |
 | T040 受管 Worker | [跨平台验收及未实测限制](T040-cross-platform-acceptance-2026-11-04.md) | [实现与失败历史](T040-report.md)、[独立审查](T040-change-review-2026-11-04.md) |
 | T050 训练 | [固定 Linux CPU 验收](T050-ci-acceptance-2026-11-04.md) | [实现报告](T050-report.md)、[环境与资产前检](T050-preflight-2026-11-04.md) |
-| T060 导出重建 | [源码检查点及未验收边界](T060-rebuild-checkpoints.md)、[普通 CI 范围](T060-source-ci-2026-11-04.md) | [后端范围](T060-export-rebuild-core.md)、[重建记录](T060-rebuild-recovery-2026-11-04.md) |
+| T060 E 导出 | [限定工程验收](T060-export-acceptance-2026-11-05.md)、[精确隔离运行](T060-isolated-ml-2026-11-05.md) | [历史重建检查点](T060-rebuild-checkpoints.md)、[普通 CI 范围](T060-source-ci-2026-11-04.md) |
+| T060 I 单图推理 | [限定工程验收](T060-image-acceptance-2026-11-14.md)、[历史源码整合](T060-image-integration-2026-11-05.md) | [后端检查点](T060-image-checkpoints.md)、[隔离验证入口源码](T060-image-validation-source.md) |
+| T060 P 独立源码包 | [精确运行及浏览器验收](T060-package-acceptance-2026-11-14.md) | [T060 分阶段报告](T060-report.md) |
 
 T060 的计划、源码检查和普通 CI 不能代替真实模型验收；E / I / P 的最新结论以项目状态及对应实际执行报告为准。T070 尚无完整平台验收报告，不从前置阶段拼接推断通过。
 
