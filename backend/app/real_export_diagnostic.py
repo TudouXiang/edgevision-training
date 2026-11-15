@@ -1,7 +1,8 @@
-"""Fixed, one-arm diagnostic for real CPU ONNX export behavior.
+"""Fixed A/D export-backend control, diagnostic only.
 
-No ML imports occur until the strict container/network/root guard passes. This
-module is not an HTTP job or product exporter and never publishes artifacts.
+No native imports occur until the exact container/network/profile guard has
+passed. Arm A exports once with MKLDNN enabled; arm D consumes A's strict
+private handoff and only disables MKLDNN. Neither arm publishes artifacts.
 """
 from __future__ import annotations
 
@@ -15,9 +16,10 @@ DATA_ROOT = '/opt/edgevision/private/real-platform'
 PROFILE = 'v1'
 _spec = importlib.util.spec_from_file_location('export_compare_metrics', ROOT / 'scripts' / 'export_compare_metrics.py')
 metrics = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(metrics)
-ARMS = ('A', 'B', 'C')
+ARMS = ('A', 'D')
 SAMPLES = ('zeros', 'gradient', 'pattern')
-FAILURE_CODES = ('POLICY_FAILED', 'SOURCE_INVALID', 'GRAPH_INVALID', 'PT_REPEAT_MISMATCH', 'FUSED_MISMATCH', 'ONNX_MISMATCH', 'SOURCE_CHANGED', 'RUNTIME_FAILED', 'UNKNOWN')
+FAILURE_CODES = ('POLICY_FAILED', 'SOURCE_INVALID', 'GRAPH_INVALID', 'PT_REPEAT_MISMATCH', 'BACKEND_MISMATCH', 'SOURCE_CHANGED', 'ONNX_MISMATCH', 'RUNTIME_FAILED', 'UNKNOWN')
+CHECKS = {'source_bn', 'onnx_batchnorm', 'pt_repeat_pre', 'pt_repeat_post', 'source_unchanged', 'network_unchanged', 'reference_ort_match', 'backend_reference_match', 'shared_input_unchanged'}
 
 
 def load_boundary(root: Path):
@@ -45,7 +47,7 @@ def guard(*, root: Path | None = None, environ=None) -> None:
 def arm_settings(arm):
     if type(arm) is not str or arm not in ARMS:
         raise ValueError('unknown comparison arm')
-    return {'fuse': arm == 'C', 'constant_folding': arm != 'B'}
+    return {'export': arm == 'A', 'disable_mkldnn': arm == 'D'}
 
 
 class DiagnosticFailure(Exception):
@@ -53,66 +55,66 @@ class DiagnosticFailure(Exception):
         if type(code) is not str or code not in FAILURE_CODES or type(exit_code) is not int:
             raise ValueError('invalid diagnostic failure')
         self.code, self.exit_code = code, exit_code
-        super().__init__('real export diagnostic failed')
+        super().__init__('export backend diagnostic failed')
 
 
 def empty_proof(arm):
     arm_settings(arm)
-    return {'schema_version': 2, 'metrics': metrics.empty_matrix(arm), 'arm': arm, 'status': 'failed',
+    return {'schema_version': 3, 'arm': arm, 'status': 'failed',
         'checks': {'source_bn': None, 'onnx_batchnorm': None,
             'pt_repeat_pre': None, 'pt_repeat_post': None, 'source_unchanged': None,
-            'network_unchanged': None,
-            'reference_ort_match': {name: None for name in SAMPLES},
-            'fused_reference_match': None if arm != 'C' else None},
-        'failure_code': 'UNKNOWN'}
+            'network_unchanged': None, 'reference_ort_match': {name: None for name in SAMPLES},
+            'backend_reference_match': None, 'shared_input_unchanged': None},
+        'failure_code': 'UNKNOWN', 'metrics': metrics.empty_matrix(arm), 'precision': None}
 
 
 def validate_proof(value):
-    if type(value) is not dict or set(value) != {'schema_version', 'arm', 'status', 'checks', 'failure_code', 'metrics'}:
+    if type(value) is not dict or set(value) != {'schema_version', 'arm', 'status', 'checks', 'failure_code', 'metrics', 'precision'}:
         raise ValueError('diagnostic proof schema invalid')
-    if type(value['schema_version']) is not int or value['schema_version'] != 2:
+    if type(value['schema_version']) is not int or value['schema_version'] != 3:
         raise ValueError('diagnostic proof version invalid')
-    settings = arm_settings(value['arm'])
+    arm_settings(value['arm'])
     if value['status'] not in ('passed', 'failed'):
         raise ValueError('diagnostic proof status invalid')
     if value['failure_code'] is not None and (type(value['failure_code']) is not str or value['failure_code'] not in FAILURE_CODES):
         raise ValueError('diagnostic failure code invalid')
+    if value['precision'] is not None:
+        metrics.validate_precision(value['precision'], value['arm'])
     checks = value['checks']
-    expected = {'source_bn', 'onnx_batchnorm', 'pt_repeat_pre', 'pt_repeat_post', 'source_unchanged', 'network_unchanged', 'reference_ort_match', 'fused_reference_match'}
-    if type(checks) is not dict or set(checks) != expected:
+    if type(checks) is not dict or set(checks) != CHECKS:
         raise ValueError('diagnostic checks invalid')
-    for key in ('source_bn', 'onnx_batchnorm', 'pt_repeat_pre', 'pt_repeat_post', 'source_unchanged', 'network_unchanged'):
-        if checks[key] is not None and type(checks[key]) is not bool:
+    for name in CHECKS - {'reference_ort_match'}:
+        if name == 'backend_reference_match' and value['arm'] == 'A':
+            if checks[name] is not None: raise ValueError('A backend comparison not applicable')
+        elif checks[name] is not None and type(checks[name]) is not bool:
             raise ValueError('diagnostic check type invalid')
-    samples = checks['reference_ort_match']
-    if type(samples) is not dict or set(samples) != set(SAMPLES) or any(x is not None and type(x) is not bool for x in samples.values()):
+    matches = checks['reference_ort_match']
+    if type(matches) is not dict or set(matches) != set(SAMPLES) or any(x is not None and type(x) is not bool for x in matches.values()):
         raise ValueError('diagnostic sample checks invalid')
-    fused = checks['fused_reference_match']
-    if settings['fuse']:
-        if fused is not None and type(fused) is not bool:
-            raise ValueError('diagnostic fused check invalid')
-    elif fused is not None:
-        raise ValueError('fused check not applicable')
     if value['status'] == 'passed':
-        if type(checks['source_bn']) is not bool or type(checks['onnx_batchnorm']) is not bool:
-            raise ValueError('completed BN observations are required')
-            # BN presence is descriptive evidence; fused exports may legitimately have none.
-        required = [checks[k] for k in ('pt_repeat_pre', 'pt_repeat_post', 'source_unchanged', 'network_unchanged')]
-        required.extend(samples[name] for name in SAMPLES)
-        if settings['fuse']:
-            required.append(fused)
-        if any(type(x) is not bool for x in required) or checks['source_unchanged'] is not True or any(x is not True for x in required) or value['failure_code'] is not None:
+        required = ('source_bn', 'onnx_batchnorm', 'pt_repeat_pre', 'pt_repeat_post', 'source_unchanged', 'network_unchanged', 'shared_input_unchanged')
+        if any(type(checks[name]) is not bool for name in required):
+            raise ValueError('completed diagnostic checks missing')
+        if (checks['source_unchanged'] is not True or checks['shared_input_unchanged'] is not True
+                or checks['pt_repeat_pre'] is not True or checks['pt_repeat_post'] is not True
+                or checks['network_unchanged'] is not True or any(v is not True for v in matches.values())
+                or value['precision'] is None or value['failure_code'] is not None):
             raise ValueError('incomplete or failed proof cannot pass')
+        if value['arm'] == 'D' and checks['backend_reference_match'] is not True:
+            raise ValueError('D backend comparison did not pass')
     elif type(value['failure_code']) is not str:
         raise ValueError('failed proof needs a closed failure code')
     metrics.validate_matrix(value['metrics'], value['arm'], checks)
-    if value['status'] == 'passed' and not metrics.complete(value['metrics'], value['arm']):
-        raise ValueError('numeric observations incomplete')
+    if value['status'] == 'passed':
+        if not metrics.complete(value['metrics'], value['arm']):
+            raise ValueError('numeric observations incomplete')
+        if any(not metrics.matches(groups) for block in value['metrics'].values() if block is not None for groups in block.values()):
+            raise ValueError('numeric comparisons did not all match')
     return value
 
 
 def _model_input(value, job_id, run_id):
-    if type(value) is not dict or set(value) != {'schema_version', 'job_id', 'run_id', 'kind', 'arm', 'source_export'}:
+    if type(value) is not dict or set(value) != {'schema_version', 'job_id', 'run_id', 'kind', 'arm', 'source_export', 'backend_source'}:
         raise ValueError('diagnostic input schema invalid')
     if type(value['schema_version']) is not int or value['schema_version'] != 1 or value['kind'] != 'real_export_diagnostic':
         raise ValueError('diagnostic input identity invalid')
@@ -121,28 +123,35 @@ def _model_input(value, job_id, run_id):
     arm_settings(value['arm'])
     if type(value['source_export']) is not dict:
         raise ValueError('frozen export input required')
-    return value['arm'], value['source_export']
+    if value['arm'] == 'A' and value['backend_source'] is not None:
+        raise ValueError('A must not receive a handoff')
+    if value['arm'] == 'D' and type(value['backend_source']) is not dict:
+        raise ValueError('D requires the fixed A handoff')
+    return value['arm'], value['source_export'], value['backend_source']
 
 
-def _outputs(torch, np, network, tensors, classes):
+def _outputs(torch, network, tensors):
+    import numpy as np
     values = {}
     with torch.inference_mode():
         for name in SAMPLES:
             result = network(torch.from_numpy(tensors[name]))
-            if not isinstance(result, torch.Tensor) or tuple(result.shape) != (1, 4 + len(classes), 8400):
+            if not isinstance(result, torch.Tensor) or tuple(result.shape) != (1, 6, 8400):
                 raise ValueError('fixed PT output schema invalid')
             values[name] = result.detach().cpu().numpy().copy()
     return values
 
 
+def _same_outputs(np, left, right):
+    return all(np.array_equal(left[name], right[name], equal_nan=True) for name in SAMPLES)
+
+
 def _snapshot_network(network):
-    """Clone state tensors participating in the selected export arm."""
     result = {}
     for category, values in (('parameter', network.named_parameters()), ('buffer', network.named_buffers())):
         for name, value in values:
             key = f'{category}:{name}'
-            if key in result:
-                raise ValueError('duplicate network state name')
+            if key in result: raise ValueError('duplicate network state name')
             tensor = value.detach().cpu().clone()
             result[key] = (str(tensor.dtype), tuple(tensor.shape), tensor)
     return result
@@ -150,8 +159,7 @@ def _snapshot_network(network):
 
 def _network_unchanged(torch, network, before):
     after = _snapshot_network(network)
-    if set(after) != set(before):
-        return False
+    if set(after) != set(before): return False
     return all(before[key][0] == after[key][0] and before[key][1] == after[key][1]
                and torch.equal(before[key][2], after[key][2]) for key in before)
 
@@ -167,7 +175,7 @@ def compare_observation(measure, compare, mismatch_type):
 
 
 def collect_samples(compare_one, mismatch_type):
-    """Retain all fixed comparisons after mismatches, but not runtime failures."""
+    """Continue after complete numerical mismatches; runtime errors stay null."""
     results = {name: None for name in SAMPLES}
     for name in SAMPLES:
         try:
@@ -182,12 +190,10 @@ def collect_samples(compare_one, mismatch_type):
 
 
 def _contains_batchnorm(model_proto):
-    from google.protobuf.message import Message
     stack = [model_proto]
     while stack:
         message = stack.pop()
-        if getattr(message, 'op_type', None) == 'BatchNormalization':
-            return True
+        if getattr(message, 'op_type', None) == 'BatchNormalization': return True
         for field, value in message.ListFields():
             if field.message_type is not None:
                 stack.extend(value if field.is_repeated else [value])
@@ -200,192 +206,305 @@ def _write(directory, proof):
 
 
 def write_observations(directory, proof, fatal):
-    # A native dependency may catch a policy exception; its persistent audit
-    # marker remains authoritative and must prevent complete observations.
+    # Native dependencies can swallow a policy exception, not its audit marker.
     if fatal:
         raise DiagnosticFailure('POLICY_FAILED', 68)
     _write(directory, proof)
 
 
+def _set_head_export(network, Detect):
+    heads = [module for module in network.modules() if isinstance(module, Detect)]
+    if len(heads) != 1 or heads[0].nc != 2 or getattr(heads[0], 'end2end', False):
+        raise ValueError('fixed detection head invalid')
+    for head in heads: head.export, head.format, head.dynamic = True, 'onnx', False
+
+
+def _ort_session(ort, graph_bytes):
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 2
+    options.inter_op_num_threads = 1
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
+    session = ort.InferenceSession(graph_bytes, sess_options=options, providers=['CPUExecutionProvider'])
+    session.disable_fallback()
+    if session.get_providers() != ['CPUExecutionProvider']:
+        raise RuntimeError('CPU provider mismatch')
+    inputs, outputs = session.get_inputs(), session.get_outputs()
+    if (len(inputs) != 1 or len(outputs) != 1
+            or (inputs[0].name, inputs[0].type, inputs[0].shape) != ('images', 'tensor(float)', [1, 3, 640, 640])
+            or (outputs[0].name, outputs[0].type, outputs[0].shape) != ('output0', 'tensor(float)', [1, 6, 8400])):
+        raise RuntimeError('fixed ORT interface mismatch')
+    return session
+
+
+def _raw_array(raw, np):
+    if len(raw) != 201600: raise ValueError('fixed handoff tensor size invalid')
+    value = np.frombuffer(raw, dtype='<f4').reshape((1, 6, 8400)).copy()
+    if not np.isfinite(value).all(): raise ValueError('fixed handoff tensor nonfinite')
+    return value
+
+
+def _array_bytes(value, np):
+    if value.shape != (1, 6, 8400) or value.dtype != np.float32 or not np.isfinite(value).all():
+        raise DiagnosticFailure('RUNTIME_FAILED', 72)
+    raw = value.astype('<f4', copy=False).tobytes(order='C')
+    if len(raw) != 201600: raise DiagnosticFailure('RUNTIME_FAILED', 72)
+    return raw
+
+
+def _compare_one(metrics_module, typed_compare, mismatch_type, np, reference, actual, name):
+    # Save grouped statistics atomically, while retaining the production typed
+    # shape/dtype/finite/tolerance comparator as the validity authority. Only a
+    # fully computed numeric mismatch is retained as observations.
+    groups = metrics_module.measure_arrays(np, reference, actual)
+    try:
+        typed_compare(np, reference, actual, name)
+    except mismatch_type as exc:
+        if getattr(exc, 'diagnostic', None) not in {'compare_tolerance', 'compare_nonfinite'}:
+            raise
+    return groups
+
+
+def _set_failure(proof, code):
+    proof['status'] = 'failed'; proof['failure_code'] = code
+
+
 def probe_child(job_id, run_id):
-    # Container/network/profile checks precede all app and native runtime imports.
+    # Strict guard is before any app/native runtime imports.
     guard()
-    from .run_files import run_directory, read_json, atomic_json, fingerprint
+    from .run_files import run_directory, read_json, fingerprint
     from .export_contract import ExportInput, INPUT_SHAPE, TENSOR_NAMES, tensor_bytes
     from .export_inputs import verify_input, copy_input
     from .training_runtime import prepare_environment, initialize, TrainingPolicyError
     from .ml_privacy import load_ort
     from .export_runtime import read_model_bytes, guard_graph, compare_arrays
     from .export_errors import ExportGraphError
-    import copy
+    from .export_backend_handoff import (
+        verify as verify_handoff, copy_to as copy_handoff,
+        _read_fixed_file, _write_exclusive,
+    )
     import stat
 
     directory = run_directory(job_id, run_id)
     proof = empty_proof('A')
     try:
         raw_input = read_json(directory / 'input.json', 1024 * 1024)
-        arm, export_raw = _model_input(raw_input, job_id, run_id)
+        arm, source_raw, backend_source = _model_input(raw_input, job_id, run_id)
         proof = empty_proof(arm)
-        export_input = ExportInput.model_validate(export_raw)
-        if export_input.kind != 'export_onnx':
-            raise ValueError('source export required')
-        frozen = verify_input(export_input.input.model_dump(mode='json'))
+        source_export = ExportInput.model_validate(source_raw)
+        if (source_export.kind != 'export_onnx' or str(source_export.job_id) != job_id
+                or str(source_export.run_id) != run_id):
+            raise ValueError('source export identity invalid')
+        frozen = verify_input(source_export.input.model_dump(mode='json'))
         source = copy_input(frozen, directory)
-        if source.is_symlink() or not stat.S_ISREG(source.lstat().st_mode):
-            raise ValueError('frozen source file rejected')
+        if source.is_symlink() or not stat.S_ISREG(source.lstat().st_mode): raise ValueError('source checkpoint type invalid')
         source_before = fingerprint(source)
+
+        copied_handoff = None
+        current_outputs = None
+        current_raws = None
+        if arm == 'D':
+            verify_handoff(backend_source, frozen)
+            copied_handoff = copy_handoff(backend_source, frozen, directory)
+            current_raws = {name: _read_fixed_file(copied_handoff[f'current-{name}.f32'].parent, f'current-{name}.f32') for name in SAMPLES}
+            graph_bytes = _read_fixed_file(copied_handoff['model.onnx'].parent, 'model.onnx')
 
         prepare_environment(directory)
         torch, torchvision, YOLO, DetectionModel, fail, fatal, loads = initialize(directory, {source})
+        from .export_backend_handoff import precision_snapshot as get_precision
+        try:
+            precision_start = get_precision(torch)
+        except Exception as exc:
+            raise TrainingPolicyError('PRECISION_CONTROLS_UNAVAILABLE') from exc
+        if arm == 'A':
+            if precision_start['mkldnn_enabled'] is not True: raise TrainingPolicyError('MKLDNN_NOT_ENABLED')
+            proof['precision'] = precision_start
+        else:
+            a_precision = backend_source['precision']
+            precision_start = get_precision(torch)
+            if precision_start['mkldnn_enabled'] is not True or any(precision_start[k] != a_precision[k] for k in ('global', 'backend', 'conv', 'matmul')):
+                raise TrainingPolicyError('PRECISION_PROFILE_CHANGED')
+            # Exactly one A/D perturbation; do not use mkldnn.flags() context.
+            torch.backends.mkldnn.enabled = False
+            precision_after_toggle = get_precision(torch)
+            expected_precision = {**a_precision, 'mkldnn_enabled': False}
+            if precision_after_toggle != expected_precision: raise TrainingPolicyError('PRECISION_TOGGLE_CHANGED_OTHER_SETTING')
+            proof['precision'] = precision_after_toggle
+
         ort = load_ort()
         import onnx
         import numpy as np
         import ultralytics
+        if arm == 'D':
+            current_outputs = {name: _raw_array(current_raws[name], np) for name in SAMPLES}
         if (torch.__version__ != '2.15.0+cpu' or torchvision.__version__ != '0.29.2+cpu'
                 or ultralytics.__version__ != '8.4.202' or onnx.__version__ != '1.23.2'
                 or ort.__version__ != '1.31.1' or torch.version.cuda is not None
                 or torch.version.hip is not None or torch.cuda.is_available()):
             raise TrainingPolicyError('RUNTIME_VERSION_MISMATCH')
-        # initialize() applies the fixed 2 intra / 1 inter thread limits.
-        before = fingerprint(source)
+        # initialize() already installs the fixed 2 intra / 1 inter thread limits.
         model = YOLO(str(source), task='detect')
-        if not isinstance(model.model, DetectionModel) or model.task != 'detect':
-            raise TrainingPolicyError('SOURCE_STRUCTURE_INVALID')
-        classes = export_input.input.source_metadata.classes
+        if not isinstance(model.model, DetectionModel) or model.task != 'detect': raise TrainingPolicyError('SOURCE_STRUCTURE_INVALID')
+        classes = source_export.input.source_metadata.classes
         actual_classes = [model.names[index] for index in range(len(model.names))]
-        if classes != actual_classes or not 1 <= len(classes) <= 1000:
-            raise TrainingPolicyError('SOURCE_CLASSES_CHANGED')
+        if classes != actual_classes or classes is None or len(classes) != 2: raise TrainingPolicyError('SOURCE_CLASSES_CHANGED')
         if model.ckpt.get('optimizer') is not None or model.ckpt.get('ema') is not None or model.ckpt.get('epoch') != -1:
             raise TrainingPolicyError('SOURCE_CHECKPOINT_NOT_FINALIZED')
-        original = model.model.cpu().float().eval()
-        for parameter in original.parameters():
+        network = model.model.cpu().float().eval()
+        for parameter in network.parameters():
             parameter.requires_grad_(False)
-            if not torch.isfinite(parameter).all():
-                raise TrainingPolicyError('SOURCE_NONFINITE')
+            if not torch.isfinite(parameter).all(): raise TrainingPolicyError('SOURCE_NONFINITE')
         from ultralytics.nn.modules.head import Detect
-        heads = [module for module in original.modules() if isinstance(module, Detect)]
-        if len(heads) != 1 or heads[0].nc != len(classes):
-            raise TrainingPolicyError('SOURCE_HEAD_INVALID')
-        if getattr(heads[0], 'end2end', False):
-            raise TrainingPolicyError('SOURCE_HEAD_INVALID')
-        proof['checks']['source_bn'] = any(isinstance(module, torch.nn.BatchNorm2d) for module in original.modules())
-        for head in heads:
-            head.export, head.format, head.dynamic = True, 'onnx', False
-        tensors = {name: np.frombuffer(tensor_bytes(name), dtype='<f4').reshape(INPUT_SHAPE).copy() for name in TENSOR_NAMES}
-        references = _outputs(torch, np, original, tensors, classes)
-        repeated = _outputs(torch, np, original, tensors, classes)
-        proof['checks']['pt_repeat_pre'] = all(np.array_equal(references[n], repeated[n], equal_nan=True) for n in SAMPLES)
-
-        settings = arm_settings(arm)
-        export_network = original
-        fused_outputs = None
-        if settings['fuse']:
-            export_network = copy.deepcopy(original)
-            export_network.fuse()
-            export_network.eval()
-            for parameter in export_network.parameters(): parameter.requires_grad_(False)
-            for head in (m for m in export_network.modules() if isinstance(m, Detect)):
-                head.export, head.format, head.dynamic = True, 'onnx', False
-            fused_outputs = _outputs(torch, np, export_network, tensors, classes)
-            fused = True
-            for name in SAMPLES:
-                statistics, matched = compare_observation(
-                    lambda: metrics.measure_arrays(np, references[name], fused_outputs[name]),
-                    lambda: compare_arrays(np, references[name], fused_outputs[name], name), ExportGraphError)
-                proof['metrics']['original_fused'][name] = statistics
-                fused = fused and matched
-            proof['checks']['fused_reference_match'] = fused
-
-        # Snapshot the actual network handed to torch.onnx.export, not the original
-        # reference network when arm C exports its explicit fused copy.
-        network_before = _snapshot_network(export_network)
-
-        candidate = directory / 'model.onnx'
+        _set_head_export(network, Detect)
         try:
-            torch.onnx.export(export_network, torch.from_numpy(tensors['zeros']), str(candidate),
-                export_params=True, opset_version=18, do_constant_folding=settings['constant_folding'],
-                input_names=['images'], output_names=['output0'], dynamic_axes=None,
-                dynamo=False, external_data=False, verbose=False)
+            precision_at_compare = get_precision(torch)
+        except Exception as exc:
+            raise TrainingPolicyError('PRECISION_CONTROLS_UNAVAILABLE') from exc
+        if precision_at_compare != proof['precision']:
+            raise TrainingPolicyError('PRECISION_CHANGED_BEFORE_COMPARISON')
+        proof['checks']['source_bn'] = any(isinstance(module, torch.nn.BatchNorm2d) for module in network.modules())
+        network_before = _snapshot_network(network)
+        tensors = {name: np.frombuffer(tensor_bytes(name), dtype='<f4').reshape(INPUT_SHAPE).copy() for name in TENSOR_NAMES}
+        if arm == 'A':
+            references = _outputs(torch, network, tensors)
+            repeated = _outputs(torch, network, tensors)
+            proof['checks']['pt_repeat_pre'] = _same_outputs(np, references, repeated)
+            output_records = {}
+            for name in SAMPLES:
+                raw = _array_bytes(references[name], np)
+                path = directory / f'current-{name}.f32'
+                _write_exclusive(path, raw)
+                output_records[path.name] = __import__('hashlib').sha256(raw).hexdigest()
+            candidate = directory / 'model.onnx'
+            if candidate.exists() or candidate.is_symlink(): raise ValueError('export target already exists')
+            try:
+                torch.onnx.export(network, torch.from_numpy(tensors['zeros']), str(candidate),
+                    export_params=True, opset_version=18, do_constant_folding=True,
+                    input_names=['images'], output_names=['output0'], dynamic_axes=None,
+                    dynamo=False, external_data=False, verbose=False)
+            except Exception as exc:
+                raise DiagnosticFailure('RUNTIME_FAILED', 72) from exc
+            try:
+                graph_bytes = read_model_bytes(candidate)
+                model_proto = onnx.load_model_from_string(graph_bytes)
+                from .export_runtime import guard_graph
+                guard_graph(model_proto, onnx, classes)
+                onnx.checker.check_model(graph_bytes, full_check=True)
+            except Exception as exc:
+                raise DiagnosticFailure('GRAPH_INVALID', 74) from exc
+            proof['checks']['onnx_batchnorm'] = _contains_batchnorm(model_proto)
+            shared_outputs = references
+        else:
+            assert current_outputs is not None and copied_handoff is not None
+            try:
+                model_proto = onnx.load_model_from_string(graph_bytes)
+                from .export_runtime import guard_graph
+                guard_graph(model_proto, onnx, classes)
+                onnx.checker.check_model(graph_bytes, full_check=True)
+            except Exception as exc:
+                raise DiagnosticFailure('GRAPH_INVALID', 74) from exc
+            proof['checks']['onnx_batchnorm'] = _contains_batchnorm(model_proto)
+            shared_outputs = current_outputs
+            references = _outputs(torch, network, tensors)
+            repeated = _outputs(torch, network, tensors)
+            proof['checks']['pt_repeat_pre'] = _same_outputs(np, references, repeated)
+            disabled_outputs = references
+            for name in SAMPLES:
+                proof['metrics']['current_disabled'][name] = _compare_one(metrics, compare_arrays, ExportGraphError, np, shared_outputs[name], disabled_outputs[name], name)
+            proof['checks']['backend_reference_match'] = all(metrics.matches(proof['metrics']['current_disabled'][name]) for name in SAMPLES)
+            output_records = None
+
+        try:
+            session = _ort_session(ort, graph_bytes)
         except Exception as exc:
             raise DiagnosticFailure('RUNTIME_FAILED', 72) from exc
-        try:
-            graph_bytes = read_model_bytes(candidate)
-            model_proto = onnx.load_model_from_string(graph_bytes)
-            guard_graph(model_proto, onnx, classes)
-            onnx.checker.check_model(graph_bytes, full_check=True)
-        except Exception as exc:
-            raise DiagnosticFailure('GRAPH_INVALID', 74) from exc
-        proof['checks']['onnx_batchnorm'] = _contains_batchnorm(model_proto)
-        options = ort.SessionOptions(); options.intra_op_num_threads = 2; options.inter_op_num_threads = 1
-        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
-        session = ort.InferenceSession(graph_bytes, sess_options=options, providers=['CPUExecutionProvider'])
-        session.disable_fallback()
-        if session.get_providers() != ['CPUExecutionProvider']:
-            raise TrainingPolicyError('ORT_PROVIDER_MISMATCH')
-        ins, outs = session.get_inputs(), session.get_outputs()
-        expected_out = [1, 4 + len(classes), 8400]
-        if len(ins) != 1 or len(outs) != 1 or (ins[0].name, ins[0].type, ins[0].shape) != ('images', 'tensor(float)', list(INPUT_SHAPE)) or (outs[0].name, outs[0].type, outs[0].shape) != ('output0', 'tensor(float)', expected_out):
-            raise TrainingPolicyError('ORT_INTERFACE_MISMATCH')
-        # Complete the fixed three-input matrix even after an individual mismatch/error.
-        def compare_one(name):
-            outputs = session.run(['output0'], {'images': tensors[name]})
-            if len(outputs) != 1: raise ValueError('ORT output schema invalid')
-            statistics, matched = compare_observation(
-                lambda: (metrics.measure_arrays(np, references[name], outputs[0]),
-                         metrics.measure_arrays(np, fused_outputs[name], outputs[0]) if arm == 'C' else None),
-                lambda: compare_arrays(np, references[name], outputs[0], name), ExportGraphError)
-            proof['metrics']['original_ort'][name] = statistics[0]
-            if arm == 'C': proof['metrics']['fused_ort'][name] = statistics[1]
-            return matched
-        # Comparison mismatches are false but do not short-circuit the other two
-        # inputs. Runtime/protocol errors stay null and preserve only the prefix.
-        matches, incomplete_runtime = collect_samples(compare_one, ExportGraphError)
-        proof['checks']['reference_ort_match'] = matches
-        proof['checks']['network_unchanged'] = _network_unchanged(torch, export_network, network_before)
-        post = _outputs(torch, np, original, tensors, classes)
-        proof['checks']['pt_repeat_post'] = all(np.array_equal(references[n], post[n], equal_nan=True) for n in SAMPLES)
-        proof['checks']['source_unchanged'] = fingerprint(source) == source_before
-        verify_input(frozen)
+        runtime_error = False
+        for name in SAMPLES:
+            try:
+                values = session.run(['output0'], {'images': tensors[name]})
+                if len(values) != 1: raise RuntimeError('ORT output count invalid')
+                if arm == 'A':
+                    current_ort = _compare_one(metrics, compare_arrays, ExportGraphError, np, references[name], values[0], name)
+                    proof['metrics']['current_ort'][name] = current_ort
+                else:
+                    current_ort = _compare_one(metrics, compare_arrays, ExportGraphError, np, shared_outputs[name], values[0], name)
+                    disabled_ort = _compare_one(metrics, compare_arrays, ExportGraphError, np, disabled_outputs[name], values[0], name)
+                    proof['metrics']['current_ort'][name] = current_ort
+                    proof['metrics']['disabled_ort'][name] = disabled_ort
+                proof['checks']['reference_ort_match'][name] = metrics.matches(proof['metrics']['current_ort'][name])
+            except Exception:
+                # A failed ORT invocation/schema is incomplete, not an observed numeric mismatch.
+                runtime_error = True
+                break
 
-        checks = proof['checks']
-        all_ok = (checks['pt_repeat_pre'] is True and checks['pt_repeat_post'] is True
-                  and checks['source_unchanged'] is True and checks['network_unchanged'] is True
-                  and type(checks['source_bn']) is bool and type(checks['onnx_batchnorm']) is bool
-                  and all(checks['reference_ort_match'][name] is True for name in SAMPLES)
-                  and (arm != 'C' or checks['fused_reference_match'] is True))
-        if all_ok:
-            proof['status'] = 'passed'; proof['failure_code'] = None
-        elif incomplete_runtime:
-            proof['status'] = 'failed'; proof['failure_code'] = 'RUNTIME_FAILED'
+        proof['checks']['network_unchanged'] = _network_unchanged(torch, network, network_before)
+        if arm == 'D':
+            post = _outputs(torch, network, tensors)
+            proof['checks']['pt_repeat_post'] = _same_outputs(np, disabled_outputs, post)
         else:
-            proof['status'] = 'failed'
-            if checks['source_unchanged'] is not True: proof['failure_code'] = 'SOURCE_CHANGED'
-            elif checks['pt_repeat_pre'] is not True or checks['pt_repeat_post'] is not True: proof['failure_code'] = 'PT_REPEAT_MISMATCH'
-            elif arm == 'C' and checks['fused_reference_match'] is not True: proof['failure_code'] = 'FUSED_MISMATCH'
-            elif any(checks['reference_ort_match'][name] is not True for name in SAMPLES): proof['failure_code'] = 'ONNX_MISMATCH'
-            else: proof['failure_code'] = 'UNKNOWN'
-        if checks['network_unchanged'] is not True:
-            proof['status'] = 'failed'; proof['failure_code'] = 'SOURCE_CHANGED'
+            post = _outputs(torch, network, tensors)
+            proof['checks']['pt_repeat_post'] = _same_outputs(np, references, post)
+
+        try:
+            source_ok = fingerprint(source) == source_before
+        except Exception:
+            source_ok = False
+        try:
+            verify_input(frozen)
+        except Exception:
+            source_ok = False
+        proof['checks']['source_unchanged'] = source_ok
+        if arm == 'A':
+            try:
+                from .export_backend_handoff import _read_fixed_file
+                proof['checks']['shared_input_unchanged'] = all(
+                    __import__('hashlib').sha256(_read_fixed_file(directory, name)).hexdigest() == digest
+                    for name, digest in output_records.items()) and __import__('hashlib').sha256(_read_fixed_file(directory, 'model.onnx')).hexdigest() == __import__('hashlib').sha256(graph_bytes).hexdigest()
+            except Exception:
+                proof['checks']['shared_input_unchanged'] = False
+        else:
+            try:
+                verify_handoff(backend_source, frozen)
+                proof['checks']['shared_input_unchanged'] = all(
+                    __import__('hashlib').sha256(_read_fixed_file(path.parent, name)).hexdigest() == backend_source['files'][name]['sha256']
+                    for name, path in copied_handoff.items())
+            except Exception:
+                proof['checks']['shared_input_unchanged'] = False
+
+        try:
+            precision_end = get_precision(torch)
+        except Exception as exc:
+            raise TrainingPolicyError('PRECISION_CONTROLS_UNAVAILABLE') from exc
+        if precision_end != proof['precision']:
+            raise TrainingPolicyError('PRECISION_CHANGED_DURING_COMPARISON')
+        if fatal: raise TrainingPolicyError('RUNTIME_POLICY_FATAL')
+        if not proof['checks']['source_unchanged'] or not proof['checks']['shared_input_unchanged']:
+            _set_failure(proof, 'SOURCE_CHANGED')
+        elif not proof['checks']['network_unchanged']:
+            _set_failure(proof, 'SOURCE_CHANGED')
+        elif runtime_error:
+            _set_failure(proof, 'RUNTIME_FAILED')
+        elif not proof['checks']['pt_repeat_pre'] or not proof['checks']['pt_repeat_post']:
+            _set_failure(proof, 'PT_REPEAT_MISMATCH')
+        elif arm == 'D' and not proof['checks']['backend_reference_match']:
+            _set_failure(proof, 'BACKEND_MISMATCH')
+        elif any(value is not True for value in proof['checks']['reference_ort_match'].values()):
+            _set_failure(proof, 'ONNX_MISMATCH')
+        elif not metrics.complete(proof['metrics'], arm) or any(
+                not metrics.matches(groups) for block in proof['metrics'].values() if block is not None for groups in block.values()):
+            _set_failure(proof, 'ONNX_MISMATCH')
+        else:
+            proof['status'] = 'passed'; proof['failure_code'] = None
         write_observations(directory, proof, fatal)
-        if proof['failure_code'] == 'SOURCE_CHANGED':
-            return 68
-        if proof['failure_code'] == 'RUNTIME_FAILED':
-            return 72
-        return 0 if proof['status'] == 'passed' else 74
+        if proof['status'] == 'passed': return 0
+        if proof['failure_code'] == 'SOURCE_CHANGED': return 68
+        if proof['failure_code'] == 'RUNTIME_FAILED': return 72
+        return 74
     except DiagnosticFailure as exc:
-        proof['status'] = 'failed'; proof['failure_code'] = exc.code
-        _write(directory, proof)
-        return exc.exit_code
+        _set_failure(proof, exc.code); _write(directory, proof); return exc.exit_code
     except TrainingPolicyError:
-        proof['status'] = 'failed'; proof['failure_code'] = 'POLICY_FAILED'
-        _write(directory, proof)
-        return 68
+        _set_failure(proof, 'POLICY_FAILED'); _write(directory, proof); return 68
     except (ValueError, OSError, TypeError):
-        proof['status'] = 'failed'; proof['failure_code'] = 'SOURCE_INVALID'
-        _write(directory, proof)
-        return 65
+        _set_failure(proof, 'SOURCE_INVALID'); _write(directory, proof); return 65
     except Exception:
-        proof['status'] = 'failed'; proof['failure_code'] = 'UNKNOWN'
-        _write(directory, proof)
-        return 72
+        _set_failure(proof, 'UNKNOWN'); _write(directory, proof); return 72

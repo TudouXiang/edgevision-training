@@ -15,10 +15,10 @@ def test_noncontainer_rejected():
     with pytest.raises(ValueError):probe().guard()
 
 
-def test_three_arm_budget_is_reserved(monkeypatch):
+def test_two_arm_budget_is_reserved(monkeypatch):
     m=probe();monkeypatch.setattr(m.time,'monotonic',lambda:100)
-    assert m.require_arm_budget(731)==630
-    with pytest.raises(TimeoutError):m.require_arm_budget(729)
+    assert m.require_arm_budget(521)==420
+    with pytest.raises(TimeoutError):m.require_arm_budget(519)
 
 
 def test_bound_completed_receipt_only():
@@ -42,8 +42,8 @@ def test_valid_complete_failed_observation_is_not_product_pass(tmp_path):
     m=probe();report=m.load('export_compare_report')
     checks={name:True for name in report.CHECKS}
     checks['reference_ort_match']={name:False for name in report.TENSORS}
-    checks['fused_reference_match']=None
-    proof={'schema_version':2,'arm':'A','status':'failed','checks':checks,'failure_code':'ONNX_MISMATCH'}
+    checks['backend_reference_match']=None
+    proof={'schema_version':3,'arm':'A','status':'failed','checks':checks,'failure_code':'ONNX_MISMATCH'}
     from test_export_compare_report import with_metrics
     with_metrics(proof)
     p=tmp_path/'proof.json';p.write_text(json.dumps(proof))

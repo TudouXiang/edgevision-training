@@ -23,6 +23,10 @@ T060 的计划、源码检查和普通 CI 不能代替真实模型验收；E / I
 - [基础实验对比与十二阶段重验](T070-comparison-acceptance-2026-11-14.md)
 - [隔离集成审查](T070-integration-review-2026-11-14.md)
 
+- [真实数据与取消/恢复演练](T070-real-cpu-diagnostic-2026-11-15.md)
+- [数值分组诊断](T070-export-error-groups-2026-11-15.md)
+- [交付闸门更新](T070-delivery-gates-2026-11-15.md)
+
 ## 专项记录
 
 - [T060 依赖计划](T060-rebuild-dependency-plan.md)、[隔离 CI 计划](T060-isolated-ci-plan-2026-11-04.md)：区分方案与实际执行。

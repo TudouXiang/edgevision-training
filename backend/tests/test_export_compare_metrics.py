@@ -40,9 +40,9 @@ def test_closed_groups_and_numeric_types():
 
 
 def test_unexecuted_matrix_is_incomplete():
-    matrix=m.empty_matrix('C')
-    assert not m.complete(matrix,'C')
-    assert set(matrix)=={'original_ort','original_fused','fused_ort'}
+    matrix=m.empty_matrix('D')
+    assert not m.complete(matrix,'D')
+    assert set(matrix)=={'current_ort','current_disabled','disabled_ort'}
 
 
 @pytest.mark.parametrize('shape,dtype',[((1,5,8400),'float32'),((1,6,8400),'float64'),((50400,),'float32')])
@@ -62,8 +62,8 @@ def test_bounded_numeric_schema(key,value):
 
 
 def test_statistics_and_boolean_must_agree():
-    matrix=m.empty_matrix('A');matrix['original_ort']['zeros']=m.measure_values([0.0]*50400,[0.0]*50400)
-    checks={'reference_ort_match':{'zeros':False,'gradient':None,'pattern':None},'fused_reference_match':None}
+    matrix=m.empty_matrix('A');matrix['current_ort']['zeros']=m.measure_values([0.0]*50400,[0.0]*50400)
+    checks={'reference_ort_match':{'zeros':False,'gradient':None,'pattern':None},'backend_reference_match':None}
     with pytest.raises(ValueError):m.validate_matrix(matrix,'A',checks)
     checks['reference_ort_match']['zeros']=True
     m.validate_matrix(matrix,'A',checks)
@@ -71,7 +71,7 @@ def test_statistics_and_boolean_must_agree():
 
 
 def test_unknown_direction_and_extra_group_rejected():
-    matrix=m.empty_matrix('B');matrix['raw_tensor']=[]
-    with pytest.raises(ValueError):m.validate_matrix(matrix,'B',{})
+    matrix=m.empty_matrix('A');matrix['raw_tensor']=[]
+    with pytest.raises(ValueError):m.validate_matrix(matrix,'A',{})
     result=m.measure_values([0.0]*50400,[0.0]*50400);result['raw']=[]
     with pytest.raises(ValueError):m.validate_groups(result)

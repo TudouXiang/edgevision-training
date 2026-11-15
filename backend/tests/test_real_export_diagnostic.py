@@ -38,20 +38,19 @@ def test_guard_requires_profile_and_private_root(monkeypatch, tmp_path):
 
 
 def test_arm_settings_are_closed_and_fixed():
-    assert module.arm_settings('A') == {'fuse': False, 'constant_folding': True}
-    assert module.arm_settings('B') == {'fuse': False, 'constant_folding': False}
-    assert module.arm_settings('C') == {'fuse': True, 'constant_folding': True}
-    for arm in ('a', 'D', None, True):
+    assert module.arm_settings('A') == {'export': True, 'disable_mkldnn': False}
+    assert module.arm_settings('D') == {'export': False, 'disable_mkldnn': True}
+    for arm in ('a', 'B', 'C', None, True):
         with pytest.raises(ValueError): module.arm_settings(arm)
 
 
 def test_proof_uses_null_for_unexecuted_and_requires_complete_pass():
-    proof = module.empty_proof('C')
+    proof = module.empty_proof('D')
     assert proof['checks']['source_bn'] is None
     assert proof['checks']['reference_ort_match'] == {'zeros': None, 'gradient': None, 'pattern': None}
     with pytest.raises(ValueError): module.validate_proof({**proof, 'status':'passed'})
     proof['checks'].update(source_bn=False, onnx_batchnorm=False, pt_repeat_pre=True,
-        pt_repeat_post=True, source_unchanged=True, network_unchanged=True, fused_reference_match=True,
+        pt_repeat_post=True, source_unchanged=True, network_unchanged=True, backend_reference_match=True,
         reference_ort_match={'zeros':True,'gradient':True,'pattern':True})
     proof['status'] = 'passed'; proof['failure_code'] = None
     from test_export_compare_report import with_metrics
@@ -110,16 +109,19 @@ def test_sample_comparisons_continue_after_numerical_mismatch_but_not_runtime_er
     assert values == {'zeros':True, 'gradient':None, 'pattern':None} and incomplete
 
 
-def test_non_c_fused_check_must_be_null_and_unknown_keys_rejected():
-    proof = module.empty_proof('B')
-    proof['checks']['fused_reference_match'] = False
+def test_a_backend_check_must_be_null_and_unknown_keys_rejected():
+    proof = module.empty_proof('A')
+    proof['checks']['backend_reference_match'] = False
     with pytest.raises(ValueError): module.validate_proof(proof)
 
 
 def test_run_input_accepts_only_fixed_arm_and_source_export_mapping():
     value = {'schema_version':1, 'job_id':'job', 'run_id':'run',
-        'kind':'real_export_diagnostic', 'arm':'B', 'source_export':{'kind':'export_onnx'}}
-    assert module._model_input(value, 'job', 'run') == ('B', {'kind':'export_onnx'})
+        'kind':'real_export_diagnostic', 'arm':'A', 'source_export':{'kind':'export_onnx'}, 'backend_source':None}
+    assert module._model_input(value, 'job', 'run') == ('A', {'kind':'export_onnx'}, None)
+    with pytest.raises(ValueError): module._model_input({**value, 'backend_source':{}}, 'job', 'run')
+    with pytest.raises(ValueError): module._model_input({**value, 'arm':'D'}, 'job', 'run')
+    assert module._model_input({**value, 'arm':'D', 'backend_source':{}}, 'job', 'run') == ('D', {'kind':'export_onnx'}, {})
     value['source_export_input'] = value.pop('source_export')
     with pytest.raises(ValueError): module._model_input(value, 'job', 'run')
 
@@ -154,19 +156,19 @@ def test_observation_does_not_publish_statistics_when_comparator_errors():
     assert module.compare_observation(lambda:{'closed':True},lambda:None,Mismatch)==({'closed':True},True)
 
 
-def test_last_fused_sample_runtime_error_preserves_null_suffix():
+def test_last_disabled_sample_runtime_error_preserves_null_suffix():
     class Mismatch(Exception):pass
-    proof=module.empty_proof('C')
+    proof=module.empty_proof('D')
     from test_export_compare_report import with_metrics
-    completed=module.empty_proof('C');completed['checks']['fused_reference_match']=True
+    completed=module.empty_proof('D');completed['checks']['backend_reference_match']=True
     with_metrics(completed)
     for sample in ('zeros','gradient'):
-        stats,match=module.compare_observation(lambda:completed['metrics']['original_fused'][sample],lambda:None,Mismatch)
-        proof['metrics']['original_fused'][sample]=stats
+        stats,match=module.compare_observation(lambda:completed['metrics']['current_disabled'][sample],lambda:None,Mismatch)
+        proof['metrics']['current_disabled'][sample]=stats
     def fail():raise RuntimeError('private failure')
     with pytest.raises(RuntimeError):
-        stats,match=module.compare_observation(lambda:completed['metrics']['original_fused']['pattern'],fail,Mismatch)
-        proof['metrics']['original_fused']['pattern']=stats
+        stats,match=module.compare_observation(lambda:completed['metrics']['current_disabled']['pattern'],fail,Mismatch)
+        proof['metrics']['current_disabled']['pattern']=stats
     proof['failure_code']='RUNTIME_FAILED'
-    assert proof['metrics']['original_fused']['pattern'] is None
+    assert proof['metrics']['current_disabled']['pattern'] is None
     module.validate_proof(proof)

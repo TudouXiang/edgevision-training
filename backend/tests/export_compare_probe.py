@@ -29,8 +29,8 @@ def guard():
 
 
 def require_arm_budget(deadline):
-    if deadline-time.monotonic()<3*ARM_BUDGET:raise TimeoutError('full diagnostic budget unavailable')
-    return 3*ARM_BUDGET
+    if deadline-time.monotonic()<2*ARM_BUDGET:raise TimeoutError('full diagnostic budget unavailable')
+    return 2*ARM_BUDGET
 
 
 def accept_receipt(receipt,job_id,run_id):
@@ -65,18 +65,20 @@ def run_arms(frozen,result,save,deadline):
     from app.export_inputs import verify_input
     from app.export_assets import runtime_identity
     from app.training_assets import digest_json
-    report=load('export_compare_report');root=data_root()
+    from app.export_backend_handoff import capture, verify
+    report=load('export_compare_report');root=data_root();backend_source=None
     with worker_lock(root):
         if not recover_probe() or recover():raise ValueError('prior process unsettled')
         require_arm_budget(deadline)
         for arm in report.ARMS:
+            if arm=='D':verify(backend_source,frozen)
             verify_input(frozen)
             if digest_json(runtime_identity())!=frozen['runtime_binding']:raise ValueError('runtime changed')
             if deadline-time.monotonic()<ARM_BUDGET:raise TimeoutError('arm budget')
             job_id,run_id=str(uuid4()),str(uuid4())
             directory=run_directory(job_id,run_id,create=True)
             source_export=ExportInput.model_validate({'schema_version':1,'job_id':job_id,'run_id':run_id,'kind':'export_onnx','input':frozen}).model_dump(mode='json')
-            atomic_json(directory/'input.json',{'schema_version':1,'job_id':job_id,'run_id':run_id,'kind':'real_export_diagnostic','arm':arm,'source_export':source_export})
+            atomic_json(directory/'input.json',{'schema_version':1,'job_id':job_id,'run_id':run_id,'kind':'real_export_diagnostic','arm':arm,'source_export':source_export,'backend_source':backend_source})
             input_binding=fingerprint(directory/'input.json')
             active={'job_id':job_id,'run_id':run_id,'guardian':None}
             atomic_json(root/'training-probe-active.json',active)
@@ -103,6 +105,11 @@ def run_arms(frozen,result,save,deadline):
             if (receipt['exit_code']==0)!=(proof['status']=='passed'):raise ValueError('proof exit mismatch')
             result['arms'][arm]=proof;save()
             if proof['failure_code'] in ('POLICY_FAILED','SOURCE_INVALID','SOURCE_CHANGED') or not report.observed(proof):raise ValueError('incomplete or unsafe observations')
+            if proof['checks']['network_unchanged'] is not True:raise ValueError('network changed')
+            if arm=='A':backend_source=capture(job_id,run_id,frozen,proof['precision'])
+            else:
+                verify(backend_source,frozen)
+                if any(proof['precision'][k]!=backend_source['precision'][k] for k in ('global','backend','conv','matmul')):raise ValueError('precision changed')
 
 
 def run(result,save,log):

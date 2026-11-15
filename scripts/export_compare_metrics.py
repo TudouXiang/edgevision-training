@@ -1,7 +1,7 @@
 """Fixed, anonymous numeric diagnostic. No native imports or model execution."""
 import math
 SAMPLES=('zeros','gradient','pattern')
-DIRECTIONS=('original_ort','original_fused','fused_ort')
+DIRECTIONS=('current_ort','current_disabled','disabled_ort')
 ELEMENTS={'boxes':33600,'scores':16800}
 KEYS={'elements','finite','mismatch_count','max_absolute_error','max_tolerance_ratio'}
 
@@ -54,27 +54,34 @@ def matches(groups):
 
 
 def empty_matrix(arm):
-    require(arm in ('A','B','C'))
-    return {d:({s:None for s in SAMPLES} if d=='original_ort' or arm=='C' else None) for d in DIRECTIONS}
+    require(arm in ('A','D'))
+    return {d:({s:None for s in SAMPLES} if d=='current_ort' or arm=='D' else None) for d in DIRECTIONS}
 
 
 def validate_matrix(value,arm,checks):
     require(type(value) is dict and set(value)==set(DIRECTIONS))
     for direction in DIRECTIONS:
         block=value[direction]
-        if direction!='original_ort' and arm!='C':require(block is None);continue
+        if direction!='current_ort' and arm!='D':require(block is None);continue
         require(type(block) is dict and set(block)==set(SAMPLES))
         for sample,g in block.items():
             if g is not None:validate_groups(g)
-            if direction=='original_ort':
+            if direction=='current_ort':
                 flag=checks['reference_ort_match'][sample]
                 require(flag is None if g is None else flag is matches(g))
-        if direction=='original_fused':
-            flag=checks['fused_reference_match']
+        if direction=='current_disabled':
+            flag=checks['backend_reference_match']
             require(flag is None if any(g is None for g in block.values()) else flag is all(matches(g) for g in block.values()))
     return value
 
 
 def complete(value,arm):
     return all(value[d] is not None and all(g is not None and all(v['finite'] for v in g.values()) for g in value[d].values())
-               for d in DIRECTIONS if d=='original_ort' or arm=='C')
+               for d in DIRECTIONS if d=='current_ort' or arm=='D')
+
+
+def validate_precision(value,arm):
+    require(type(value) is dict and set(value)=={'mkldnn_enabled','global','backend','conv','matmul'})
+    require(type(value['mkldnn_enabled']) is bool and value['mkldnn_enabled'] is (arm=='A'))
+    require(all(type(value[k]) is str and value[k] in ('none','ieee','tf32','bf16') for k in ('global','backend','conv','matmul')))
+    return value
