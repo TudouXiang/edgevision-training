@@ -142,3 +142,62 @@ def test_export_sidecar_symlink_parent_is_unknown(tmp_path):
     (directory/'export-failure.json').write_text('{"schema_version":1,"code":"graph_guard"}')
     link=tmp_path/'link';link.symlink_to(directory,target_is_directory=True)
     assert m.read_export_detail(link/'export-failure.json')=='unknown'
+
+
+def test_independent_drills_continue_only_verified_model_failure():
+    m=probe();r={'stages':[{'stage':'export','status':'failed'}], 'export_failure':{'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID'}}
+    state={};error=m.ExportTaskFailure('failed','ONNX_MODEL_INVALID')
+    with m.continue_after_export_failure(r,state,lambda:True):raise error
+    assert state['error'] is error
+    assert r['stages'][0]['status']=='failed'
+    for verify in (lambda:False,lambda:None):
+        with pytest.raises(m.ExportTaskFailure) as caught:
+            with m.continue_after_export_failure(r,{},verify):raise error
+        assert caught.value is error
+
+
+def test_drill_continuation_never_swallows_other_failures():
+    import subprocess
+    m=probe();r={'stages':[{'stage':'export','status':'failed'}], 'export_failure':{'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID'}}
+    for error in (AssertionError(),ValueError(),subprocess.TimeoutExpired('private',1),m.ExportTaskFailure('failed','INPUT_CHANGED')):
+        with pytest.raises(type(error)):
+            with m.continue_after_export_failure(r,{},lambda:pytest.fail('must not verify')):raise error
+    r['export_failure']['phase']='export_worker'
+    with pytest.raises(m.ExportTaskFailure):
+        with m.continue_after_export_failure(r,{},lambda:pytest.fail('must not verify')):raise m.ExportTaskFailure('failed','ONNX_MODEL_INVALID')
+
+
+def test_drill_continuation_input_validation_failure_propagates():
+    m=probe();r={'stages':[{'stage':'export','status':'failed'}], 'export_failure':{'phase':'export_result','error':'assertion','task_state':'failed','task_code':'ONNX_MODEL_INVALID'}}
+    def changed():raise ValueError('input changed')
+    with pytest.raises(ValueError):
+        with m.continue_after_export_failure(r,{},changed):raise m.ExportTaskFailure('failed','ONNX_MODEL_INVALID')
+
+
+def test_drill_source_requires_receipt_lineage_runtime_and_local_hash(tmp_path,monkeypatch):
+    import json
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from app import export_inputs,export_assets
+    from app.training_assets import digest_json
+    m=probe();monkeypatch.setattr(m,'PRIVATE',tmp_path)
+    path=tmp_path/'trained.pt';path.write_bytes(b'synthetic checkpoint')
+    pt={'id':'pt','kind':'pt_best','job_id':'training','size_bytes':path.stat().st_size,'sha256':m.digest(path)}
+    frozen={'project_id':'project','source_artifact_id':'pt','source_job_id':'training','source_sha256':pt['sha256'],'source_size_bytes':pt['size_bytes'],'runtime_binding':digest_json({})}
+    row={'id':'export','project_id':'project','run_id':'run','kind':'export_onnx','status':'failed','error_code':'ONNX_MODEL_INVALID','input_snapshot_json':json.dumps(frozen)}
+    receipt={'job_id':'export','run_id':'run','tree_exited':True,'reason':'completed','exit_code':74,'started':True,'logs_complete':True}
+    @contextmanager
+    def transaction():yield SimpleNamespace(execute=lambda *args:SimpleNamespace(fetchone=lambda:row))
+    calls=[]
+    def verify(value):calls.append(value);return frozen
+    monkeypatch.setattr(export_inputs,'verify_input',verify)
+    monkeypatch.setattr(export_assets,'runtime_identity',lambda:{})
+    def check():return m.verify_drill_source('export',pt,'project','training',transaction,lambda *a,**k:receipt)
+    assert check() and calls
+    for key,bad in [('source_job_id','other'),('source_artifact_id','other'),('source_sha256','other'),('runtime_binding','other')]:
+        original=frozen[key];frozen[key]=bad;assert not check();frozen[key]=original
+    receipt['tree_exited']=False;calls.clear();assert not check() and not calls
+    receipt['tree_exited']=True
+    path.write_bytes(b'changed');assert not check()
+    path.unlink();other=tmp_path/'other';other.write_bytes(b'synthetic checkpoint');path.symlink_to(other)
+    assert not check()

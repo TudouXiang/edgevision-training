@@ -70,6 +70,48 @@ def export_step(result,phase):
         raise
 
 
+@contextmanager
+def continue_after_export_failure(result, continuation, verify):
+    """Retain a drained model failure while collecting independent recovery evidence."""
+    try:
+        yield
+    except ExportTaskFailure as error:
+        failure=result.get('export_failure',{})
+        export=next((s for s in result['stages'] if s['stage']=='export'),{})
+        if (error.state!='failed' or error.code!='ONNX_MODEL_INVALID'
+                or export.get('status')!='failed'
+                or any(failure.get(k)!=v for k,v in {
+                    'phase':'export_result','error':'assertion','task_state':'failed',
+                    'task_code':'ONNX_MODEL_INVALID'}.items())):
+            raise
+        if verify() is not True:
+            raise
+        continuation['error']=error
+
+
+def verify_drill_source(identity, pt, project, training, transaction, drain_receipt):
+    """Recheck actual receipt, frozen lineage and both source copies, not diagnostics."""
+    from app.export_inputs import verify_input
+    from app.export_assets import runtime_identity
+    from app.training_assets import digest_json
+    from app.run_files import fingerprint
+    with transaction() as connection:
+        found=connection.execute('SELECT * FROM jobs WHERE id=?',(identity,)).fetchone()
+    if found is None:return False
+    row=dict(found)
+    if row['id']!=identity or row['project_id']!=project:return False
+    if not completed_export_drain(row,drain_receipt(row,wait_seconds=20)):return False
+    frozen=verify_input(json.loads(row['input_snapshot_json']))
+    if (pt['kind']!='pt_best' or pt['job_id']!=training
+            or frozen['project_id']!=project or frozen['source_artifact_id']!=pt['id'] or frozen['source_job_id']!=training
+            or frozen['source_sha256']!=pt['sha256'] or frozen['source_size_bytes']!=pt['size_bytes']
+            or frozen['runtime_binding']!=digest_json(runtime_identity())):
+        return False
+    local=PRIVATE/'trained.pt'
+    if local.is_symlink() or not local.is_file():return False
+    return fingerprint(local)==(pt['size_bytes'],pt['sha256'])
+
+
 def completed_export_drain(row,receipt):
     return (type(receipt) is dict and row.get('kind')=='export_onnx' and row.get('status')=='failed'
             and row.get('error_code')=='ONNX_MODEL_INVALID' and bool(row.get('run_id'))
@@ -238,63 +280,66 @@ def run(result,save,log):
             pt=next(a for a in artifacts() if a['kind']=='pt_best' and a['job_id']==training)
             download(pt,PRIVATE/'trained.pt')
             (PRIVATE/'validation-metrics.json').write_text(client.get(f'/api/v1/jobs/{training}/metrics').text)
-        with stage('export'):
-            with export_step(result,'export_probe'):
-                command(['-m','app.export_probe'],log,180)
-            with export_step(result,'export_submit'):
-                export=submit({'kind':'export_onnx','params':{'model_artifact_id':pt['id'],'imgsz':640,'batch':1,'precision':'fp32'}},'real-export')
-            with export_step(result,'export_worker'):
-                once(180)
-            with export_step(result,'export_result'):
-                from app.run_files import run_directory
-                task=job(export)
-                require_export_success(result,task,export_diagnostic(export,task,transaction,drain_receipt,run_directory))
-                onnx=next(a for a in artifacts() if a['kind']=='onnx' and a['job_id']==export)
-            with export_step(result,'export_download'):
-                download(onnx,PRIVATE/'trained.onnx')
-            with export_step(result,'export_lineage'):
-                assert onnx['metadata']['provenance']['source_sha256']==pt['sha256']
-            with export_step(result,'inference_probe'):
-                command(['-m','app.inference_probe','--onnx-artifact-id',onnx['id']],log,180)
-        measured={};series={}
-        with stage('evaluation'):
-            for backend in ('pt','onnx'):
-                command(['-I',str(ROOT/'scripts/real_cpu_measure.py'),backend],log,180)
-                measured[backend]=json.loads((PRIVATE/f'measure-{backend}/result.json').read_text())
-                for key,values in measured[backend]['series'].items():series[f'{backend}_{key}']=values
-            from array import array
-            maximum=0.;ratio=0.
-            for i in range(20):
-                assert match_detections(measured['pt']['detections'][i],measured['onnx']['detections'][i])
-                pair=[]
+        continuation={}
+        with continue_after_export_failure(result,continuation,lambda:verify_drill_source(export,pt,project,training,transaction,drain_receipt)):
+            with stage('export'):
+                with export_step(result,'export_probe'):
+                    command(['-m','app.export_probe'],log,180)
+                with export_step(result,'export_submit'):
+                    export=submit({'kind':'export_onnx','params':{'model_artifact_id':pt['id'],'imgsz':640,'batch':1,'precision':'fp32'}},'real-export')
+                with export_step(result,'export_worker'):
+                    once(180)
+                with export_step(result,'export_result'):
+                    from app.run_files import run_directory
+                    task=job(export)
+                    require_export_success(result,task,export_diagnostic(export,task,transaction,drain_receipt,run_directory))
+                    onnx=next(a for a in artifacts() if a['kind']=='onnx' and a['job_id']==export)
+                with export_step(result,'export_download'):
+                    download(onnx,PRIVATE/'trained.onnx')
+                with export_step(result,'export_lineage'):
+                    assert onnx['metadata']['provenance']['source_sha256']==pt['sha256']
+                with export_step(result,'inference_probe'):
+                    command(['-m','app.inference_probe','--onnx-artifact-id',onnx['id']],log,180)
+        if 'error' not in continuation:
+            measured={};series={}
+            with stage('evaluation'):
                 for backend in ('pt','onnx'):
-                    values=array('f');values.frombytes((PRIVATE/f'measure-{backend}/{i:02}.f32le').read_bytes())
-                    if sys.byteorder!='little':values.byteswap()
-                    pair.append(values)
-                assert len(pair[0])==len(pair[1])==6*8400
-                for a,b in zip(*pair):
-                    import math
-                    assert math.isfinite(a) and math.isfinite(b)
-                    error=abs(a-b);maximum=max(maximum,error);ratio=max(ratio,error/(1e-4+1e-4*abs(a)))
-                assert ratio<=1
-            (PRIVATE/'numeric-comparison.json').write_text(json.dumps({'max_absolute_error':maximum,'max_tolerance_ratio':ratio,'atol':1e-4,'rtol':1e-4}))
-            result['evaluation']={'protocol':'single-head-p025-iou050-v1',**{b:metric.evaluate(truth,measured[b]['detections']) for b in ('pt','onnx')}}
-            result['evaluation']['comparison']={'images':20,'elements':1008000,'max_absolute_error':maximum,'max_tolerance_ratio':ratio,'atol':1e-4,'rtol':1e-4,'detections_matched':True}
-        with stage('timings'):
-            for backend,source in (('pt',pt),('onnx',onnx)):
-                values=[]
-                for index,sample in enumerate(samples):
-                    raw=(PRIVATE/'test-images'/f"{sample['name']}.jpg").read_bytes()
-                    began=time.perf_counter()
-                    image=response(client.post(f'/api/v1/projects/{project}/images',headers=headers(),files={'file':('test.jpg',raw,'image/jpeg')}),201)
-                    task=submit({'kind':'infer','params':{'model_artifact_id':source['id'],'image_artifact_id':image['id'],'backend':backend,'confidence':.25,'iou':.45}},f'http-{backend}-{index}')
-                    once(60);assert job(task)['state']=='succeeded'
-                    artifact=next(a for a in artifacts() if a['kind']=='inference_result' and a['job_id']==task)
-                    output=response(client.get('/api/v1/inferences/'+artifact['id']))
-                    values.append((time.perf_counter()-began)*1000)
-                    assert match_detections(output['detections'],measured[backend]['detections'][index])
-                series[f'{backend}_http']=values
-            result['measurements']=report.measurements(series,{b:measured[b]['model_load_ms'] for b in ('pt','onnx')})
+                    command(['-I',str(ROOT/'scripts/real_cpu_measure.py'),backend],log,180)
+                    measured[backend]=json.loads((PRIVATE/f'measure-{backend}/result.json').read_text())
+                    for key,values in measured[backend]['series'].items():series[f'{backend}_{key}']=values
+                from array import array
+                maximum=0.;ratio=0.
+                for i in range(20):
+                    assert match_detections(measured['pt']['detections'][i],measured['onnx']['detections'][i])
+                    pair=[]
+                    for backend in ('pt','onnx'):
+                        values=array('f');values.frombytes((PRIVATE/f'measure-{backend}/{i:02}.f32le').read_bytes())
+                        if sys.byteorder!='little':values.byteswap()
+                        pair.append(values)
+                    assert len(pair[0])==len(pair[1])==6*8400
+                    for a,b in zip(*pair):
+                        import math
+                        assert math.isfinite(a) and math.isfinite(b)
+                        error=abs(a-b);maximum=max(maximum,error);ratio=max(ratio,error/(1e-4+1e-4*abs(a)))
+                    assert ratio<=1
+                (PRIVATE/'numeric-comparison.json').write_text(json.dumps({'max_absolute_error':maximum,'max_tolerance_ratio':ratio,'atol':1e-4,'rtol':1e-4}))
+                result['evaluation']={'protocol':'single-head-p025-iou050-v1',**{b:metric.evaluate(truth,measured[b]['detections']) for b in ('pt','onnx')}}
+                result['evaluation']['comparison']={'images':20,'elements':1008000,'max_absolute_error':maximum,'max_tolerance_ratio':ratio,'atol':1e-4,'rtol':1e-4,'detections_matched':True}
+            with stage('timings'):
+                for backend,source in (('pt',pt),('onnx',onnx)):
+                    values=[]
+                    for index,sample in enumerate(samples):
+                        raw=(PRIVATE/'test-images'/f"{sample['name']}.jpg").read_bytes()
+                        began=time.perf_counter()
+                        image=response(client.post(f'/api/v1/projects/{project}/images',headers=headers(),files={'file':('test.jpg',raw,'image/jpeg')}),201)
+                        task=submit({'kind':'infer','params':{'model_artifact_id':source['id'],'image_artifact_id':image['id'],'backend':backend,'confidence':.25,'iou':.45}},f'http-{backend}-{index}')
+                        once(60);assert job(task)['state']=='succeeded'
+                        artifact=next(a for a in artifacts() if a['kind']=='inference_result' and a['job_id']==task)
+                        output=response(client.get('/api/v1/inferences/'+artifact['id']))
+                        values.append((time.perf_counter()-began)*1000)
+                        assert match_detections(output['detections'],measured[backend]['detections'][index])
+                    series[f'{backend}_http']=values
+                result['measurements']=report.measurements(series,{b:measured[b]['model_load_ms'] for b in ('pt','onnx')})
         for mode in ('cancel','worker_recovery'):
             with stage(mode):
                 fault_train={**train,'params':{**train['params'],'epochs':2,'experiment_name':'fault drill after first epoch'}}
@@ -342,6 +387,7 @@ def run(result,save,log):
                 value=client.get('/api/v1/artifacts/'+artifact['id']+'/download')
                 verify_download(artifact,value)
         completed=True
+        if 'error' in continuation:raise continuation['error']
     finally:
         if client is not None:client.close()
         def verify_settled():

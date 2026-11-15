@@ -25,6 +25,8 @@ def execute(job_id: str, run_id: str) -> int:
         from .inference_probe import probe_child as run
     elif kind == "export_probe":
         from .export_probe import probe_child as run
+    elif kind == "real_export_diagnostic":
+        from .real_export_diagnostic import probe_child as run
     elif kind == "ml_probe":
         from .training_probe import probe_child as run
     elif kind != "dataset_check":

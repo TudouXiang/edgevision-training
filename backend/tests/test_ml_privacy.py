@@ -60,8 +60,8 @@ def test_rebuild_workflow_never_automatically_executes_ml():
     from pathlib import Path
     import yaml
     workflow = yaml.load((Path(__file__).resolve().parents[2]/'.github/workflows/t020-ci.yml').read_text(), Loader=yaml.BaseLoader)
-    assert workflow['jobs']['linux-training']['if'] == "${{ github.event_name == 'workflow_dispatch' && inputs.run_isolated_ml == true && inputs.run_real_cpu != true }}"
-    assert workflow['jobs']['linux-real-cpu']['if'] == "${{ github.event_name == 'workflow_dispatch' && inputs.run_real_cpu == true && inputs.run_isolated_ml != true }}"
+    assert workflow['jobs']['linux-training']['if'] == "${{ github.event_name == 'workflow_dispatch' && inputs.run_isolated_ml == true && inputs.run_real_cpu != true && inputs.run_export_compare != true }}"
+    assert workflow['jobs']['linux-real-cpu']['if'] == "${{ github.event_name == 'workflow_dispatch' && inputs.run_real_cpu == true && inputs.run_isolated_ml != true && inputs.run_export_compare != true }}"
     assert workflow['on']['workflow_dispatch']['inputs']['run_isolated_ml']['default'] == 'false'
     for name in ('checks', 'windows-process'):
         assert workflow['jobs'][name]['env']['EDGEVISION_ML_POLICY_ROOT'] == ''
