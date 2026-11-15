@@ -170,7 +170,7 @@ def reject_overrides(environment: dict[str, str]) -> None:
 
 
 def verify_hosted_workflow(environment: dict[str, str], expected_commit: str, *, profile: str = 'legacy') -> None:
-    require(profile in ('legacy', 'real_cpu_v1', 'export_compare_v1'))
+    require(profile in ('legacy', 'real_cpu_v1', 'export_compare_v1', 'pt_eval_v1'))
     # Accident-prevention gate, not authentication against a malicious owner who
     # can forge env vars or edit this program. Trust the reviewed hosted workflow.
     require(bool(re.fullmatch(r'[a-f0-9]{40}', expected_commit)))
@@ -178,7 +178,7 @@ def verify_hosted_workflow(environment: dict[str, str], expected_commit: str, *,
     require(environment.get('RUNNER_ENVIRONMENT') == 'github-hosted')
     require(environment.get('GITHUB_EVENT_NAME') == 'workflow_dispatch')
     require(environment.get('GITHUB_WORKFLOW') == 'EdgeVision feature checks')
-    flag = {'legacy':'EDGEVISION_RUN_ISOLATED_ML','real_cpu_v1':'EDGEVISION_RUN_REAL_CPU','export_compare_v1':'EDGEVISION_RUN_EXPORT_COMPARE'}[profile]
+    flag = {'legacy':'EDGEVISION_RUN_ISOLATED_ML','real_cpu_v1':'EDGEVISION_RUN_REAL_CPU','export_compare_v1':'EDGEVISION_RUN_EXPORT_COMPARE','pt_eval_v1':'EDGEVISION_RUN_PT_EVAL'}[profile]
     require(environment.get(flag) == 'true')
     require(environment.get('GITHUB_SHA') == expected_commit)
     require(environment.get('GITHUB_WORKFLOW_SHA') == expected_commit)
@@ -359,8 +359,8 @@ def verify_owned(container: dict, name: str, token: str, image: str) -> None:
 
 def verify_container(container: dict, name: str, token: str, image: str, host_netns: str,
                      *, exited: bool = False, profile: str = 'legacy') -> None:
-    require(profile in ('legacy', 'real_cpu_v1', 'export_compare_v1'))
-    entry = {'legacy':ENTRY,'real_cpu_v1':'/opt/edgevision/scripts/real_cpu_entry.py','export_compare_v1':'/opt/edgevision/scripts/export_compare_entry.py'}[profile]
+    require(profile in ('legacy', 'real_cpu_v1', 'export_compare_v1', 'pt_eval_v1'))
+    entry = {'legacy':ENTRY,'real_cpu_v1':'/opt/edgevision/scripts/real_cpu_entry.py','export_compare_v1':'/opt/edgevision/scripts/export_compare_entry.py','pt_eval_v1':'/opt/edgevision/scripts/pt_eval_entry.py'}[profile]
     verify_owned(container, name, token, image)
     config, host, state = container['Config'], container['HostConfig'], container['State']
     args = ['-I', '-S', entry, '--host-netns', host_netns]

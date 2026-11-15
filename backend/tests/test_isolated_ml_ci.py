@@ -339,7 +339,7 @@ def test_workflow_dispatch_gate_and_fixed_budget_are_explicit():
     assert 'workflow_dispatch:' in workflow
     assert 'run_isolated_ml:' in workflow and 'default: false' in workflow and 'type: boolean' in workflow
     job = workflow.split('  linux-training:\n')[1]
-    assert "if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_isolated_ml == true && inputs.run_real_cpu != true && inputs.run_export_compare != true }}" in job
+    assert "if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_isolated_ml == true && inputs.run_real_cpu != true && inputs.run_export_compare != true && inputs.run_pt_eval != true }}" in job
     assert 'timeout-minutes: 20' in job and 'ubuntu-24.04' in job
     assert 'scripts/install_ml.py' not in job and 'playwright install' not in job
     assert 'summary.json' in job and 'cache-to' not in job and 'docker push' not in job
