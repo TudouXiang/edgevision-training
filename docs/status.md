@@ -1,3 +1,11 @@
+# 最新已核验的 main CI 基线（2026-11-15 UTC）
+
+精确提交 `694ffd510e7ec2f1c993d5d5ab74533f494c266f` 的 GitHub Actions [run #85](https://github.com/TudouXiang/edgevision-training/actions/runs/43695951409) 成功：`checks`、`linux-training` 和 `windows-process` 均 success。Linux 隔离摘要 schema 5 的 `isolation`、`dependency_check`、`training_http`、`export_http`、`onnx_policy`、`training_policy`、`browser_delivery`、`inference_http`、`inference_policy`、`inference_browser`、`package_http`、`package_browser` 十二阶段全部 passed；[完整执行边界与产物](evidence/main-694ffd-ci-2026-11-15.md)。
+
+该 run 只验证提交 `694ffd5`，不会验证此状态文档后续提交。训练链路为隔离 Linux CPU 上固定 YOLO11n 与合成数据的小规模工程烟测，不是 Oxford 真实模型导出、正式精度/性能、Windows ML、GPU/NPU 或整项目验收。此前 Oxford 子集严格 ONNX 数值门禁失败仍有效；没有新增 accepted 真实数据 ONNX 产物。run #85 的 `linux-real-cpu`、`linux-export-compare`、`linux-pt-eval` 按互斥 profile 跳过。用户机器部署状态不由 GitHub CI 更新。
+
+下方状态条目保留各自源码和日期；在本节范围内，旧的 main 提交指针不是本次最新 CI 基线。
+
 # 最新集成 · 项目导航与 PT 真实测试集测量（2026-11-15 UTC）
 
 保留 main `eeb65ce` 已合入的项目工作台/管理区导航，不覆盖 UI 改动；本次增量加入独立 PT 评估及 `/proc` 退出竞态防护。普通源码 CI [#79](https://github.com/TudouXiang/edgevision-training/actions/runs/43672056388) 与显式隔离 [#80](https://github.com/TudouXiang/edgevision-training/actions/runs/43673168097) 全部选定任务通过。
