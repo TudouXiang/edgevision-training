@@ -24,11 +24,11 @@
 - Atomic sample statistics and outcome keep runtime-error suffix null.
 
 ## Tasks
-- [ ] Implement strict handoff helper and A/D native child in isolated worktree with synthetic failure tests.
-- [ ] Implement schema3 report/metrics and coordinator handoff freeze/verify, adapt synthetic tests.
-- [ ] Integrate changes without overwriting work, independent review and frozen full aggregate.
-- [ ] Safe feature push, wait ordinary CI, dispatch one exact-SHA diagnostic.
-- [ ] Preserve evidence. Do not replace product reference based on proximity alone. If no deterministic repair is demonstrated, stop backend experiments and continue other delivery gates.
+- [x] Implement strict handoff helper and A/D native child in isolated worktree with synthetic failure tests.
+- [x] Implement schema3 report/metrics and coordinator handoff freeze/verify, adapt synthetic tests.
+- [x] Integrate changes without overwriting work, independent review and frozen full aggregate.
+- [x] Safe feature push, wait ordinary CI, dispatch one exact-SHA diagnostic.
+- [x] Preserve evidence. Do not replace product reference based on proximity alone. If no deterministic repair is demonstrated, stop backend experiments and continue other delivery gates.
 
 ## Implementation ledger
 
@@ -49,3 +49,8 @@
 - Frozen full `python scripts/dev.py check` exit0: 1056 backend passed,14 native
   skipped,312 warnings (391.38s);157 frontend passed; typecheck/build and generated
   contract parity passed. This is not native A/D validation.
+
+- #73 ordinary CI success; #74 A/D safely collected all observations but found no
+  compliant repair. Backend scanning stopped. #75 existing fixed engineering
+  profile passed all12 native stages plus ordinary/Windows checks. This is not
+  an Oxford-model acceptance. Evidence and remaining delivery limits retained.

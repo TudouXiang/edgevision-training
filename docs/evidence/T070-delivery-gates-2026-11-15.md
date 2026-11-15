@@ -47,3 +47,15 @@ product ML adapter supports the fixed Linux CPU environment only.
 
 Whole-project acceptance is still open. No line above upgrades Windows ML, CUDA,
 RKNN/NPU, formal accuracy/latency or real-data export to passed.
+
+## Final control and administrator update
+
+[#74 final A/D control](T070-final-backend-control-2026-11-15.md) completed safely but
+did not resolve numerical acceptance. Backend scans are stopped; strict export
+gate remains unchanged. XiaoHu deployment read-only recheck found one active
+administrator in its own database and both loopback HTTP endpoints returned200.
+No password field was read or used; this is not a password verification.
+
+[#75 engineering baseline](T070-final-backend-control-2026-11-15.md) revalidated all12
+existing Linux CPU E/I/P stages at8c83441; ordinary and Windows jobs passed. This
+updates the engineering baseline only, not real-data export/formal accuracy/GPU.

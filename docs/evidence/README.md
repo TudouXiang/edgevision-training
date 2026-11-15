@@ -25,6 +25,7 @@ T060 的计划、源码检查和普通 CI 不能代替真实模型验收；E / I
 
 - [真实数据与取消/恢复演练](T070-real-cpu-diagnostic-2026-11-15.md)
 - [数值分组诊断](T070-export-error-groups-2026-11-15.md)
+- [最终固定后端对照：无合规修复](T070-final-backend-control-2026-11-15.md)
 - [交付闸门更新](T070-delivery-gates-2026-11-15.md)
 
 ## 专项记录
