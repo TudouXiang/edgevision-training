@@ -30,6 +30,7 @@ T060 的计划、源码检查和普通 CI 不能代替真实模型验收；E / I
 
 ## 专项记录
 
+- [main 694ffd5 的精确 CI 基线与范围](main-694ffd-ci-2026-11-15.md)：run #85 三个选定 job success；只限固定 Linux CPU/合成数据 smoke。
 - [T060 依赖计划](T060-rebuild-dependency-plan.md)、[隔离 CI 计划](T060-isolated-ci-plan-2026-11-04.md)：区分方案与实际执行。
 - [联网准备子进程修正](T060-preparation-bootstrap-2026-11-05.md)：源码修正与聚焦 / 整合回归边界。
 - [浏览器证据计数](T060-browser-evidence-counts-2026-11-04.md)：区分实际执行、跳过、未运行和重试。
