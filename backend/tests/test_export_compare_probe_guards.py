@@ -30,7 +30,7 @@ def test_bound_completed_receipt_only():
 
 def test_proof_read_rejects_link_oversize_duplicate(tmp_path):
     m=probe();p=tmp_path/'proof.json'
-    for raw in ('x'*4097,'{"schema_version":1,"schema_version":1}'):
+    for raw in ('x'*8193,'{"schema_version":1,"schema_version":1}'):
         p.write_text(raw)
         with pytest.raises(ValueError):m.read_proof(p,'A')
     p.unlink();p.symlink_to(tmp_path/'other')
@@ -43,7 +43,9 @@ def test_valid_complete_failed_observation_is_not_product_pass(tmp_path):
     checks={name:True for name in report.CHECKS}
     checks['reference_ort_match']={name:False for name in report.TENSORS}
     checks['fused_reference_match']=None
-    proof={'schema_version':1,'arm':'A','status':'failed','checks':checks,'failure_code':'ONNX_MISMATCH'}
+    proof={'schema_version':2,'arm':'A','status':'failed','checks':checks,'failure_code':'ONNX_MISMATCH'}
+    from test_export_compare_report import with_metrics
+    with_metrics(proof)
     p=tmp_path/'proof.json';p.write_text(json.dumps(proof))
     assert m.read_proof(p,'A')==proof
     assert report.observed(proof)

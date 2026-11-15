@@ -39,8 +39,8 @@ def main(argv=None):
         finally:
             path=private/'compare-receipt.json'
             if path.is_symlink() or not path.is_file():raise ValueError('receipt missing')
-            with path.open('rb') as source:raw=source.read(16385)
-            if len(raw)>16384:raise ValueError('receipt size')
+            with path.open('rb') as source:raw=source.read(32769)
+            if len(raw)>32768:raise ValueError('receipt size')
             result=report.validate(raw.decode('utf-8'))
     except BaseException:
         result['status']='failed'

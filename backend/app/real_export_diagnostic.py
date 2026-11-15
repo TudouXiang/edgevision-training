@@ -13,6 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = '/opt/edgevision/private/real-platform'
 PROFILE = 'v1'
+_spec = importlib.util.spec_from_file_location('export_compare_metrics', ROOT / 'scripts' / 'export_compare_metrics.py')
+metrics = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(metrics)
 ARMS = ('A', 'B', 'C')
 SAMPLES = ('zeros', 'gradient', 'pattern')
 FAILURE_CODES = ('POLICY_FAILED', 'SOURCE_INVALID', 'GRAPH_INVALID', 'PT_REPEAT_MISMATCH', 'FUSED_MISMATCH', 'ONNX_MISMATCH', 'SOURCE_CHANGED', 'RUNTIME_FAILED', 'UNKNOWN')
@@ -56,7 +58,7 @@ class DiagnosticFailure(Exception):
 
 def empty_proof(arm):
     arm_settings(arm)
-    return {'schema_version': 1, 'arm': arm, 'status': 'failed',
+    return {'schema_version': 2, 'metrics': metrics.empty_matrix(arm), 'arm': arm, 'status': 'failed',
         'checks': {'source_bn': None, 'onnx_batchnorm': None,
             'pt_repeat_pre': None, 'pt_repeat_post': None, 'source_unchanged': None,
             'network_unchanged': None,
@@ -66,9 +68,9 @@ def empty_proof(arm):
 
 
 def validate_proof(value):
-    if type(value) is not dict or set(value) != {'schema_version', 'arm', 'status', 'checks', 'failure_code'}:
+    if type(value) is not dict or set(value) != {'schema_version', 'arm', 'status', 'checks', 'failure_code', 'metrics'}:
         raise ValueError('diagnostic proof schema invalid')
-    if type(value['schema_version']) is not int or value['schema_version'] != 1:
+    if type(value['schema_version']) is not int or value['schema_version'] != 2:
         raise ValueError('diagnostic proof version invalid')
     settings = arm_settings(value['arm'])
     if value['status'] not in ('passed', 'failed'):
@@ -103,6 +105,9 @@ def validate_proof(value):
             raise ValueError('incomplete or failed proof cannot pass')
     elif type(value['failure_code']) is not str:
         raise ValueError('failed proof needs a closed failure code')
+    metrics.validate_matrix(value['metrics'], value['arm'], checks)
+    if value['status'] == 'passed' and not metrics.complete(value['metrics'], value['arm']):
+        raise ValueError('numeric observations incomplete')
     return value
 
 
@@ -151,18 +156,28 @@ def _network_unchanged(torch, network, before):
                and torch.equal(before[key][2], after[key][2]) for key in before)
 
 
+def compare_observation(measure, compare, mismatch_type):
+    """Return one atomic observation only after a completed comparison."""
+    statistics = measure()
+    try:
+        compare()
+    except mismatch_type:
+        return statistics, False
+    return statistics, True
+
+
 def collect_samples(compare_one, mismatch_type):
     """Retain all fixed comparisons after mismatches, but not runtime failures."""
     results = {name: None for name in SAMPLES}
     for name in SAMPLES:
         try:
-            compare_one(name)
+            matched = compare_one(name)
         except mismatch_type:
             results[name] = False
         except Exception:
             return results, True
         else:
-            results[name] = True
+            results[name] = matched is not False
     return results, False
 
 
@@ -274,10 +289,11 @@ def probe_child(job_id, run_id):
             fused_outputs = _outputs(torch, np, export_network, tensors, classes)
             fused = True
             for name in SAMPLES:
-                try:
-                    compare_arrays(np, references[name], fused_outputs[name], name)
-                except ExportGraphError:
-                    fused = False
+                statistics, matched = compare_observation(
+                    lambda: metrics.measure_arrays(np, references[name], fused_outputs[name]),
+                    lambda: compare_arrays(np, references[name], fused_outputs[name], name), ExportGraphError)
+                proof['metrics']['original_fused'][name] = statistics
+                fused = fused and matched
             proof['checks']['fused_reference_match'] = fused
 
         # Snapshot the actual network handed to torch.onnx.export, not the original
@@ -315,7 +331,13 @@ def probe_child(job_id, run_id):
         def compare_one(name):
             outputs = session.run(['output0'], {'images': tensors[name]})
             if len(outputs) != 1: raise ValueError('ORT output schema invalid')
-            compare_arrays(np, references[name], outputs[0], name)
+            statistics, matched = compare_observation(
+                lambda: (metrics.measure_arrays(np, references[name], outputs[0]),
+                         metrics.measure_arrays(np, fused_outputs[name], outputs[0]) if arm == 'C' else None),
+                lambda: compare_arrays(np, references[name], outputs[0], name), ExportGraphError)
+            proof['metrics']['original_ort'][name] = statistics[0]
+            if arm == 'C': proof['metrics']['fused_ort'][name] = statistics[1]
+            return matched
         # Comparison mismatches are false but do not short-circuit the other two
         # inputs. Runtime/protocol errors stay null and preserve only the prefix.
         matches, incomplete_runtime = collect_samples(compare_one, ExportGraphError)

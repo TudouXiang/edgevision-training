@@ -46,8 +46,8 @@ def read_proof(path,arm):
     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
     with os.fdopen(fd,'rb') as source:
         info=os.fstat(source.fileno())
-        if not stat.S_ISREG(info.st_mode) or not 0<info.st_size<=4096:raise ValueError('proof type or size')
-        raw=source.read(4097)
+        if not stat.S_ISREG(info.st_mode) or not 0<info.st_size<=8192:raise ValueError('proof type or size')
+        raw=source.read(8193)
     if len(raw)!=info.st_size:raise ValueError('proof changed')
     proof=report.validate_proof(json.loads(raw,object_pairs_hook=report.unique))
     if proof['arm']!=arm:raise ValueError('proof arm')

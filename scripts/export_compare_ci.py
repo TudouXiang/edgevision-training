@@ -63,7 +63,7 @@ class RealRun(base.IsolatedRun):
         try:
             output = self.commands.docker(['start', '--attach', container['Id']], timeout=remaining())
         except base.PrivateCommandError as failure:
-            if failure.output.stat().st_size <= 16384:
+            if failure.output.stat().st_size <= 32768:
                 self.result = report.validate(failure.output.read_text())
             raise
         self.result = report.validate(output)

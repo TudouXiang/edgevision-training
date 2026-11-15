@@ -28,6 +28,7 @@ def runtime_identity():
     for name in ('export_assets.py', 'real_export_diagnostic.py', 'export_contract.py', 'export_errors.py', 'export_inputs.py', 'export_runtime.py', 'export_runner.py', 'export_probe.py', 'export_publication.py', 'export_service.py', 'export_download.py', 'training_download.py', 'training_inputs.py', 'training_service.py', 'worker.py', 'guardian.py', 'run_files.py', 'job_service.py', 'database.py', 'config.py', 'dataset_storage.py', 'process_identity.py', 'process_linux.py', 'process_windows.py'):
         value['adapter'][name] = fingerprint(Path(__file__).parent / name)[1]
     value['adapter']['task_process.py'] = fingerprint(Path(__file__).parent / 'task_process.py')[1]
+    value['adapter']['export_compare_metrics.py'] = fingerprint(Path(__file__).resolve().parents[2] / 'scripts' / 'export_compare_metrics.py')[1]
     value.update(delivery_lock_sha256=fingerprint(lock)[1], delivery_packages=packages)
     return value
 

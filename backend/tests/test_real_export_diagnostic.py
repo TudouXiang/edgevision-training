@@ -54,6 +54,8 @@ def test_proof_uses_null_for_unexecuted_and_requires_complete_pass():
         pt_repeat_post=True, source_unchanged=True, network_unchanged=True, fused_reference_match=True,
         reference_ort_match={'zeros':True,'gradient':True,'pattern':True})
     proof['status'] = 'passed'; proof['failure_code'] = None
+    from test_export_compare_report import with_metrics
+    with_metrics(proof)
     assert module.validate_proof(proof) is proof
 
 
@@ -63,6 +65,8 @@ def test_failed_comparison_proof_can_retain_all_three_samples():
     proof['checks'].update(source_bn=True, onnx_batchnorm=True, pt_repeat_pre=True,
         pt_repeat_post=True, source_unchanged=True, network_unchanged=True,
         reference_ort_match={'zeros':True,'gradient':False,'pattern':True})
+    from test_export_compare_report import with_metrics
+    with_metrics(proof)
     assert module.validate_proof(proof) is proof
     proof['checks']['reference_ort_match'].pop('pattern')
     with pytest.raises(ValueError): module.validate_proof(proof)
@@ -139,3 +143,30 @@ def test_swallowed_policy_failure_cannot_write_complete_proof(monkeypatch, tmp_p
     assert writes == []
     module.write_observations(tmp_path, proof, [])
     assert writes == [(tmp_path, proof)]
+
+
+def test_observation_does_not_publish_statistics_when_comparator_errors():
+    class Mismatch(Exception):pass
+    def error():raise RuntimeError('private failure')
+    with pytest.raises(RuntimeError):module.compare_observation(lambda:{'private':'stats'},error,Mismatch)
+    def mismatch():raise Mismatch()
+    assert module.compare_observation(lambda:{'closed':True},mismatch,Mismatch)==({'closed':True},False)
+    assert module.compare_observation(lambda:{'closed':True},lambda:None,Mismatch)==({'closed':True},True)
+
+
+def test_last_fused_sample_runtime_error_preserves_null_suffix():
+    class Mismatch(Exception):pass
+    proof=module.empty_proof('C')
+    from test_export_compare_report import with_metrics
+    completed=module.empty_proof('C');completed['checks']['fused_reference_match']=True
+    with_metrics(completed)
+    for sample in ('zeros','gradient'):
+        stats,match=module.compare_observation(lambda:completed['metrics']['original_fused'][sample],lambda:None,Mismatch)
+        proof['metrics']['original_fused'][sample]=stats
+    def fail():raise RuntimeError('private failure')
+    with pytest.raises(RuntimeError):
+        stats,match=module.compare_observation(lambda:completed['metrics']['original_fused']['pattern'],fail,Mismatch)
+        proof['metrics']['original_fused']['pattern']=stats
+    proof['failure_code']='RUNTIME_FAILED'
+    assert proof['metrics']['original_fused']['pattern'] is None
+    module.validate_proof(proof)
