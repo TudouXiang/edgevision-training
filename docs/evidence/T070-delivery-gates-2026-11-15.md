@@ -69,3 +69,20 @@ lineage verification passed. This supersedes the earlier PT accuracy NOT_RUN
 statement only for this exact fixed single-head protocol and fresh 1-epoch model.
 It is not mAP, formal quality acceptance or a latency study. ONNX accuracy/parity,
 GPU/NPU and overall project acceptance remain unverified or blocked as stated.
+
+## Integration-status correction (2026-11-15 UTC)
+
+The earlier statement that the `feat/t070-real-cpu` diagnostics were not integrated
+described the then-current `57bc2b5` baseline. It is superseded by the later main
+history: branch head `d1095723e5a1d6580a4c52f87c0a4f3911a7f0be` is an ancestor of
+code commit `694ffd510e7ec2f1c993d5d5ab74533f494c266f` ([compare](https://github.com/TudouXiang/edgevision-training/compare/d1095723e5a1d6580a4c52f87c0a4f3911a7f0be...694ffd510e7ec2f1c993d5d5ab74533f494c266f)); the fixed backend-control commit
+`8c83441256a1d5fccc56acdd24b0bfd75d57b89c` is also an ancestor of that main source
+([compare](https://github.com/TudouXiang/edgevision-training/compare/8c83441256a1d5fccc56acdd24b0bfd75d57b89c...694ffd510e7ec2f1c993d5d5ab74533f494c266f)). Main subsequently advanced to documentation-only merge `aa0a832e5d6f669c160f662fcba4d791232b0dc0`, whose parent is `694ffd5`.
+
+This corrects only the source-integration status. It does **not** mean the
+real-data ONNX issue was repaired or accepted: the Oxford-subset strict
+`compare_tolerance` failure remains, no accepted real-data ONNX artifact exists,
+and formal PT/ONNX accuracy/performance plus GPU/NPU validation remain unverified.
+Run #85 passed the fixed Linux CPU/synthetic engineering profile on `694ffd5`; it
+was not a real-data export test and did not run against the later documentation
+merge commit.
