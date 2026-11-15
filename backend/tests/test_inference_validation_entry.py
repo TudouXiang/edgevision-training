@@ -123,7 +123,7 @@ def test_browser_private_inputs_go_only_to_browser_environment(browser, monkeypa
     assert 'SECRET_SESSION' in private['EDGEVISION_E2E_INFERENCE_SESSION']
     assert 'EDGEVISION_E2E_ADMIN_PASSWORD' not in private
     assert private['EDGEVISION_E2E_INFERENCE_PROJECT_ID'] == 'project'
-    assert service['PLATFORM_DATA_ROOT'] == '/opt/edgevision/private/http'
+    assert Path(service['PLATFORM_DATA_ROOT']) == browser.DATA
     assert service['ORT_DISABLE_TELEMETRY'] == '1'
 
 
