@@ -26,6 +26,7 @@ export async function verifyExport(page: Page, projectId: string, trainingJobId:
   const sources: Artifact[] = inventory.items.filter((item: Artifact) => item.job_id === trainingJobId && item.validation_state === 'passed' && ['pt_best', 'pt_last'].includes(item.kind))
   expect(sources).toHaveLength(2)
   const source = sources.find(item => item.kind === 'pt_best')!
+  await page.getByRole('navigation', {name:'项目流程'}).getByRole('button', {name:'模型导出',exact:true}).click()
   const panel = page.locator('.export-panel')
   await panel.getByRole('button', { name: '刷新导出状态' }).click()
   await expect(panel.getByLabel('来源模型').locator('option', { hasText: source.id })).toHaveCount(1)

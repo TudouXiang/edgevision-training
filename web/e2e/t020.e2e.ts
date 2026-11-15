@@ -59,9 +59,12 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   await page.getByRole('button', { name: '登录', exact: true }).click()
   await expect(page.getByRole('heading', { name: '项目工作区' })).toBeVisible()
   await page.reload()
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '系统状态', exact: true }).click()
   await expect(page.getByText('数据库已就绪', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '项目工作区', exact: true }).click()
 
   const createUser = page.waitForResponse(response => response.url().endsWith('/api/v1/admin/users') && response.request().method() === 'POST')
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '管理', exact: true }).click()
   await page.getByLabel('用户名', { exact: true }).fill(user.username)
   await page.getByLabel('初始密码', { exact: true }).fill(user.password)
   await page.getByRole('button', { name: '创建用户' }).click()
@@ -69,6 +72,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   const userRow = page.locator('article.user-row').filter({ hasText: user.username })
   await expect(userRow).toContainText('账号已启用')
 
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '管理', exact: true }).click()
   await page.getByLabel('用户名', { exact: true }).fill(user.username)
   await page.getByLabel('初始密码', { exact: true }).fill(user.password)
   await page.getByRole('button', { name: '创建用户' }).click()
@@ -81,6 +85,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
     if (request.url().endsWith('/api/v1/projects') && request.method() === 'POST') projectPosts += 1
   })
   const createProject = page.waitForResponse(response => response.url().endsWith('/api/v1/projects') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: '项目工作区', exact: true }).click()
   await page.getByLabel('项目名称').fill(projectName)
   await page.getByLabel('描述', { exact: true }).fill(projectDescription)
   await page.getByRole('button', { name: '创建项目' }).evaluate((button: HTMLButtonElement) => { button.click(); button.click() })
@@ -115,6 +120,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
 
   // Keep a real owned input so this tests archive rejection, not missing-resource precedence.
   await page.getByLabel('所属项目').selectOption(createdProject.id)
+  await page.getByRole('navigation', {name:'项目流程'}).getByRole('button', {name:'数据集',exact:true}).click()
   await page.getByLabel('受控 YOLO ZIP').setInputFiles(required('EDGEVISION_E2E_DATASET_ZIP'))
   const datasetUpload = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${createdProject.id}/datasets`) && response.request().method() === 'POST')
   await page.getByRole('button', { name: '上传新快照' }).click()
@@ -125,6 +131,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   expect(archivedDataset.state).toBe('pending')
 
   const archiveResponse = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${createdProject.id}/archive`))
+  await page.getByRole('button', { name: '返回项目列表' }).click()
   await projectRow.getByRole('button', { name: '归档' }).click()
   expect((await archiveResponse).status()).toBe(200)
   await expect(projectRow).toContainText('已归档')
@@ -152,6 +159,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   })).status).toBe(404)
   expect((await sameOrigin(ordinarySession.page, `/projects/${createdProject.id}/archive`, { method: 'POST' })).status).toBe(404)
 
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '管理', exact: true }).click()
   await userRow.getByRole('button', { name: '禁用' }).click()
   await expect(userRow).toContainText('账号已禁用')
   await ordinarySession.page.reload()
@@ -173,6 +181,7 @@ test('real identity, administration, ownership and project lifecycle', async ({ 
   const beforeCookies = await currentSession.context.cookies(root)
   expect(beforeCookies.find(cookie => cookie.name === 'edgevision_session')?.httpOnly).toBe(true)
   expect(beforeCookies.find(cookie => cookie.name === 'edgevision_csrf')?.httpOnly).toBe(false)
+  await currentSession.page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '账号安全', exact: true }).click()
   await currentSession.page.getByLabel('当前密码').fill(`${user.password}-wrong`)
   await currentSession.page.getByLabel('新密码').fill(rotatedPassword)
   await currentSession.page.getByRole('button', { name: '修改密码' }).click()

@@ -29,7 +29,9 @@ async function sameOrigin(page: Page, path: string, method = 'GET', extraHeaders
 
 test('real bounded dataset upload creates immutable pending versions and archived projects disable upload', async ({ page }) => {
   await login(page)
+  await page.getByRole('navigation', { name: '工作区导航' }).getByRole('button', { name: '系统状态', exact: true }).click()
   await expect(page.getByText('数据集 · 可用', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '项目工作区', exact: true }).click()
 
   const projectName = `dataset-project-${Date.now()}`
   const projectResponse = page.waitForResponse(response => response.url().endsWith('/api/v1/projects') && response.request().method() === 'POST')
@@ -90,8 +92,10 @@ test('real bounded dataset upload creates immutable pending versions and archive
 
   const projectRow = page.locator('article.row-card').filter({ hasText: projectName }).filter({ has: page.getByRole('button', { name: '归档' }) })
   const archive = page.waitForResponse(response => response.url().endsWith(`/api/v1/projects/${project.id}/archive`))
+  await page.getByRole('button', { name: '返回项目列表' }).click()
   await projectRow.getByRole('button', { name: '归档' }).click()
   expect((await archive).status()).toBe(200)
+  await projectRow.getByRole('button', { name: '进入项目' }).click()
   await expect(page.getByText('归档项目只读，不能继续上传。')).toBeVisible()
   await expect(page.getByRole('button', { name: '上传新快照' })).toBeDisabled()
 })

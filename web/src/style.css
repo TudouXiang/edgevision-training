@@ -99,3 +99,12 @@ label { display: block; color: #485c57; font-size: 13px; font-weight: 650; }
 .dataset-actions a { color: #286d5e; font-size: 12px; }
 @media (max-width: 760px) { .job-row { flex-direction: column; align-items: stretch; } .dataset-actions { width: 100%; } }
 .job-pagination { margin-top: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+/* Keep workspace controls separate from project workflow and administrative tools. */
+.workspace-nav { display:flex; flex-wrap:wrap; gap:8px; max-width:1120px; margin:20px auto 0; padding:0 16px; }
+.workspace-nav button, .workflow-nav button { background:transparent; }
+.workspace-nav button[aria-pressed="true"], .workflow-nav button[aria-pressed="true"] { color:white; background:var(--green); border-color:var(--green); }
+.workflow-nav { display:flex; flex-wrap:wrap; gap:8px; padding-top:20px; margin-top:20px; border-top:1px solid var(--line); }
+.project-context h1 { margin:6px 0; font-size:25px; overflow-wrap:anywhere; }
+.project-context p, .project-context small { color:var(--muted); }
+.project-context .section-title { gap:16px; flex-wrap:wrap; }
+@media(max-width:760px) { .workspace-nav { margin-top:12px; } .workflow-nav button { flex:1 0 30%; } }

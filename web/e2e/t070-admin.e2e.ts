@@ -29,6 +29,7 @@ test('administrator reads another user task through real global listing while us
   const accepted=member.waitForResponse(r=>r.url().endsWith('/check')&&r.request().method()==='POST')
   await row.getByRole('button',{name:'开始校验'}).click(); const response=await accepted; expect(response.status()).toBe(202)
   const task=await response.json() as {job_id:string}
+  await page.getByRole('navigation', {name:'工作区导航'}).getByRole('button', {name:'管理',exact:true}).click()
   const panel=page.getByRole('region',{name:'管理员全局任务'})
   await panel.getByRole('button',{name:'刷新任务'}).click()
   const globalRow=panel.locator('article').filter({hasText:task.job_id}); await expect(globalRow).toContainText(created.body.id)
@@ -38,7 +39,7 @@ test('administrator reads another user task through real global listing while us
   await detail.getByRole('button',{name:'刷新详情'}).click(); await expect(detail).toContainText('succeeded')
   await expect(detail.getByLabel('全局任务日志')).toContainText('Dataset validation passed')
   await detail.getByRole('button',{name:'关闭详情'}).click(); await expect(detail).toHaveCount(0)
-  await page.reload(); await expect(panel.locator('article').filter({hasText:task.job_id})).toBeVisible()
+  await page.reload(); await page.getByRole('navigation', {name:'工作区导航'}).getByRole('button', {name:'管理',exact:true}).click(); await expect(panel.locator('article').filter({hasText:task.job_id})).toBeVisible()
   await page.setViewportSize({width:375,height:812}); expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
  } finally { await context.close() }
 })
