@@ -14,7 +14,7 @@ def boot_id() -> str | None:
 def linux_identity(pid: int) -> dict | None:
     try:
         text = Path(f"/proc/{pid}/stat").read_bytes()
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return None
     fields = text[text.rfind(b")") + 2:].split()
     return {"pid": pid, "start_ticks": int(fields[19]), "session": int(fields[3]), "ppid": int(fields[1]), "state": fields[0].decode("ascii")}

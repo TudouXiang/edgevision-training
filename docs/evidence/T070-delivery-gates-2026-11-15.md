@@ -59,3 +59,13 @@ No password field was read or used; this is not a password verification.
 [#75 engineering baseline](T070-final-backend-control-2026-11-15.md) revalidated all12
 existing Linux CPU E/I/P stages at8c83441; ordinary and Windows jobs passed. This
 updates the engineering baseline only, not real-data export/formal accuracy/GPU.
+
+## Independent PT evaluation update
+
+[PT-only experiment #80](T070-pt-only-evaluation-2026-11-15.md) now supplies a real,
+limited test-set measurement independent of the blocked ONNX export: 20 images,
+TP 5 / FP 63 / FN 15, precision 7.35%, recall 25%; six native stages and model
+lineage verification passed. This supersedes the earlier PT accuracy NOT_RUN
+statement only for this exact fixed single-head protocol and fresh 1-epoch model.
+It is not mAP, formal quality acceptance or a latency study. ONNX accuracy/parity,
+GPU/NPU and overall project acceptance remain unverified or blocked as stated.

@@ -1,3 +1,13 @@
+# 最新集成 · 项目导航与 PT 真实测试集测量（2026-11-15 UTC）
+
+保留 main `eeb65ce` 已合入的项目工作台/管理区导航，不覆盖 UI 改动；本次增量加入独立 PT 评估及 `/proc` 退出竞态防护。普通源码 CI [#79](https://github.com/TudouXiang/edgevision-training/actions/runs/43672056388) 与显式隔离 [#80](https://github.com/TudouXiang/edgevision-training/actions/runs/43673168097) 全部选定任务通过。
+
+[真实 PT 证据](evidence/T070-pt-only-evaluation-2026-11-15.md)：冻结的 20 张测试图，TP 5、FP 63、FN 15，precision 7.35%、recall 25%。这是新训练 1 epoch 模型的有限协议测量，分数偏低，不是 mAP 或模型质量验收。原生隔离、数据、依赖、训练、评估、清理及谱系校验均通过，不依赖 ONNX 导出。
+
+真实模型 ONNX 严格导出仍受阻，GPU/NPU、正式精度/性能研究及整体验收仍未完成。远端集成不会自动升级 PEC/XiaoHu 部署；机器运行状态以对应实测记录为准。以下为历史检查点，不将旧收据当作新版本验收。
+
+---
+
 # 当前交付代码 · T070 工程链路重验，真实数据导出限制保留（2026-11-15 UTC）
 
 本交付修订以 `8c83441` 产品代码为基线，后续只补证据文档。[#75](evidence/T070-final-backend-control-2026-11-15.md) 的十二阶段固定 Linux CPU 工程链路、普通 CI 与 Windows 进程回归均通过；这覆盖既有训练、导出、推理和独立源码包闭环，不代表任意模型可导出。
